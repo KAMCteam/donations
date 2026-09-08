@@ -1,0 +1,45 @@
+#-------------------------
+# Composer
+#-------------------------
+vendor/
+
+#-------------------------
+# Environment / secrets
+#-------------------------
+.env
+
+#-------------------------
+# Runtime files
+#-------------------------
+writable/cache/*
+!writable/cache/index.html
+writable/debugbar/*
+!writable/debugbar/index.html
+writable/logs/*
+!writable/logs/index.html
+writable/session/*
+!writable/session/index.html
+writable/temp/*
+!writable/temp/index.html
+writable/uploads/*
+!writable/uploads/index.html
+
+#-------------------------
+# Test / build output
+#-------------------------
+build/
+phpunit*.xml
+!phpunit.dist.xml
+.phpunit.*.cache
+.php-cs-fixer.php
+.php-cs-fixer.cache
+
+#-------------------------
+# Editors / OS
+#-------------------------
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db

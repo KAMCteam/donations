@@ -1,0 +1,38 @@
+.program-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.programs {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    background-color: var(--light-blue);
+    padding: 8px 12px;
+    border: 2px var(--dark-blue) solid;
+    box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.1);
+    border-radius: 24px;
+    color: white;
+    gap: 25px;
+}
+
+.program {
+    text-decoration: none;
+    background-color: var(--light-blue);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.2);
+    transition: all 0.4s ease;
+}
+
+.program:hover {
+    filter: brightness(0.9);
+}
+
+.active {
+    background-color: var(--dark-blue);
+}

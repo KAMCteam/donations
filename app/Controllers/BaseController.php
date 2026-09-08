@@ -5,6 +5,7 @@ namespace App\Controllers;
 use CodeIgniter\Controller;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
+use CodeIgniter\Session\Session;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -21,11 +22,21 @@ use Psr\Log\LoggerInterface;
 abstract class BaseController extends Controller
 {
     /**
+     * Helpers loaded for every controller.
+     *
+     * The CodeIgniter 3 project autoloaded url, form, auth, lang and language
+     * in application/config/autoload.php; `language` is built into CI4, so the
+     * remaining four are listed here.
+     *
+     * @var list<string>
+     */
+    protected $helpers = ['url', 'form', 'auth', 'lang'];
+
+    /**
      * Be sure to declare properties for any property fetch you initialized.
      * The creation of dynamic property is deprecated in PHP 8.2.
      */
-
-    // protected $session;
+    protected Session $session;
 
     /**
      * @return void
@@ -39,7 +50,10 @@ abstract class BaseController extends Controller
         // Caution: Do not edit this line.
         parent::initController($request, $response, $logger);
 
-        // Preload any models, libraries, etc, here.
-        // $this->session = service('session');
+        // CI3 autoloaded the session library; CI4 gets it from the service.
+        $this->session = service('session');
+
+        // Picks the locale from ?lang= or the session (app/Helpers/lang_helper.php).
+        set_language();
     }
 }

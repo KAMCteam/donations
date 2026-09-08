@@ -31,9 +31,9 @@
 #--------------------------------------------------------------------
 
 # database.default.hostname = localhost
-# database.default.database = ci4
+# database.default.database = donations
 # database.default.username = root
-# database.default.password = root
+# database.default.password =
 # database.default.DBDriver = MySQLi
 # database.default.DBPrefix =
 # database.default.port = 3306
@@ -67,3 +67,17 @@
 #--------------------------------------------------------------------
 
 # logger.threshold = 4
+
+#--------------------------------------------------------------------
+# TRAKCARE (ODBC)
+#--------------------------------------------------------------------
+# Connection used by App\Models\ServicesModel to look up patient
+# demographics by MRN. Leave blank to disable the lookup - the model
+# returns an "ODBC connection failed" payload rather than throwing.
+
+# trak.driver = "{InterSystems IRIS ODBC35}"
+# trak.server =
+# trak.port = 56772
+# trak.database = TRAK
+# trak.username =
+# trak.password =

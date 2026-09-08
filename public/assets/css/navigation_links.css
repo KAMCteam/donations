@@ -1,0 +1,40 @@
+body {
+    display: flex;
+    flex-direction: row;
+    margin: 0px;
+}
+
+.side-bar {
+    display: flex;
+    flex-direction: column;
+    /* justify-content: space-between; */
+    gap: 40px;
+    height: 100%;
+    width: 270px;
+    padding: 0 10px;
+    background-color: var(--dark-blue);
+    background: linear-gradient(20deg, rgb(21, 80, 138) 0%, rgb(52, 114, 173) 63%, rgb(72, 146, 207) 100%);
+}
+
+.KAMC-logo {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.KAMC-image {
+    width: 250px;
+    height: 80px;
+}
+
+.nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+}
+
+.nav-link {
+    text-decoration: none;
+    color: var(--light-grey);
+}

@@ -47,8 +47,10 @@ class Routing extends BaseRouting
      * specified.
      *
      * Default: 'Home'
+     *
+     * Migrated from the CodeIgniter 3 $route['default_controller'] = 'Patient'.
      */
-    public string $defaultController = 'Home';
+    public string $defaultController = 'Patient';
 
     /**
      * For Defined Routes and Auto Routing.

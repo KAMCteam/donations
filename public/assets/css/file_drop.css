@@ -1,0 +1,40 @@
+#drop-zone {
+    border: 2px dashed lightblue;
+    padding: 40px;
+    text-align: center;
+    border-radius: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.3s;
+    background-color: #f9f9f9;
+    margin-bottom: 20px;
+}
+
+#drop-zone:hover {
+    border-color: #1e90ff;
+    background-color: #f0f8ff;
+}
+
+#drop-zone input[type="file"] {
+    opacity: 0;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.drop-message {
+    position: relative;
+    z-index: 1;
+    color: #555;
+    font-size: 16px;
+    pointer-events: none;
+}
+
+.plus-icon {
+    font-size: 40px;
+    color: lightblue;
+    margin-bottom: 10px;
+}

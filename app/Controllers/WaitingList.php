@@ -5,6 +5,14 @@ namespace App\Controllers;
 use App\Models\PairsModel;
 
 /**
+ * 
+ * 
+ * ✔ عرض قائمة المستلمين غير المرتبطين (Unmatched Recipients)
+ * ✔ تطبيق فلتر فصيلة الدم (blood_group)
+ * ✔ إلغاء الفلتر عند الضغط عليه مرة ثانية
+ * ✔ تمرير البيانات إلى صفحة waiting_list
+ * 
+ * 
  * Migrated from the CodeIgniter 3 WaitingList controller.
  *
  * The organ_chosen() call the constructor used to make is now the `organ`

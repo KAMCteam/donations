@@ -5,6 +5,16 @@ namespace App\Models;
 use CodeIgniter\Model;
 
 /**
+ * 
+ * 
+ * مخصص فقط لعرض عدادات لوحة التحكم Dashboard.
+ * ✔ وظيفته: حساب أرقام سريعة من قاعدة البيانات
+ * مثل:
+ * عدد المرضى
+ * عدد الأزواج
+ * 
+ * عدد المرضى تحت طبيب معين (MRP)
+ * 
  * Dashboard counters, migrated from the CodeIgniter 3 Queries_model.
  *
  * CI3 chained ->from(...)->count_all_results(); in CI4 the table comes from

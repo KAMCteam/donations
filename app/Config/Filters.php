@@ -74,15 +74,12 @@ class Filters extends BaseFilters
      */
     public array $globals = [
         'before' => [
-            // 'honeypot',
-            // 'csrf',
-            // 'invalidchars',
+            'organ' => ['except' => ['Organ', 'Organ/*']],
         ],
         'after' => [
-            // 'honeypot',
-            // 'secureheaders',
         ],
     ];
+
 
     /**
      * List of filter aliases that works on a

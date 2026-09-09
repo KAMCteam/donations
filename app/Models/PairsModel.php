@@ -5,6 +5,17 @@ namespace App\Models;
 use CodeIgniter\Model;
 
 /**
+ * 
+ * 
+ * ✔ إدارة الأزواج (Pairs) بين المتبرعين والمستلمين
+ * ✔ تحديد من هو غير مرتبط (Unmatched)
+ * ✔ حساب درجة الأولوية (Score) في قائمة الانتظار
+ * ✔ جلب الأزواج حسب الفلاتر
+ * ✔ التحقق إن كان المريض مرتبطًا بزوج
+ * ✔ إدراج وتحديث الأزواج
+ * بمعنى آخر:
+ * هو قلب نظام المطابقة بين المتبرعين والمستلمين.
+ * 
  * Migrated from the CodeIgniter 3 Pairs_model.
  *
  * The raw-SQL bits (the score expression and the NOT IN sub-selects) are kept
@@ -21,6 +32,14 @@ class PairsModel extends Model
     ];
 
     /**
+     * حساب درجة الانتظار (Score)
+     * 
+     * النظام يحسب درجة الأولوية للمستلم بناءً على:
+     * عدد الأشهر منذ دخوله النظام
+     * عدد الأشهر على الغسيل الكلوي
+     * 
+     * كلما زادت هذه الأرقام → زادت الأولوية.
+     * 
      * Waiting-list score: months since entry plus months on dialysis.
      */
     private const SCORE_CALC = '

@@ -17,6 +17,8 @@ use InvalidArgumentException;
  * CI3 read input through $this->input->post()/get() and ended the request from
  * inside helper methods; CI4 reads $this->request and every redirect has to be
  * returned up to the routing layer, which is the bulk of the change here.
+ * 
+ * الي يعرض البيانات المربوطة بالعضو
  */
 class Patient extends BaseController
 {
@@ -24,7 +26,7 @@ class Patient extends BaseController
     {
         $lists = model(ListsModel::class);
 
-        $organ        = $this->session->get('organ');
+        $organ        = $this->session->get('organ'); // the organ filter guarantees this is set
         $program      = $this->request->getGet('program');
         $patient_type = $this->request->getGet('patient_type');
 
@@ -271,6 +273,8 @@ class Patient extends BaseController
     /**
      * Writes every submitted lab result for one patient, inserting or updating
      * as needed. $offset is the suffix the form gave that patient's fields.
+     * 
+     * حفظ نتائج التحاليل المخبرية لكل مريض، سواء كانت جديدة أو تحديث للنتائج السابقة. $offset هو اللاحقة التي أعطاها النموذج لحقول المريض.
      */
     public function setLabData(int|string $mrn, string $offset): void
     {
@@ -295,6 +299,8 @@ class Patient extends BaseController
 
     /**
      * Demographics lookup used by the MRN fields on the add form.
+     * 
+     * يبحث عن بيانات المريض من خلال رقم الملف الطبي
      */
     public function getByMRN(): ResponseInterface
     {

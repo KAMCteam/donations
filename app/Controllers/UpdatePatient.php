@@ -9,6 +9,13 @@ use App\Models\PatientModel;
 use CodeIgniter\HTTP\RedirectResponse;
 
 /**
+ * 
+ * الكود مسؤول عن وظيفتين:
+ * 
+ * 1) إذا لم يتم تمرير MRN في الرابط → يعرض قائمة المرضى مع فلاتر
+ * 2) إذا تم تمرير MRN → يعرض نموذج تحديث بيانات المريض
+ * 
+ * 
  * Update-patient screen. Migrated from the CodeIgniter 3 UpdatePatient controller.
  *
  * index() doubles as the patient picker: with no MRN in the URL it lists

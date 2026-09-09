@@ -5,6 +5,16 @@ namespace App\Models;
 use CodeIgniter\Model;
 
 /**
+ * 
+ * ✔ بناء القوائم (option lists)
+ * ✔ قراءة قيم ENUM من قاعدة البيانات
+ * ✔ تجهيز حقول نموذج إضافة المريض حسب البرنامج
+ * ✔ تجهيز حقول المتبرع (donor)
+ * ✔ جلب فحوصات المختبر grouped حسب الـ parent lab
+ * بمعنى آخر:
+ * هو العقل الذي يجهّز كل القوائم والحقول التي تظهر في صفحة Add Patient.
+ * 
+ * 
  * Builds the option lists and form definitions the add-patient screen renders.
  *
  * Migrated from the CodeIgniter 3 Lists_model. Language keys gained the

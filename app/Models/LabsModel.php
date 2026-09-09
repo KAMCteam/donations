@@ -5,6 +5,9 @@ namespace App\Models;
 use CodeIgniter\Model;
 
 /**
+ * 
+ * هذا الـ Model مسؤول عن كل ما يتعلق بـ المختبرات (Labs) و نتائج المختبرات (Lab Results) في النظام.
+ * 
  * Migrated from the CodeIgniter 3 Labs_model.
  */
 class LabsModel extends Model
@@ -15,6 +18,8 @@ class LabsModel extends Model
     protected $allowedFields = ['lab_name', 'result_shape', 'lab_parent_id', 'patient_type', 'organ_type'];
 
     /**
+     * 
+     * إضافة فحص جديد
      * @param array<string, mixed> $lab
      */
     public function insert_lab(array $lab): bool
@@ -23,6 +28,7 @@ class LabsModel extends Model
     }
 
     /**
+     * جلب جميع الفحوصات + نتائج المريض
      * Every lab, left-joined with this patient's result for it.
      *
      * @return list<array<string, mixed>>
@@ -65,6 +71,7 @@ class LabsModel extends Model
     }
 
     /**
+     * المختبرات المخصصة التي تنطبق على نوع المريض والعضو، مرتبة حسب الأب (parent).
      * Labs that apply to this patient type and organ, ordered by lab parent.
      *
      * @return list<array<string, mixed>>

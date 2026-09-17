@@ -53,16 +53,19 @@ final class SchemaTest extends CIUnitTestCase
         }
     }
 
-    /** A recipient, a second recipient with no dialysis date, and a donor. */
+    /**
+     * A recipient, a second recipient with no dialysis date, and a donor —
+     * each written to its own table, since `patients` is a read-only union.
+     */
     private function seedPeople(): void
     {
         $this->db->table('mrp')->insert(['mrp_id' => 'MRP-001', 'name' => 'Test Physician']);
         $this->db->table('coordinators')->insert(['coordinator_name' => 'Test Coordinator']);
 
-        $this->db->table('patients')->insert([
+        $this->db->table('recipients')->insert([
             'mrn' => 1001, 'name' => 'Recipient Twenty', 'city' => 'Riyadh',
             'phone_number' => '+966500000001', 'gender' => 'M', 'age' => 42,
-            'blood_group' => 'A', 'organs' => 'kidney', 'type' => 'recipient',
+            'blood_group' => 'A', 'organs' => 'kidney',
             'status' => 'ready', 'urgency' => 'high', 'mrp_id' => 1, 'coordinator_id' => 1,
             'hospital' => 'KAMC', 'diagnosis' => 'ESRD',
             'dialysis' => date('Y-m-d', strtotime('-30 months')),
@@ -70,15 +73,15 @@ final class SchemaTest extends CIUnitTestCase
             'note' => 'clinical note',
         ]);
 
-        $this->db->table('patients')->insert([
+        $this->db->table('recipients')->insert([
             'mrn' => 1002, 'name' => 'Recipient NoDialysis', 'blood_group' => 'O',
-            'organs' => 'kidney', 'type' => 'recipient', 'urgency' => 'critical',
+            'organs' => 'kidney', 'urgency' => 'critical',
             'entry_date' => date('Y-m-d', strtotime('-12 months')),
         ]);
 
-        $this->db->table('patients')->insert([
+        $this->db->table('donors')->insert([
             'mrn' => 2001, 'name' => 'Donor One', 'blood_group' => 'A',
-            'organs' => 'kidney', 'type' => 'donor', 'urgency' => 'low',
+            'organs' => 'kidney', 'hospital' => 'KAMC',
             'entry_date' => date('Y-m-d'), 'donation_type' => 'living',
             'relationship' => 'Brother of 1001',
         ]);
@@ -111,15 +114,15 @@ final class SchemaTest extends CIUnitTestCase
         $this->seedPeople();
 
         // ORDER BY urgency DESC must still mean most-urgent-first.
-        $rows = $this->db->table('patients')->orderBy('urgency', 'DESC')->get()->getResultArray();
+        $rows = $this->db->table('recipients')->orderBy('urgency', 'DESC')->get()->getResultArray();
 
         $this->assertSame('critical', $rows[0]['urgency']);
         $this->assertSame('1', (string) $rows[0]['urgency_rank']);
         $this->assertSame('1', (string) $rows[0]['is_urgent']);
 
-        $this->assertSame('low', $rows[2]['urgency']);
-        $this->assertSame('4', (string) $rows[2]['urgency_rank']);
-        $this->assertSame('0', (string) $rows[2]['is_urgent']);
+        $this->assertSame('high', $rows[1]['urgency']);
+        $this->assertSame('2', (string) $rows[1]['urgency_rank']);
+        $this->assertSame('1', (string) $rows[1]['is_urgent']);
     }
 
     // ---- The retained models still work ----------------------------------
@@ -221,9 +224,9 @@ final class SchemaTest extends CIUnitTestCase
     {
         $lists = model(ListsModel::class);
 
-        $this->assertSame(['kidney', 'liver'], $lists->get_enum_values('patients', 'organs'));
-        $this->assertSame(['A', 'B', 'AB', 'O'], $lists->get_enum_values('patients', 'blood_group'));
-        $this->assertSame(['M', 'F'], $lists->get_enum_values('patients', 'gender'));
+        $this->assertSame(['kidney', 'liver'], $lists->get_enum_values('recipients', 'organs'));
+        $this->assertSame(['A', 'B', 'AB', 'O'], $lists->get_enum_values('recipients', 'blood_group'));
+        $this->assertSame(['M', 'F'], $lists->get_enum_values('donors', 'gender'));
         $this->assertSame(['R_LRD', 'R_LURD', 'R_DD', 'R_PE', 'D_D'], $lists->get_enum_values('pairs', 'programs'));
 
         // The original five match statuses survive alongside the platform's.
@@ -296,15 +299,15 @@ final class SchemaTest extends CIUnitTestCase
         ]);
 
         $this->expectException(Throwable::class);
-        $this->db->table('patients')->where('mrn', 1001)->delete();
+        $this->db->table('recipients')->where('mrn', 1001)->delete();
     }
 
     public function testAnUnknownMrpIsRejected(): void
     {
         $this->expectException(Throwable::class);
-        $this->db->table('patients')->insert([
+        $this->db->table('recipients')->insert([
             'mrn' => 9999, 'name' => 'x', 'blood_group' => 'A', 'organs' => 'kidney',
-            'type' => 'recipient', 'entry_date' => '2026-01-01', 'mrp_id' => 424242,
+            'entry_date' => '2026-01-01', 'mrp_id' => 424242,
         ]);
     }
 
@@ -317,7 +320,7 @@ final class SchemaTest extends CIUnitTestCase
 
         // ON UPDATE CASCADE: this is what the pairs table gives up a unique
         // open-pair index for.
-        $this->db->table('patients')->where('mrn', 1001)->update(['mrn' => 1010]);
+        $this->db->table('recipients')->where('mrn', 1001)->update(['mrn' => 1010]);
 
         $this->assertSame('1010', (string) $this->db->table('pairs')->get()->getRowArray()['recipient_mrn']);
     }
@@ -328,14 +331,14 @@ final class SchemaTest extends CIUnitTestCase
     {
         $this->seedPeople();
 
-        $row = $this->db->table('patients')->where('mrn', 1001)->get()->getRowArray();
+        $row = $this->db->table('recipients')->where('mrn', 1001)->get()->getRowArray();
 
         // The columns added for the platform's screens.
         $this->assertSame('KAMC', $row['hospital']);
         $this->assertSame('ESRD', $row['diagnosis']);
         $this->assertSame('1', (string) $row['coordinator_id']);
 
-        $donor = $this->db->table('patients')->where('mrn', 2001)->get()->getRowArray();
+        $donor = $this->db->table('donors')->where('mrn', 2001)->get()->getRowArray();
         $this->assertSame('living', $donor['donation_type']);
         $this->assertSame('Brother of 1001', $donor['relationship']);
 
@@ -374,27 +377,28 @@ final class SchemaTest extends CIUnitTestCase
         );
         sort($codes);
 
-        $patientOrgans = model(ListsModel::class)->get_enum_values('patients', 'organs');
-        $labOrgans     = model(ListsModel::class)->get_enum_values('labs', 'organ_type');
-        sort($patientOrgans);
-        sort($labOrgans);
+        foreach (['recipients', 'donors'] as $table) {
+            $organs = model(ListsModel::class)->get_enum_values($table, 'organs');
+            sort($organs);
+            $this->assertSame($codes, $organs, "organ_programs and {$table}.organs have drifted apart");
+        }
 
-        $this->assertSame($codes, $patientOrgans, 'organ_programs and patients.organs have drifted apart');
+        $labOrgans = model(ListsModel::class)->get_enum_values('labs', 'organ_type');
+        sort($labOrgans);
         $this->assertSame($codes, $labOrgans, 'organ_programs and labs.organ_type have drifted apart');
     }
 
-    /** The Donors List screen: its eight columns, straight out of the view. */
-    public function testDonorsViewMatchesTheDonorsListScreen(): void
+    /** The Donors List screen: its eight columns, out of `donors_list`. */
+    public function testDonorsListMatchesTheDonorsListScreen(): void
     {
         $this->seedPeople();
 
         // A second donor, deceased and with no labs, plus a pair so that one
         // donor is matched and the other is not.
-        $this->db->table('patients')->insert([
+        $this->db->table('donors')->insert([
             'mrn' => 2002, 'name' => 'Donor Two', 'age' => 55, 'blood_group' => 'O',
-            'organs' => 'kidney', 'type' => 'donor', 'urgency' => 'low',
-            'entry_date' => date('Y-m-d'), 'donation_type' => 'deceased',
-            'hospital' => 'PSMMC',
+            'organs' => 'kidney', 'entry_date' => date('Y-m-d'),
+            'donation_type' => 'deceased', 'hospital' => 'PSMMC',
         ]);
 
         $labId = (int) model(LabsModel::class)->get_lab_ids()[0];
@@ -404,8 +408,8 @@ final class SchemaTest extends CIUnitTestCase
             'recipient_mrn' => 1001, 'donor_mrn' => 2001, 'match_status' => 'active',
         ]);
 
-        $rows = $this->db->table('donors')->orderBy('mrn')->get()->getResultArray();
-        $this->assertCount(2, $rows, 'the view holds donors only, not recipients');
+        $rows = $this->db->table('donors_list')->orderBy('mrn')->get()->getResultArray();
+        $this->assertCount(2, $rows, 'donors only, not recipients');
 
         [$first, $second] = $rows;
 
@@ -424,22 +428,119 @@ final class SchemaTest extends CIUnitTestCase
         $this->assertSame('0', (string) $second['is_matched']);
 
         // What the screen actually renders is the unmatched half.
-        $unmatched = $this->db->table('donors')->where('is_matched', 0)->get()->getResultArray();
+        $unmatched = $this->db->table('donors_list')->where('is_matched', 0)->get()->getResultArray();
         $this->assertCount(1, $unmatched);
         $this->assertSame('Donor Two', $unmatched[0]['name']);
     }
 
-    public function testRecipientsViewCarriesTheProgrammeAndPeopleByName(): void
+    public function testWaitingListCarriesTheProgrammeAndPeopleByName(): void
     {
         $this->seedPeople();
 
-        $rows = $this->db->table('recipients')->orderBy('mrn')->get()->getResultArray();
-        $this->assertCount(2, $rows, 'recipients only');
+        $rows = $this->db->table('waiting_list')->orderBy('mrn')->get()->getResultArray();
+        $this->assertCount(2, $rows, 'unmatched recipients only');
 
         $this->assertSame('Kidney', $rows[0]['program_label']);
         $this->assertSame('Test Physician', $rows[0]['mrp_name']);
         $this->assertSame('Test Coordinator', $rows[0]['coordinator_name']);
-        $this->assertSame('0', (string) $rows[0]['is_matched']);
+    }
+
+    // ---- recipients and donors are tables, patients is the view ----------
+
+    /**
+     * The point of the restructure: the two registers are real tables and the
+     * old single table is the derived one, not the other way round.
+     */
+    public function testTheRegistersAreTablesAndPatientsIsTheView(): void
+    {
+        $types = [];
+
+        foreach (['recipients', 'donors', 'pairs', 'lab_results', 'patients', 'waiting_list', 'donors_list'] as $name) {
+            $row = $this->db->query(
+                'SELECT TABLE_TYPE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
+                [$this->db->prefixTable($name)]
+            )->getRowArray();
+
+            $types[$name] = $row['TABLE_TYPE'] ?? 'MISSING';
+        }
+
+        $this->assertSame('BASE TABLE', $types['recipients']);
+        $this->assertSame('BASE TABLE', $types['donors']);
+        $this->assertSame('BASE TABLE', $types['pairs']);
+        $this->assertSame('BASE TABLE', $types['lab_results']);
+        $this->assertSame('VIEW', $types['patients'], 'the old single table is now the compatibility view');
+        $this->assertSame('VIEW', $types['waiting_list']);
+        $this->assertSame('VIEW', $types['donors_list']);
+    }
+
+    /** Each register carries only the columns its own form collects. */
+    public function testEachRegisterHoldsOnlyItsOwnRoleColumns(): void
+    {
+        $recipient = array_keys($this->db->getFieldNames('recipients') ? array_flip($this->db->getFieldNames('recipients')) : []);
+        $donor     = array_keys($this->db->getFieldNames('donors') ? array_flip($this->db->getFieldNames('donors')) : []);
+
+        foreach (['diagnosis', 'dialysis', 'urgency', 'is_urgent', 'urgency_rank'] as $recipientOnly) {
+            $this->assertContains($recipientOnly, $recipient);
+            $this->assertNotContains($recipientOnly, $donor, "donors should not carry {$recipientOnly}");
+        }
+
+        foreach (['donation_type', 'relationship'] as $donorOnly) {
+            $this->assertContains($donorOnly, $donor);
+            $this->assertNotContains($donorOnly, $recipient, "recipients should not carry {$donorOnly}");
+        }
+
+        // Shared columns are on both, under the original schema's names.
+        foreach (['mrn', 'name', 'city', 'phone_number', 'gender', 'age', 'blood_group', 'organs', 'status', 'hospital', 'mrp_id', 'coordinator_id', 'note'] as $shared) {
+            $this->assertContains($shared, $recipient);
+            $this->assertContains($shared, $donor);
+        }
+    }
+
+    /** The compatibility view puts `type` back and reassembles both halves. */
+    public function testPatientsViewUnionsBothRegisters(): void
+    {
+        $this->seedPeople();
+
+        $rows = $this->db->table('patients')->orderBy('mrn')->get()->getResultArray();
+        $this->assertCount(3, $rows);
+
+        $this->assertSame('recipient', $rows[0]['type']);
+        $this->assertSame('ESRD', $rows[0]['diagnosis']);
+        $this->assertNull($rows[0]['donation_type'], 'recipient-side rows have no donation type');
+
+        $this->assertSame('donor', $rows[2]['type']);
+        $this->assertSame('living', $rows[2]['donation_type']);
+        $this->assertNull($rows[2]['diagnosis'], 'donor-side rows have no diagnosis');
+        $this->assertNull($rows[2]['urgency']);
+    }
+
+    /**
+     * `lab_results.patient_id` cannot have a foreign key — no column can point
+     * at either of two tables — so triggers do the cascade instead.
+     */
+    public function testDeletingAPersonTakesTheirLabResultsWithThem(): void
+    {
+        $this->seedPeople();
+        $labId = (int) model(LabsModel::class)->get_lab_ids()[0];
+
+        $this->db->table('lab_results')->insert(['patient_id' => 2001, 'lab_id' => $labId, 'status' => 'completed']);
+        $this->assertSame(1, $this->db->table('lab_results')->where('patient_id', 2001)->countAllResults());
+
+        $this->db->table('donors')->where('mrn', 2001)->delete();
+        $this->assertSame(0, $this->db->table('lab_results')->where('patient_id', 2001)->countAllResults());
+    }
+
+    /** A recipient MRN can no longer be filed as the donor half of a pair. */
+    public function testEachSideOfAPairMustExistInItsOwnRegister(): void
+    {
+        $this->seedPeople();
+
+        $this->expectException(Throwable::class);
+        model(PairsModel::class)->insert_pair([
+            'recipient_mrn' => 1001,
+            'donor_mrn'     => 1002, // a recipient, not a donor
+            'match_status'  => 'active',
+        ]);
     }
 
     /** The Pairs List screen: one row per pair, both sides flattened. */

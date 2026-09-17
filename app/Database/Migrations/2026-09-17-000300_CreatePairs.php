@@ -8,6 +8,10 @@ use CodeIgniter\Database\Migration;
  * `pairs` — the recipient/donor matches. Column names are unchanged, so
  * `PairsModel` (including its `NOT IN (SELECT recipient_mrn FROM pairs ...)`
  * sub-selects and the `match_status NOT IN ('closed')` guard) keeps working.
+ *
+ * Each side points at its own table now that recipients and donors have one
+ * each, which is stricter than before: a recipient MRN can no longer be
+ * entered as the donor half by mistake.
  */
 class CreatePairs extends Migration
 {
@@ -88,8 +92,8 @@ class CreatePairs extends Migration
         $this->forge->addKey('match_status');
         // RESTRICT, not CASCADE: deleting a patient who is half of a pair
         // should fail loudly rather than quietly drop the match.
-        $this->forge->addForeignKey('recipient_mrn', 'patients', 'mrn', 'CASCADE', 'RESTRICT');
-        $this->forge->addForeignKey('donor_mrn', 'patients', 'mrn', 'CASCADE', 'RESTRICT');
+        $this->forge->addForeignKey('recipient_mrn', 'recipients', 'mrn', 'CASCADE', 'RESTRICT');
+        $this->forge->addForeignKey('donor_mrn', 'donors', 'mrn', 'CASCADE', 'RESTRICT');
 
         $this->forge->createTable('pairs', true, ['ENGINE' => 'InnoDB']);
 

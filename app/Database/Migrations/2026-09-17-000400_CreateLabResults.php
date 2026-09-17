@@ -9,7 +9,9 @@ use CodeIgniter\Database\Migration;
  *
  * The original three columns keep their names, so `LabsModel` keeps working:
  * `patient_id`, `lab_id`, `result`, plus `lab_comment`, which the old
- * add-patient screen posted as `<lab_id>_comment`.
+ * add-patient screen posted as `<lab_id>_comment`. `patient_id` is an MRN and
+ * matches a row in `recipients`, in `donors`, or in both when the same person
+ * has been each.
  *
  * The additions are what the platform's lab cards need and the old schema had
  * no room for: the pending / completed / flagged state each card shows, and
@@ -76,10 +78,34 @@ class CreateLabResults extends Migration
         // already; now the database enforces it.
         $this->forge->addUniqueKey(['patient_id', 'lab_id']);
         $this->forge->addKey('status');
-        $this->forge->addForeignKey('patient_id', 'patients', 'mrn', 'CASCADE', 'CASCADE');
         $this->forge->addForeignKey('lab_id', 'labs', 'lab_id', 'CASCADE', 'CASCADE');
 
         $this->forge->createTable('lab_results', true, ['ENGINE' => 'InnoDB']);
+
+        // `patient_id` has no foreign key, and cannot: MySQL has no way to
+        // point one column at either of two tables, and a person's results
+        // belong to them by MRN whichever role they are in — their HLA typing
+        // is their HLA typing. The triggers below take the place of the
+        // ON DELETE CASCADE that a foreign key would have given, so removing
+        // someone does not leave their results behind.
+        foreach (['recipients', 'donors'] as $table) {
+            $people     = $this->name($table);
+            $labResults = $this->name('lab_results');
+            $trigger    = $this->name($table . '_delete_lab_results');
+
+            $this->db->query(<<<SQL
+                CREATE TRIGGER {$trigger} AFTER DELETE ON {$people}
+                FOR EACH ROW
+                DELETE FROM {$labResults}
+                WHERE patient_id = OLD.mrn
+                SQL);
+        }
+    }
+
+    /** Prefixed and quoted name, since raw SQL does not get DBPrefix applied. */
+    private function name(string $table): string
+    {
+        return $this->db->protectIdentifiers($this->db->prefixTable($table), false, true);
     }
 
     public function down(): void

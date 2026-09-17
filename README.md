@@ -165,57 +165,85 @@ coordinators. Only structure, the two organ programmes and the lab catalogue.
 
 | Table | Holds |
 | --- | --- |
-| `patients` | One row per person, recipient or donor, keyed by `mrn` |
+| `recipients` | One row per recipient, keyed by `mrn` |
+| `donors` | One row per donor, keyed by `mrn` |
 | `pairs` | Recipient/donor matches, their status and dates |
 | `labs` | The catalogue of tests — what *can* be run, per organ and person type |
 | `lab_parents` | The group each lab is listed under (Virology, Imaging, ...) |
-| `lab_results` | One row per patient per lab: status, result, date, comment |
+| `lab_results` | One row per person per lab: status, result, date, comment |
 | `mrp` | Most responsible physicians |
 | `coordinators` | Transplant coordinators |
-| `organ_programs` | The programmes the picker offers: label, description, icon (new) |
-| `staff` | Sign-in accounts for the login screen (new) |
+| `organ_programs` | The programmes the picker offers: label, description, icon |
+| `staff` | Sign-in accounts for the login screen |
 
-### One database object per screen
+### Two registers, not one patients table
 
-Every screen in the design that shows data has something in the database named
-after it and shaped the way it reads:
+The original schema kept everyone in one `patients` table with a
+`type ENUM('recipient','donor')`. This schema has **a table each**, because the
+design does: it has a Recipient Waitlist screen and a Donors List screen, and
+their forms ask for different things. The split also removes columns that were
+always NULL for one side:
 
-| Screen | Object | |
-| --- | --- | --- |
-| Recipient Waitlist | `waiting_list` | view — unmatched recipients, with the score |
-| Donors List | `donors` | view — every donor, lab progress, `is_matched` |
-| Pairs List | `pairs_overview` | view — one row per pair, both sides flattened |
-| Dashboard | `dashboard_stats` | view — one row per programme, the four counters |
-| (the recipient register) | `recipients` | view — the symmetric counterpart of `donors` |
-| Organ picker | `organ_programs` | table — its label, description and icon |
+| Only on `recipients` | Only on `donors` |
+| --- | --- |
+| `entry_date`, `urgency` (+ `is_urgent`, `urgency_rank`), `diagnosis`, `dialysis` | `donation_type`, `relationship` |
 
-**`donors` is a view over `patients WHERE type = 'donor'`, not a table of its
-own.** A donor is a person, and so is a recipient: the same MRN, the same lab
-results, the same two foreign keys from `pairs`. The original schema worked
-this way and every retained model assumes it —
-`PairsModel::get_unmatched_donors()` queries `patients WHERE type = 'donor'`,
-and `expand_pairs()` calls `get_patient_info_modified()` for both halves of a
-pair. A physical `donors` table would mean duplicating fifteen columns, giving
-`pairs` two different foreign-key targets, splitting `lab_results.patient_id`
-in two, and deciding what happens when the same person donates on one
-programme and receives on another. The view gives the screen its own name and
-its own shape with none of that.
+Everything else — `mrn`, `name`, `city`, `phone_number`, `gender`, `age`,
+`blood_group`, `organs`, `status`, `hospital`, `mrp_id`, `coordinator_id`,
+`note` — is on both, under the original schema's names.
 
-`recipients` and `donors` hold *everyone* of that type and expose an
-`is_matched` flag; each screen renders `WHERE is_matched = 0` for the unmatched
-list. `waiting_list` is the one that filters for you, because "waiting list"
-means unmatched.
+`pairs` points each side at its own table, which is stricter than before: a
+recipient's MRN can no longer be filed as the donor half by mistake.
 
-The views are read-only. `patients` and `pairs` stay the only things written
-to, so there is nothing to keep in sync.
+The same person can appear in both registers under one MRN — they may donate on
+one programme and receive on another, and it is still one person with one set
+of lab results.
+
+### The views
+
+Five, and none of them stores anything:
+
+| View | Is |
+| --- | --- |
+| `patients` | `recipients UNION ALL donors`, with `type` back — the compatibility shim |
+| `waiting_list` | Unmatched recipients with the score — the Recipient Waitlist screen |
+| `donors_list` | Every donor with lab progress and `is_matched` — the Donors List screen |
+| `pairs_overview` | One row per pair, both sides flattened under `r_` / `d_` — the Pairs List |
+| `dashboard_stats` | One row per programme — the Dashboard's counters |
+
+**`patients` is what keeps the retained models working.** `PatientModel`,
+`PairsModel`, `QueriesModel` and `ListsModel` were written against the single
+table, and they all still read the names and shape they expect —
+`get_all_patients()`, `get_unmatched_donors()`, the score, the ENUM discovery.
+What the view cannot do is take an INSERT: MySQL will not write through a
+UNION, so new people are written to `recipients` and `donors` directly.
+
+`waiting_list` and `donors_list` exist because those two screens show things no
+column can hold — the score, how many of someone's labs are done, and whether
+they are already in an open pair — so those are counted at read time. A report
+cannot be a table without something to refresh it, which is why these are views
+while the two registers are not.
 
 `organ_programs` is a real table because it is content, not derivation: the
 picker's heading, its subtitle and its icon were hardcoded in
-`Ui::organSelector()`, which made adding a third programme a code change.
-`patients.organs` and `labs.organ_type` stay ENUMs, since `ListsModel` reads
-their values back with `SHOW COLUMNS` to build dropdowns, and a test asserts
-the ENUMs and `organ_programs.code` never drift apart. So adding a programme is
-a row here plus a migration widening those two ENUMs.
+`Ui::organSelector()`, which made adding a programme a code change.
+`recipients.organs`, `donors.organs` and `labs.organ_type` stay ENUMs, since
+`ListsModel` reads their values back with `SHOW COLUMNS` to build dropdowns,
+and a test asserts the ENUMs and `organ_programs.code` never drift apart. So
+adding a programme is a row here plus a migration widening those three ENUMs.
+
+### `lab_results` has no foreign key on the person, and two triggers instead
+
+`lab_results.patient_id` is an MRN that matches a row in `recipients`, in
+`donors`, or in both. MySQL has no way to point one column at either of two
+tables, so there is no foreign key there — the `lab_id` one is still in place.
+In its stead, `recipients_delete_lab_results` and `donors_delete_lab_results`
+do the `ON DELETE CASCADE` a foreign key would have given, so removing someone
+does not leave their results behind. The dump carries both triggers.
+
+This is the one integrity guarantee the two-register design costs, and it is
+the reason the original schema had a single table. It is stated here rather
+than hidden.
 
 ### The waiting-list score is unchanged
 
@@ -242,9 +270,9 @@ Two subtleties that keep the retained models working:
   most-urgent-first exactly as it did when the column held 0 or 1. Declaring
   it critical-first would silently invert the waiting list. The screens take
   their own order from `UiStore::URGENCY_OPTIONS`.
-- **`patients.organs` and `pairs.programs` keep their original plural names**,
-  because `ListsModel` reads them back by name with `SHOW COLUMNS` to build
-  its dropdowns.
+- **`organs` and `pairs.programs` keep their original plural names**, because
+  `ListsModel` reads them back by name with `SHOW COLUMNS` to build its
+  dropdowns.
 
 ### What was added, and why
 
@@ -268,7 +296,9 @@ schema had nowhere to put:
 | `sort_order`, `is_active` | `labs` | Order a workup without depending on `lab_id` order; retire a test without deleting its history |
 | `staff` (whole table) | — | The login screen had nothing to authenticate against |
 | `organ_programs` (whole table) | — | The picker's label, description and icon were hardcoded in the controller |
-| `recipients`, `donors`, `pairs_overview`, `dashboard_stats` | — | A view per list screen in the design, so each has an object shaped the way it reads |
+| `recipients` / `donors` split | — | A table each, as the design has them; drops the columns that were always NULL for one side |
+| `patients` (now a view) | — | Unions the two back together so every retained model keeps working |
+| `waiting_list`, `donors_list`, `pairs_overview`, `dashboard_stats` | — | A view per list screen, for the parts no column can hold |
 | Foreign keys, indexes | all | None existed. Deleting a paired patient now fails loudly; the filter columns are indexed |
 
 Two deliberate omissions:

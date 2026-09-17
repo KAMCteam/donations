@@ -5,7 +5,8 @@ namespace App\Database\Migrations;
 use CodeIgniter\Database\Migration;
 
 /**
- * The lookup tables: lab parents, the lab catalogue, MRPs and coordinators.
+ * The lookup tables: organ programmes, lab parents, the lab catalogue, MRPs
+ * and coordinators.
  *
  * Carried over from the original `donations` schema with the same table and
  * column names, so `LabsModel`, `MrpModel`, `CoordinatorsModel` and
@@ -13,13 +14,54 @@ use CodeIgniter\Database\Migration;
  * which groups labs under their parent, and `get_enum_values()`, which reads
  * the ENUMs below with `SHOW COLUMNS`.
  *
- * Created first because `labs` points at `lab_parents` and `patients` points
- * at `mrp` and `coordinators`.
+ * Created first because `labs` points at `lab_parents`, and `recipients` and
+ * `donors` point at `mrp` and `coordinators`.
  */
 class CreateReferenceTables extends Migration
 {
     public function up(): void
     {
+        // ---- organ_programs: the programme picker, from the design -----------
+        // Its heading, subtitle and icon were hardcoded in Ui::organSelector(),
+        // which made adding a programme a code change. It is content, so it is
+        // a table. `code` matches the recipients.organs / donors.organs /
+        // labs.organ_type ENUM values, and the URL the picker links to
+        // (/organ/kidney); SchemaTest asserts they never drift apart.
+        $this->forge->addField([
+            'code' => [
+                'type'       => 'VARCHAR',
+                'constraint' => 30,
+            ],
+            'label' => [
+                'type'       => 'VARCHAR',
+                'constraint' => 60,
+            ],
+            'description' => [
+                'type'       => 'VARCHAR',
+                'constraint' => 150,
+            ],
+            // File under public/assets/ui/img, e.g. kidney.svg.
+            'icon' => [
+                'type'       => 'VARCHAR',
+                'constraint' => 60,
+                'null'       => true,
+            ],
+            'sort_order' => [
+                'type'       => 'SMALLINT',
+                'constraint' => 5,
+                'unsigned'   => true,
+                'default'    => 0,
+            ],
+            // Retire a programme without deleting the people on it.
+            'is_active' => [
+                'type'       => 'TINYINT',
+                'constraint' => 1,
+                'default'    => 1,
+            ],
+        ]);
+        $this->forge->addPrimaryKey('code');
+        $this->forge->createTable('organ_programs', true, ['ENGINE' => 'InnoDB']);
+
         // ---- lab_parents: the group each lab is listed under -----------------
         $this->forge->addField([
             'parent_id' => [
@@ -136,6 +178,7 @@ class CreateReferenceTables extends Migration
     public function down(): void
     {
         $this->forge->dropTable('coordinators', true);
+        $this->forge->dropTable('organ_programs', true);
         $this->forge->dropTable('mrp', true);
         $this->forge->dropTable('labs', true);
         $this->forge->dropTable('lab_parents', true);

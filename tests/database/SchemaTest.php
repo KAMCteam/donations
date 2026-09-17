@@ -1,6 +1,6 @@
 <?php
 
-use App\Database\Seeds\LabCatalogueSeeder;
+use App\Database\Seeds\DatabaseSeeder;
 use App\Libraries\UiStore;
 use App\Models\CoordinatorsModel;
 use App\Models\LabsModel;
@@ -42,7 +42,7 @@ final class SchemaTest extends CIUnitTestCase
 
     protected $refresh   = true;
     protected $namespace = 'App';
-    protected $seed      = LabCatalogueSeeder::class;
+    protected $seed      = DatabaseSeeder::class;
 
     protected function setUp(): void
     {
@@ -348,6 +348,166 @@ final class SchemaTest extends CIUnitTestCase
 
         $this->assertSame('scheduled', $pair['match_status']);
         $this->assertSame('awaiting cardiac clearance', $pair['note']);
+    }
+
+    // ---- One database object per screen in the design -------------------
+
+    public function testTheOrganPickerComesFromTheDatabase(): void
+    {
+        $rows = $this->db->table('organ_programs')->orderBy('sort_order')->get()->getResultArray();
+
+        $this->assertCount(2, $rows);
+        $this->assertSame(['kidney', 'liver'], array_column($rows, 'code'));
+        $this->assertSame('Renal transplant program', $rows[0]['description']);
+        $this->assertSame('kidney.svg', $rows[0]['icon']);
+    }
+
+    /**
+     * `organ_programs.code` and the two organ ENUMs have to agree, or a
+     * patient can be on a programme the picker cannot offer.
+     */
+    public function testProgrammeCodesMatchTheOrganEnums(): void
+    {
+        $codes = array_column(
+            $this->db->table('organ_programs')->get()->getResultArray(),
+            'code'
+        );
+        sort($codes);
+
+        $patientOrgans = model(ListsModel::class)->get_enum_values('patients', 'organs');
+        $labOrgans     = model(ListsModel::class)->get_enum_values('labs', 'organ_type');
+        sort($patientOrgans);
+        sort($labOrgans);
+
+        $this->assertSame($codes, $patientOrgans, 'organ_programs and patients.organs have drifted apart');
+        $this->assertSame($codes, $labOrgans, 'organ_programs and labs.organ_type have drifted apart');
+    }
+
+    /** The Donors List screen: its eight columns, straight out of the view. */
+    public function testDonorsViewMatchesTheDonorsListScreen(): void
+    {
+        $this->seedPeople();
+
+        // A second donor, deceased and with no labs, plus a pair so that one
+        // donor is matched and the other is not.
+        $this->db->table('patients')->insert([
+            'mrn' => 2002, 'name' => 'Donor Two', 'age' => 55, 'blood_group' => 'O',
+            'organs' => 'kidney', 'type' => 'donor', 'urgency' => 'low',
+            'entry_date' => date('Y-m-d'), 'donation_type' => 'deceased',
+            'hospital' => 'PSMMC',
+        ]);
+
+        $labId = (int) model(LabsModel::class)->get_lab_ids()[0];
+        $this->db->table('lab_results')->insert(['patient_id' => 2001, 'lab_id' => $labId, 'status' => 'completed']);
+
+        model(PairsModel::class)->insert_pair([
+            'recipient_mrn' => 1001, 'donor_mrn' => 2001, 'match_status' => 'active',
+        ]);
+
+        $rows = $this->db->table('donors')->orderBy('mrn')->get()->getResultArray();
+        $this->assertCount(2, $rows, 'the view holds donors only, not recipients');
+
+        [$first, $second] = $rows;
+
+        // Every column the screen's table renders.
+        $this->assertSame('Donor One', $first['name']);
+        $this->assertSame('A', $first['blood_group']);
+        $this->assertSame('living', $first['donation_type']);
+        $this->assertSame('Brother of 1001', $first['relationship']);
+        $this->assertSame('1', (string) $first['labs_completed']);
+        $this->assertSame('1', (string) $first['labs_total']);
+        $this->assertSame('1', (string) $first['is_matched'], 'paired, so off the unmatched list');
+
+        $this->assertSame('deceased', $second['donation_type']);
+        $this->assertSame('PSMMC', $second['hospital']);
+        $this->assertSame('0', (string) $second['labs_total']);
+        $this->assertSame('0', (string) $second['is_matched']);
+
+        // What the screen actually renders is the unmatched half.
+        $unmatched = $this->db->table('donors')->where('is_matched', 0)->get()->getResultArray();
+        $this->assertCount(1, $unmatched);
+        $this->assertSame('Donor Two', $unmatched[0]['name']);
+    }
+
+    public function testRecipientsViewCarriesTheProgrammeAndPeopleByName(): void
+    {
+        $this->seedPeople();
+
+        $rows = $this->db->table('recipients')->orderBy('mrn')->get()->getResultArray();
+        $this->assertCount(2, $rows, 'recipients only');
+
+        $this->assertSame('Kidney', $rows[0]['program_label']);
+        $this->assertSame('Test Physician', $rows[0]['mrp_name']);
+        $this->assertSame('Test Coordinator', $rows[0]['coordinator_name']);
+        $this->assertSame('0', (string) $rows[0]['is_matched']);
+    }
+
+    /** The Pairs List screen: one row per pair, both sides flattened. */
+    public function testPairsOverviewFlattensBothSides(): void
+    {
+        $this->seedPeople();
+        model(PairsModel::class)->insert_pair([
+            'recipient_mrn' => 1001, 'donor_mrn' => 2001, 'match_status' => 'scheduled',
+            'relationship'  => 'Brother', 'surgery_on' => '2026-10-05', 'note' => 'awaiting cardiac',
+        ]);
+
+        $rows = $this->db->table('pairs_overview')->get()->getResultArray();
+        $this->assertCount(1, $rows);
+        $row = $rows[0];
+
+        $this->assertSame('kidney', $row['organ'], 'taken from the recipient; pairs has no organ of its own');
+        $this->assertSame('scheduled', $row['match_status']);
+        $this->assertSame('awaiting cardiac', $row['note']);
+
+        $this->assertSame('Recipient Twenty', $row['r_name']);
+        $this->assertSame('A', $row['r_blood_group']);
+        $this->assertSame('high', $row['r_urgency']);
+        $this->assertSame('Test Physician', $row['r_mrp_name']);
+
+        $this->assertSame('Donor One', $row['d_name']);
+        $this->assertSame('living', $row['d_donation_type']);
+    }
+
+    /** The Dashboard's four bars, per programme. */
+    public function testDashboardStatsCountPerProgramme(): void
+    {
+        $this->seedPeople();
+
+        $before = $this->statsFor('kidney');
+        $this->assertSame(2, (int) $before['total_recipients']);
+        $this->assertSame(2, (int) $before['unmatched_recipients']);
+        $this->assertSame(1, (int) $before['total_donors']);
+        $this->assertSame(1, (int) $before['unmatched_donors']);
+        $this->assertSame(0, (int) $before['total_pairs']);
+        $this->assertSame(0, (int) $before['active_or_scheduled_pairs']);
+
+        model(PairsModel::class)->insert_pair([
+            'recipient_mrn' => 1001, 'donor_mrn' => 2001, 'match_status' => 'active',
+        ]);
+        $pairId = (int) $this->db->insertID();
+
+        $after = $this->statsFor('kidney');
+        $this->assertSame(1, (int) $after['unmatched_recipients'], 'the paired recipient drops off');
+        $this->assertSame(0, (int) $after['unmatched_donors']);
+        $this->assertSame(1, (int) $after['total_pairs']);
+        $this->assertSame(1, (int) $after['active_or_scheduled_pairs']);
+
+        // `completed` is a pair but no longer active/scheduled.
+        model(PairsModel::class)->update_pair($pairId, ['match_status' => 'completed']);
+        $done = $this->statsFor('kidney');
+        $this->assertSame(1, (int) $done['total_pairs']);
+        $this->assertSame(0, (int) $done['active_or_scheduled_pairs']);
+
+        // A programme with nobody on it still appears, with zeroes.
+        $liver = $this->statsFor('liver');
+        $this->assertSame('Liver', $liver['program_label']);
+        $this->assertSame(0, (int) $liver['total_recipients']);
+    }
+
+    /** @return array<string, mixed> */
+    private function statsFor(string $organ): array
+    {
+        return $this->db->table('dashboard_stats')->where('organ', $organ)->get()->getRowArray();
     }
 
     public function testStaffCanHoldAHashedPassword(): void

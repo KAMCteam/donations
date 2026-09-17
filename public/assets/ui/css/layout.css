@@ -1,0 +1,171 @@
+/* ==========================================================================
+   layout.css — App shell + Sidebar
+   Source: src/App.tsx, src/components/Sidebar.tsx
+   Breakpoints: sm = 40rem, md = 48rem, lg = 64rem
+   ========================================================================== */
+
+/* ---- App shell ---- */
+.app {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--slate-50);
+  font-family: "DM Sans", sans-serif;
+}
+
+.app-main {
+  flex: 1;
+  min-height: 100vh;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: var(--black-40);
+  z-index: 10;
+}
+
+/* Page mount point — layout-transparent so the page sits directly in <main> */
+.page-host { display: contents; }
+
+/* Mobile top bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background-color: #fff;
+  border-bottom: 1px solid var(--slate-200);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topbar-menu-btn {
+  padding: 0.5rem;
+  border-radius: var(--radius-lg);
+  transition-property: var(--transition-colors-props);
+  transition-timing-function: var(--ease);
+  transition-duration: var(--dur);
+}
+
+.topbar-title {
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  font-weight: 600;
+  color: var(--slate-800);
+  text-transform: capitalize;
+}
+
+/* ---- Sidebar ---- */
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  width: 15rem;
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  background-color: #15508A;
+  translate: -100% 0;
+  transition-property: transform, translate, scale, rotate;
+  transition-timing-function: var(--ease);
+  transition-duration: 300ms;
+}
+
+.sidebar.is-open {
+  translate: 0 0;
+}
+
+.sidebar-logo {
+  position: relative;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--white-10);
+}
+
+.sidebar-logo img {
+  width: 100%;
+  object-fit: contain;
+  max-height: 64px;
+}
+
+.sidebar-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  color: var(--white-50);
+  transition-property: var(--transition-colors-props);
+  transition-timing-function: var(--ease);
+  transition-duration: var(--dur);
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 1rem 0.75rem;
+  overflow-y: auto;
+}
+
+.sidebar-nav > :not(:last-child) {
+  margin-bottom: 0.125rem;
+}
+
+.nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  font-weight: 500;
+  color: var(--white-55);
+  transition-property: all;
+  transition-timing-function: var(--ease);
+  transition-duration: 150ms;
+}
+
+.nav-item .nav-icon { color: var(--white-50); }
+
+.nav-item.is-active {
+  background-color: var(--white-15);
+  color: #fff;
+}
+
+.nav-item.is-active .nav-icon { color: #fff; }
+
+.sidebar-footer {
+  padding: 0.75rem 0.75rem 1rem;
+  border-top: 1px solid var(--white-10);
+}
+
+.signout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-lg);
+  color: var(--white-40);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  transition-property: var(--transition-colors-props);
+  transition-timing-function: var(--ease);
+  transition-duration: var(--dur);
+}
+
+@media (hover: hover) {
+  .topbar-menu-btn:hover { background-color: var(--slate-100); }
+  .sidebar-close:hover { color: #fff; }
+  .nav-item:not(.is-active):hover { color: #fff; background-color: var(--white-10); }
+  .signout-btn:hover { color: var(--white-70); }
+}
+
+/* ---- Desktop (lg) ---- */
+@media (min-width: 64rem) {
+  .app-main.has-sidebar { margin-left: 15rem; }
+  .backdrop,
+  .topbar,
+  .sidebar-close { display: none; }
+  .sidebar { translate: 0 0; }
+}

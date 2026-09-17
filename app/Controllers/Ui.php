@@ -116,10 +116,9 @@ class Ui extends BaseController
         $recipients = $this->store->recipients();
         $pairs      = $this->store->pairs();
 
-        $unmatched = array_values(array_filter(
-            $recipients,
-            static fn (array $r): bool => ($r['pairedDonorId'] ?? '') === ''
-        ));
+        // The same query the waiting list uses, so the dashboard's idea of
+        // "most urgent" cannot drift from the screen it links to.
+        $waiting     = $this->store->waitingList();
         $activePairs = array_filter(
             $pairs,
             static fn (array $p): bool => in_array($p['status'], ['active', 'scheduled'], true)
@@ -131,12 +130,12 @@ class Ui extends BaseController
             'organ'     => $organ,
             'stats'     => [
                 'total'     => count($recipients),
-                'unmatched' => count($unmatched),
+                'unmatched' => count($waiting),
                 'pairs'     => count($pairs),
                 'active'    => count($activePairs),
             ],
             'maxBar'    => max(count($recipients), count($pairs), 1),
-            'topUrgent' => array_slice(UiStore::sortByUrgency($unmatched), 0, 3),
+            'topUrgent' => array_slice($waiting, 0, 3),
         ]);
     }
 
@@ -144,21 +143,15 @@ class Ui extends BaseController
 
     public function recipients(): string
     {
-        $filter    = $this->bloodTypeFilter();
-        $unmatched = array_filter(
-            $this->store->recipients(),
-            static fn (array $r): bool => ($r['pairedDonorId'] ?? '') === ''
-        );
-
-        if ($filter !== 'all') {
-            $unmatched = array_filter($unmatched, static fn (array $r): bool => $r['bloodType'] === $filter);
-        }
+        $filter = $this->bloodTypeFilter();
 
         return view('ui/recipient_waitlist', [
-            'title'      => 'Recipient Waitlist',
-            'navPage'    => 'recipients',
-            'organ'      => $this->store->organ(),
-            'recipients' => UiStore::sortByUrgency(array_values($unmatched)),
+            'title'   => 'Recipient Waitlist',
+            'navPage' => 'recipients',
+            'organ'   => $this->store->organ(),
+            // Unpaired only, most urgent first and then by score — all of it in
+            // SQL, because the score is computed and PHP cannot sort by it.
+            'recipients' => $this->store->waitingList($filter === 'all' ? null : $filter),
             'btFilter'   => $filter,
         ]);
     }
@@ -183,16 +176,11 @@ class Ui extends BaseController
 
     public function donors(): string
     {
-        $unmatched = array_values(array_filter(
-            $this->store->donors(),
-            static fn (array $d): bool => ($d['pairedRecipientId'] ?? '') === ''
-        ));
-
         return view('ui/donors_list', [
             'title'   => 'Donors List',
             'navPage' => 'donors',
             'organ'   => $this->store->organ(),
-            'donors'  => $unmatched,
+            'donors'  => $this->store->availableDonors(),
         ]);
     }
 
@@ -258,15 +246,19 @@ class Ui extends BaseController
                 'diagnosis'        => $person['diagnosis'] ?? '',
                 'urgency'          => $person['urgency'] ?? 'medium',
                 'dateRegistered'   => $person['dateRegistered'] ?? date('Y-m-d'),
-                'gender'           => 'Male',
-                'firstDialysis'    => '',
-                'selectedMrp'      => $mrps[0]['id'] ?? '',
+                // A saved record shows what was saved; only a blank form falls
+                // back to a default. These used to be hard-coded, which meant
+                // reopening a record and pressing Save reassigned its MRP to
+                // whoever happened to be first in the list.
+                'gender'           => $person['gender'] ?? 'Male',
+                'firstDialysis'    => $person['firstDialysis'] ?? '',
+                'selectedMrp'      => $person['selectedMrp'] ?? ($mrps[0]['id'] ?? ''),
                 'donationType'     => $person['donationType'] ?? 'living',
                 'relationship'     => $person['relationship'] ?? '',
-                'donorGender'      => 'Male',
-                'donorCoordinator' => '',
-                'donorStatus'      => 'On Hold',
-                'donorMrp'         => $mrps[0]['id'] ?? '',
+                'donorGender'      => $person['donorGender'] ?? 'Male',
+                'donorCoordinator' => $person['donorCoordinator'] ?? '',
+                'donorStatus'      => $person['donorStatus'] ?? 'On Hold',
+                'donorMrp'         => $person['donorMrp'] ?? ($mrps[0]['id'] ?? ''),
             ],
         ]);
     }
@@ -294,6 +286,11 @@ class Ui extends BaseController
                 'diagnosis'      => (string) $this->request->getPost('diagnosis'),
                 'urgency'        => (string) $this->request->getPost('urgency'),
                 'dateRegistered' => $person['dateRegistered'] ?? date('Y-m-d'),
+                // The form has always posted these; nothing read them until
+                // there were columns to put them in.
+                'gender'         => (string) $this->request->getPost('gender'),
+                'selectedMrp'    => (string) $this->request->getPost('selectedMrp'),
+                'firstDialysis'  => (string) $this->request->getPost('firstDialysis'),
             ]);
 
             if ($person === null) {
@@ -308,9 +305,13 @@ class Ui extends BaseController
         }
 
         $fields = array_merge($base, [
-            'type'         => 'donor',
-            'donationType' => $person['donationType'] ?? 'living',
-            'relationship' => $person['relationship'] ?? '',
+            'type'             => 'donor',
+            'donationType'     => $person['donationType'] ?? 'living',
+            'relationship'     => $person['relationship'] ?? '',
+            'donorGender'      => (string) $this->request->getPost('donorGender'),
+            'donorMrp'         => (string) $this->request->getPost('donorMrp'),
+            'donorStatus'      => (string) $this->request->getPost('donorStatus'),
+            'donorCoordinator' => (string) $this->request->getPost('donorCoordinator'),
         ]);
 
         if ($person === null) {
@@ -479,6 +480,9 @@ class Ui extends BaseController
             'hospital'       => (string) $this->request->getPost('rHospital'),
             'diagnosis'      => (string) $this->request->getPost('rDiagnosis'),
             'urgency'        => (string) $this->request->getPost('rUrgency'),
+            'gender'         => (string) $this->request->getPost('rGender'),
+            'selectedMrp'    => (string) $this->request->getPost('rMrp'),
+            'firstDialysis'  => (string) $this->request->getPost('rFirstDialysis'),
             'dateRegistered' => $entryDate,
             'notes'          => (string) $this->request->getPost('rNotes'),
             'labTests'       => $this->postedLabTests('rLabs'),
@@ -500,6 +504,10 @@ class Ui extends BaseController
             'hospital'          => '',
             'donationType'      => 'living',
             'relationship'      => $relationship,
+            'donorGender'       => (string) $this->request->getPost('dGender'),
+            'donorMrp'          => (string) $this->request->getPost('dMrp'),
+            'donorStatus'       => (string) $this->request->getPost('dStatus'),
+            'donorCoordinator'  => (string) $this->request->getPost('dCoordinator'),
             'notes'             => (string) $this->request->getPost('dNotes'),
             'labTests'          => $this->postedLabTests('dLabs'),
             'pairedRecipientId' => $recipientId,
@@ -508,11 +516,11 @@ class Ui extends BaseController
         $this->store->updateRecipient($recipientId, ['pairedDonorId' => $donorId]);
 
         $this->store->addPair([
-            'id'            => $this->store->nextPairId(),
             'organ'         => $organ,
             'status'        => 'active',
             'recipientId'   => $recipientId,
             'donorId'       => $donorId,
+            'relationship'  => $relationship,
             'scheduledDate' => $crossmatch,
             'notes'         => '',
             'createdDate'   => $entryDate,
@@ -561,12 +569,19 @@ class Ui extends BaseController
                 'rHospital'      => $recipient['hospital'] ?? '',
                 'rDiagnosis'     => $recipient['diagnosis'] ?? '',
                 'rUrgency'       => $recipient['urgency'] ?? 'medium',
+                'rGender'        => $recipient['gender'] ?? 'Male',
+                'rMrp'           => $recipient['selectedMrp'] ?? '',
+                'rFirstDialysis' => $recipient['firstDialysis'] ?? '',
                 'rNotes'         => $recipient['notes'] ?? '',
                 'dName'          => $donor['name'] ?? '',
                 'dAge'           => isset($donor['age']) ? (string) $donor['age'] : '',
                 'dBloodType'     => $donor['bloodType'] ?? 'O',
                 'dPhone'         => $donor['phone'] ?? '',
                 'dCity'          => $donor['address'] ?? '',
+                'dGender'        => $donor['donorGender'] ?? 'Male',
+                'dMrp'           => $donor['donorMrp'] ?? '',
+                'dCoordinator'   => $donor['donorCoordinator'] ?? '',
+                'dStatus'        => $donor['donorStatus'] ?? 'On Hold',
                 'dNotes'         => $donor['notes'] ?? '',
             ],
         ]);
@@ -584,34 +599,41 @@ class Ui extends BaseController
         $this->store->updatePair($pair['id'], [
             'status'        => (string) $this->request->getPost('pairStatus'),
             'scheduledDate' => (string) $this->request->getPost('crossmatchDate'),
-            'notes'         => $relationship,
+            'relationship'  => $relationship,
         ]);
 
         if ($recipient !== null) {
             $this->store->updateRecipient($recipient['id'], [
-                'name'      => (string) $this->request->getPost('rName'),
-                'age'       => (int) $this->request->getPost('rAge') ?: $recipient['age'],
-                'bloodType' => (string) $this->request->getPost('rBloodType'),
-                'phone'     => (string) $this->request->getPost('rPhone'),
-                'address'   => (string) $this->request->getPost('rCity'),
-                'hospital'  => (string) $this->request->getPost('rHospital'),
-                'diagnosis' => (string) $this->request->getPost('rDiagnosis'),
-                'urgency'   => (string) $this->request->getPost('rUrgency'),
-                'notes'     => (string) $this->request->getPost('rNotes'),
-                'labTests'  => $this->postedLabTests('rLabs'),
+                'name'          => (string) $this->request->getPost('rName'),
+                'age'           => (int) $this->request->getPost('rAge') ?: $recipient['age'],
+                'bloodType'     => (string) $this->request->getPost('rBloodType'),
+                'phone'         => (string) $this->request->getPost('rPhone'),
+                'address'       => (string) $this->request->getPost('rCity'),
+                'hospital'      => (string) $this->request->getPost('rHospital'),
+                'diagnosis'     => (string) $this->request->getPost('rDiagnosis'),
+                'urgency'       => (string) $this->request->getPost('rUrgency'),
+                'gender'        => (string) $this->request->getPost('rGender'),
+                'selectedMrp'   => (string) $this->request->getPost('rMrp'),
+                'firstDialysis' => (string) $this->request->getPost('rFirstDialysis'),
+                'notes'         => (string) $this->request->getPost('rNotes'),
+                'labTests'      => $this->postedLabTests('rLabs'),
             ]);
         }
 
         if ($donor !== null) {
             $this->store->updateDonor($donor['id'], [
-                'name'         => (string) $this->request->getPost('dName'),
-                'age'          => (int) $this->request->getPost('dAge') ?: $donor['age'],
-                'bloodType'    => (string) $this->request->getPost('dBloodType'),
-                'phone'        => (string) $this->request->getPost('dPhone'),
-                'address'      => (string) $this->request->getPost('dCity'),
-                'notes'        => (string) $this->request->getPost('dNotes'),
-                'relationship' => $relationship,
-                'labTests'     => $this->postedLabTests('dLabs'),
+                'name'             => (string) $this->request->getPost('dName'),
+                'age'              => (int) $this->request->getPost('dAge') ?: $donor['age'],
+                'bloodType'        => (string) $this->request->getPost('dBloodType'),
+                'phone'            => (string) $this->request->getPost('dPhone'),
+                'address'          => (string) $this->request->getPost('dCity'),
+                'notes'            => (string) $this->request->getPost('dNotes'),
+                'relationship'     => $relationship,
+                'donorGender'      => (string) $this->request->getPost('dGender'),
+                'donorMrp'         => (string) $this->request->getPost('dMrp'),
+                'donorStatus'      => (string) $this->request->getPost('dStatus'),
+                'donorCoordinator' => (string) $this->request->getPost('dCoordinator'),
+                'labTests'         => $this->postedLabTests('dLabs'),
             ]);
         }
 

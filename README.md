@@ -128,18 +128,32 @@ between each part to imitate React's text nodes, which changes how the browser
 kerns the join; the views here emit one ordinary string and let the browser
 shape it normally.
 
+### Where the data lives
+
+Every screen reads and writes the database. `UiStore` is the translation layer
+between the shapes the views expect and the tables in `app/Database/Migrations`:
+it holds no records of its own, and each of its methods is a query through
+`App\Models\*`. The only thing still kept in the session is which organ
+programme you picked and whether you are signed in.
+
+Two consequences worth knowing:
+
+- **The waiting list is ordered by the real score.** `RecipientModel::SCORE_CALC`
+  is the original system's formula — a tenth of a point per month waiting plus a
+  tenth per month on dialysis — computed by the query rather than stored, so it
+  keeps counting up on its own. The Score column shows it, the blood-group chips
+  filter in SQL, and the dashboard's "most urgent" panel is the top of the same
+  query. A recipient with no dialysis date scores nothing and shows a dash,
+  which is what the original did.
+- **A coordinator is registered by being typed.** The design collects the
+  coordinator as free text and has no screen that registers one, but the column
+  is a foreign key. Typing a name looks it up and creates it if it is new, so
+  `coordinators` fills from use. Typing the same name twice reuses the row.
+
 ### Not wired up yet
 
-Two things still stand between these screens and production use:
+One thing still stands between these screens and production use:
 
-- **The screens do not read the database yet.** The schema exists and every
-  field they collect has a column (see [Database](#database)), but records are
-  still held per session in `UiStore`. That store now starts **empty** — the
-  design package's invented patients, donors and pairs were deleted — so the
-  screens show their empty states until real records are entered. Reimplement
-  the read and write methods in `UiStore` on top of `App\Models\*`; the views
-  take plain arrays and need no changes, which is what that class's interface
-  is shaped for.
 - **No real login.** `/login` accepts any non-empty Staff ID and password,
   exactly as the design package's did. The `staff` table is there for it to
   check against; until `Ui::attemptLogin()` does, this must not be deployed
@@ -262,8 +276,17 @@ here rather than hidden.
 (the arithmetic, the NULL case, that it counts up on its own, and the waiting
 list's ordering and filters) and the linking rules (linking, closing,
 re-linking, refusing a double link, refusing a recipient as a donor, the
-delete restriction, and the MRN cascade). It needs a MySQL `tests` group and
-skips otherwise:
+delete restriction, and the MRN cascade).
+
+`tests/database/ScreenRoundTripTest.php` posts each form and then looks in the
+table. It exists because of a specific failure: several controls — gender, MRP,
+first dialysis, donor status, the pair's relationship — were posted faithfully
+by the views and read by nothing, so a record saved from a filled-in screen came
+back half empty, and no error was raised anywhere. A controller quietly dropping
+a field cannot be caught by unit-testing the controller, only by saving a form
+and reading the row back.
+
+Both need a MySQL `tests` group and skip otherwise:
 
 ```ini
 database.tests.hostname = 127.0.0.1
@@ -381,9 +404,9 @@ where behaviour differs from the CodeIgniter 3 original:
 `Patient::add()` was unfinished in the CodeIgniter 3 project — it dumped the
 collected recipient and donor arrays instead of saving them — and the migration
 preserved that. The controller has since been removed with the rest of the old
-screens, so the open question is no longer "finish `Patient::add()`" but
-"wire `UiStore` to `App\Models\*`", as noted under
-[Not wired up yet](#not-wired-up-yet).
+screens, and `UiStore` now writes through `App\Models\*` to the tables, so
+adding a recipient, a donor or a pair saves. What remains open is the login,
+under [Not wired up yet](#not-wired-up-yet).
 
 ## Licence
 

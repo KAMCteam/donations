@@ -82,10 +82,13 @@ class CreateDonors extends Migration
                 'null'       => true,
             ],
 
+            // Exactly the four the Donor Status picker offers, and its own
+            // default. A wider list would let a donor reach a state no screen
+            // can show, which reads as the record having lost its status.
             'status' => [
                 'type'       => 'ENUM',
-                'constraint' => ['pending', 'ready', 'active', 'on_hold', 'completed', 'cancelled'],
-                'default'    => 'pending',
+                'constraint' => ['on_hold', 'active', 'completed', 'cancelled'],
+                'default'    => 'on_hold',
             ],
             'mrp_id' => [
                 'type'       => 'INT',

@@ -17,6 +17,47 @@ use CodeIgniter\Router\RouteCollection;
 $routes->get('Organ', 'Organ::index');
 $routes->get('Organ/destroy_sess', 'Organ::destroySession');
 
+/*
+ * The transplant screens ported from the HTML prototype (app/Views/ui).
+ *
+ * Outside the `organ` guard on purpose: these screens carry their own login and
+ * programme picker and keep the choice in `ui_organ`, so the guard would bounce
+ * every one of them to the old `Organ` page. They are additive — nothing above
+ * or below changes — which is what lets both front ends run side by side while
+ * the new one is reviewed.
+ *
+ * Fixed segments are declared before the `(:segment)` catch-alls so that
+ * `ui/pairs/new` cannot be read as a pair id.
+ */
+$routes->group('ui', static function (RouteCollection $routes): void {
+    $routes->get('/', 'Ui::index');
+
+    $routes->get('login', 'Ui::login');
+    $routes->post('login', 'Ui::attemptLogin');
+    $routes->get('logout', 'Ui::logout');
+
+    $routes->get('organ', 'Ui::organSelector');
+    $routes->get('organ/(:segment)', 'Ui::chooseOrgan/$1');
+
+    $routes->get('dashboard', 'Ui::dashboard');
+
+    $routes->get('recipients', 'Ui::recipients');
+    $routes->match(['get', 'post'], 'recipients/new', 'Ui::addRecipient');
+    $routes->match(['get', 'post'], 'recipients/(:segment)', 'Ui::recipient/$1');
+
+    $routes->get('donors', 'Ui::donors');
+    $routes->match(['get', 'post'], 'donors/new', 'Ui::addDonor');
+    $routes->match(['get', 'post'], 'donors/(:segment)', 'Ui::donor/$1');
+
+    $routes->get('pairs', 'Ui::pairs');
+    $routes->get('pairs/export', 'Ui::exportPairs');
+    $routes->match(['get', 'post'], 'pairs/new', 'Ui::addPair');
+    $routes->match(['get', 'post'], 'pairs/(:segment)', 'Ui::pair/$1');
+
+    $routes->get('mrp', 'Ui::mrp');
+    $routes->post('mrp', 'Ui::addMrp');
+});
+
 $routes->group('', ['filter' => 'organ'], static function (RouteCollection $routes): void {
     // $route['default_controller'] = 'Patient';
     $routes->get('/', 'Patient::index');

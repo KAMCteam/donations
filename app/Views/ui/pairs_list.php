@@ -1,0 +1,131 @@
+<?= $this->extend('ui/layout') ?>
+
+<?= $this->section('content') ?>
+<?php
+
+use App\Libraries\UiStore;
+
+/**
+ * Pairs register. Was `js/pages/pairs-list.js`.
+ *
+ * Each pair still occupies two rows sharing a rowspan'd pair number, the
+ * alternating row background is still written inline, and "Export CSV" still
+ * downloads the filtered set — it is a link to `ui/pairs/export` now, so the
+ * file is built from the same rows the table shows rather than re-derived in
+ * the browser.
+ *
+ * @var list<array{pair: array<string, mixed>, recipient: array<string, mixed>|null, donor: array<string, mixed>|null}> $rows
+ * @var string $btFilter
+ * @var string $statusFilter
+ */
+$headers = [
+    'Pair #', 'MRN', 'Name', 'Age', 'Type', 'Relationship',
+    'Blood Group', 'MRP', 'Gender', 'Phone Number',
+    'Dialysis', 'Entry Date', 'Match Status', 'Date of Crossmatch', 'Note',
+];
+
+$dash = '—';
+
+/** Rebuilds the current query string with one filter swapped out. */
+$filterUrl = static function (string $key, string $value) use ($btFilter, $statusFilter): string {
+    $query = ['bt' => $btFilter, 'status' => $statusFilter];
+    $query[$key] = $value;
+    $query = array_filter($query, static fn (string $v): bool => $v !== 'all');
+
+    return site_url('ui/pairs') . ($query === [] ? '' : '?' . http_build_query($query));
+};
+?>
+<div class="page">
+    <div class="page-header page-header--center page-header--wrap">
+        <div>
+            <div class="eyebrow">Pairs</div>
+            <h1 class="page-title">Pairs List</h1>
+            <p class="page-subtitle"><?= esc(ui_plural(count($rows), 'pair')) ?></p>
+        </div>
+        <div class="header-actions">
+            <a class="btn-outline" href="<?= site_url('ui/pairs/export') . '?' . http_build_query(['bt' => $btFilter, 'status' => $statusFilter]) ?>"><?= ui_icon('download') ?>Export CSV</a>
+            <a class="btn-primary" href="<?= site_url('ui/pairs/new') ?>"><?= ui_icon('plus') ?>Add Pair</a>
+        </div>
+    </div>
+
+    <div class="filter-stack">
+        <div class="filter-row">
+            <span class="filter-label">Blood type:</span>
+            <a class="chip<?= $btFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', 'all') ?>">All</a>
+            <?php foreach (UiStore::BLOOD_TYPES as $bloodType): ?>
+                <a class="chip chip--mono<?= $btFilter === $bloodType ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', $bloodType) ?>"><?= esc($bloodType) ?></a>
+            <?php endforeach; ?>
+        </div>
+        <div class="filter-row">
+            <span class="filter-label">Status:</span>
+            <a class="chip<?= $statusFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('status', 'all') ?>">All</a>
+            <?php foreach (UiStore::PAIR_STATUSES as $status): ?>
+                <a class="chip capitalize<?= $statusFilter === $status ? ' is-active' : '' ?>" href="<?= $filterUrl('status', $status) ?>"><?= esc($status) ?></a>
+            <?php endforeach; ?>
+        </div>
+    </div>
+
+    <div class="card card--scroll">
+        <?php if ($rows === []): ?>
+            <div class="empty-state">No pairs found.</div>
+        <?php else: ?>
+            <table class="table pairs-table">
+                <thead>
+                    <tr>
+                        <?php foreach ($headers as $header): ?>
+                            <th><?= esc($header) ?></th>
+                        <?php endforeach; ?>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($rows as $index => $row): ?>
+                        <?php
+                        $pair        = $row['pair'];
+                        $recipient   = $row['recipient'];
+                        $donor       = $row['donor'];
+                        $rowBg       = $index % 2 === 0 ? '#ffffff' : '#f8fafc';
+                        $statusLabel = ucfirst(str_replace('-', ' ', $pair['status']));
+                        $url         = site_url('ui/pairs/' . rawurlencode($pair['id']));
+                        ?>
+                        <tr class="row-recipient" data-href="<?= $url ?>" style="background-color:<?= $rowBg ?>">
+                            <td rowspan="2" class="cell-pairno" style="background-color:<?= $rowBg ?>">
+                                <div class="pair-number"><a href="<?= $url ?>"><?= $index + 1 ?></a></div>
+                            </td>
+                            <td class="t-mono t-500"><?= esc($recipient['id'] ?? $dash) ?></td>
+                            <td class="t-medium t-800"><?= esc($recipient['name'] ?? $dash) ?></td>
+                            <td class="t-700"><?= esc($recipient['age'] ?? $dash) ?></td>
+                            <td><span class="role-tag tone-blue-soft">recipient</span></td>
+                            <td rowspan="2" class="cell-span cell-rel"><?= esc(($pair['notes'] ?? '') !== '' ? $pair['notes'] : $dash) ?></td>
+                            <td class="t-mono t-semibold t-700"><?= esc($recipient['bloodType'] ?? $dash) ?></td>
+                            <td class="t-600"><?= $dash ?></td>
+                            <td class="t-600"><?= $dash ?></td>
+                            <td class="t-mono t-600"><?= esc($recipient['phone'] ?? $dash) ?></td>
+                            <td class="t-mono t-500"><?= $dash ?></td>
+                            <td class="t-mono t-500"><?= esc($recipient['dateRegistered'] ?? $dash) ?></td>
+                            <td rowspan="2" class="cell-span">
+                                <span class="status-tag <?= ui_tone('pairStatus', $pair['status']) ?>"><?= esc($statusLabel) ?></span>
+                            </td>
+                            <td class="t-mono t-500"><?= esc(($pair['scheduledDate'] ?? '') !== '' ? $pair['scheduledDate'] : $dash) ?></td>
+                            <td class="t-500 cell-last"><?= ($pair['notes'] ?? '') !== '' ? '<span class="note-link">Show Note</span>' : $dash ?></td>
+                        </tr>
+                        <tr class="row-donor" data-href="<?= $url ?>" style="background-color:<?= $rowBg ?>">
+                            <td class="t-mono t-500"><?= esc($donor['id'] ?? $dash) ?></td>
+                            <td class="t-medium t-800"><?= esc($donor['name'] ?? $dash) ?></td>
+                            <td class="t-700"><?= esc($donor['age'] ?? $dash) ?></td>
+                            <td><span class="role-tag tone-teal-soft">donor</span></td>
+                            <td class="t-mono t-semibold t-700"><?= esc($donor['bloodType'] ?? $dash) ?></td>
+                            <td class="t-600"><?= $dash ?></td>
+                            <td class="t-600"><?= $dash ?></td>
+                            <td class="t-mono t-600"><?= esc($donor['phone'] ?? $dash) ?></td>
+                            <td class="t-500">N/A</td>
+                            <td class="t-500">N/A</td>
+                            <td class="t-mono t-500"><?= esc(($pair['scheduledDate'] ?? '') !== '' ? $pair['scheduledDate'] : $dash) ?></td>
+                            <td class="t-500 cell-last"><?= $dash ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </div>
+</div>
+<?= $this->endSection() ?>

@@ -72,6 +72,71 @@ Every route except `/Organ` runs behind the `organ` filter
 (`App\Filters\OrganFilter`), which sends visitors to the organ picker until they
 have chosen one.
 
+### The `ui/*` screens
+
+A second, newer front end lives under `/ui`, merged in from the
+`donations_html_ui` design package. It is **additive** — the screens above are
+untouched and still the ones behind `/`, so both can run side by side while the
+new set is reviewed.
+
+| Route | Purpose |
+| --- | --- |
+| `/ui/login` | Staff login |
+| `/ui/organ` | Programme picker (kidney / liver) |
+| `/ui/dashboard` | Programme statistics and high-priority waitlist |
+| `/ui/recipients` | Recipient waitlist, filterable by blood type |
+| `/ui/recipients/new`, `/ui/recipients/{id}` | Add / open a recipient |
+| `/ui/donors`, `/ui/donors/new`, `/ui/donors/{id}` | Donor registry and records |
+| `/ui/pairs` | Pairs register, filterable by blood type and status |
+| `/ui/pairs/export` | The filtered pairs as CSV |
+| `/ui/pairs/new`, `/ui/pairs/{id}` | Add / open a pair |
+| `/ui/mrp` | Register a Medical Responsible Person |
+
+These routes sit **outside** the `organ` filter on purpose: they carry their own
+login and programme picker and keep the choice in the `ui_organ` session key, so
+the filter would otherwise bounce every one of them to `/Organ`.
+
+#### HTML is the source of these screens
+
+The design package arrived as a single-page app: one empty `<div id="app">` and
+ten JavaScript files that wrote every screen into it as concatenated strings.
+That was inverted during the merge — the markup is now HTML and JavaScript only
+reacts to it:
+
+| Concern | Where it lives now |
+| --- | --- |
+| Every screen's markup | `app/Views/ui/*.php` — literal HTML with `foreach` loops |
+| Shell, sidebar, top bar | `app/Views/ui/layout.php`, `layout_bare.php` |
+| Lab-tests card | `app/Views/ui/partials/lab_tests.php` |
+| Screen selection, form posts | `app/Controllers/Ui.php` |
+| Records | `app/Libraries/UiStore.php`, seeded from `UiSeed.php` |
+| Inline SVG icons, tone lookups | `app/Helpers/ui_helper.php` |
+| Stylesheets and images | `public/assets/ui/` — copied byte-for-byte |
+| Behaviour only | `public/assets/ui/js/ui.js` — one file, ~190 lines |
+
+Navigation, filtering, sorting and saving are links and form posts, so every
+screen renders, navigates and submits **with JavaScript switched off**. `ui.js`
+is left with the mobile sidebar, the lab cards (status buttons, result editor,
+running totals), whole-row click targets and keeping "Urgency" in step with
+"Urgent?".
+
+The result was checked against the design package screen by screen with
+full-page screenshot diffs at 1440px. Login, the programme picker and the pairs
+register are pixel-identical; the rest differ by 200–400 pixels out of 1.4–3.1
+million, all of it antialiasing on a single character boundary in labels such as
+"4 unmatched donors" or "Back to Recipient Waitlist". The package built those
+strings with a helper that inserted an empty HTML comment between each part to
+imitate React's text nodes, which changes how the browser kerns the join; the
+views here emit one ordinary string and let the browser shape it normally.
+
+Records are held per session and seeded from `UiSeed.php`, the design package's
+demo data converted to PHP — nothing is read from or written to the database
+yet. Point the read methods in `UiStore` at `App\Models\*` to put the screens
+on the live `patients` / `pairs` tables; the views take plain arrays and need no
+changes. The login accepts any non-empty Staff ID and password, exactly as the
+package's did, and must be wired to the real staff directory before these
+screens go anywhere near production.
+
 ## Migration notes (CodeIgniter 3 → 4)
 
 ### Where files moved

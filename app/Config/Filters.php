@@ -74,7 +74,11 @@ class Filters extends BaseFilters
      */
     public array $globals = [
         'before' => [
-            'organ' => ['except' => ['Organ', 'Organ/*']],
+            // The `ui/*` screens (app/Controllers/Ui.php) run their own login
+            // and programme picker and store the choice in `ui_organ`, so the
+            // guard — which would redirect them all to the old Organ page —
+            // does not apply to them.
+            'organ' => ['except' => ['Organ', 'Organ/*', 'ui', 'ui/*']],
         ],
         'after' => [
         ],

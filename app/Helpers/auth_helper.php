@@ -111,20 +111,3 @@ if (! function_exists('role_exists')) {
         return null;
     }
 }
-
-if (! function_exists('organ_chosen')) {
-    /**
-     * Returns a redirect to the organ picker when none has been chosen.
-     *
-     * Routes normally rely on the `organ` filter (App\Filters\OrganFilter)
-     * instead; this is kept so the old call sites keep working.
-     */
-    function organ_chosen(): ?RedirectResponse
-    {
-        if (empty(session()->get('organ'))) {
-            return redirect()->to(site_url('Organ'));
-        }
-
-        return null;
-    }
-}

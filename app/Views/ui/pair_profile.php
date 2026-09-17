@@ -26,7 +26,7 @@ use App\Libraries\UiStore;
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
         <div>
-            <a class="back-link" href="<?= site_url('ui/pairs') ?>"><?= ui_icon('back') ?>Back to Pairs List</a>
+            <a class="back-link" href="<?= site_url('pairs') ?>"><?= ui_icon('back') ?>Back to Pairs List</a>
             <div class="eyebrow"><?= esc($pair['id']) ?></div>
             <h1 class="page-title">Pair Profile</h1>
         </div>

@@ -2,7 +2,6 @@
 
 namespace Config;
 
-use App\Filters\OrganFilter;
 use CodeIgniter\Config\Filters as BaseFilters;
 use CodeIgniter\Filters\Cors;
 use CodeIgniter\Filters\CSRF;
@@ -35,7 +34,6 @@ class Filters extends BaseFilters
         'forcehttps'    => ForceHTTPS::class,
         'pagecache'     => PageCache::class,
         'performance'   => PerformanceMetrics::class,
-        'organ'         => OrganFilter::class,
     ];
 
     /**
@@ -74,11 +72,9 @@ class Filters extends BaseFilters
      */
     public array $globals = [
         'before' => [
-            // The `ui/*` screens (app/Controllers/Ui.php) run their own login
-            // and programme picker and store the choice in `ui_organ`, so the
-            // guard — which would redirect them all to the old Organ page —
-            // does not apply to them.
-            'organ' => ['except' => ['Organ', 'Organ/*', 'ui', 'ui/*']],
+            // The `organ` guard was removed with the screens it protected: the
+            // transplant UI carries its own login and programme picker and
+            // keeps the choice in the `ui_organ` session key.
         ],
         'after' => [
         ],

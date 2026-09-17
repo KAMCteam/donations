@@ -25,7 +25,7 @@
 
     <div class="organ-options">
         <?php foreach ($organs as $organ): ?>
-            <a class="organ-card" href="<?= site_url('ui/organ/' . $organ['organ']) ?>">
+            <a class="organ-card" href="<?= site_url('organ/' . $organ['organ']) ?>">
                 <div class="organ-icon"><img src="<?= base_url('assets/ui/img/' . $organ['icon']) ?>" alt="<?= esc($organ['label']) ?>" width="30" height="30"></div>
                 <div class="organ-name"><?= esc($organ['label']) ?></div>
                 <div class="organ-desc"><?= esc($organ['desc']) ?></div>

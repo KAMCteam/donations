@@ -23,7 +23,7 @@ use App\Libraries\UiStore;
  * @var list<array{id: string, name: string}> $mrps
  */
 $isRecipient = $personType === 'recipient';
-$backUrl     = site_url($isRecipient ? 'ui/recipients' : 'ui/donors');
+$backUrl     = site_url($isRecipient ? 'recipients' : 'donors');
 $backLabel   = $isRecipient ? 'Back to Recipient Waitlist' : 'Donors List';
 $title       = $mode === 'add'
     ? ($isRecipient ? 'Add Recipient' : 'Add Donor')
@@ -39,9 +39,9 @@ $eyebrow = $mode === 'add' ? 'New' : ($person['id'] ?? '');
         </div>
         <div class="header-actions">
             <?php if ($mode === 'view' && $linked !== null): ?>
-                <a class="btn-outline" href="<?= site_url(($isRecipient ? 'ui/donors/' : 'ui/recipients/') . rawurlencode($linked['id'])) ?>">Linked: <?= esc($linked['name']) ?></a>
+                <a class="btn-outline" href="<?= site_url(($isRecipient ? 'donors/' : 'recipients/') . rawurlencode($linked['id'])) ?>">Linked: <?= esc($linked['name']) ?></a>
             <?php elseif ($mode === 'view'): ?>
-                <a class="btn-outline" href="<?= site_url($isRecipient ? 'ui/donors' : 'ui/recipients') ?>"><?= ui_icon('link14') ?>Link with <?= esc($isRecipient ? 'Donor' : 'Recipient') ?></a>
+                <a class="btn-outline" href="<?= site_url($isRecipient ? 'donors' : 'recipients') ?>"><?= ui_icon('link14') ?>Link with <?= esc($isRecipient ? 'Donor' : 'Recipient') ?></a>
             <?php endif; ?>
             <button type="submit" form="person-form" class="btn-save">Save</button>
         </div>

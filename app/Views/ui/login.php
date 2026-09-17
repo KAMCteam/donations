@@ -33,7 +33,7 @@
                 <p class="login-sub">Enter your credentials to access the platform.</p>
             </div>
 
-            <form class="stack-5" method="post" action="<?= site_url('ui/login') ?>" novalidate>
+            <form class="stack-5" method="post" action="<?= site_url('login') ?>" novalidate>
                 <?= csrf_field() ?>
                 <div>
                     <label class="login-label" for="staff-id">Staff ID</label>

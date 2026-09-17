@@ -27,9 +27,9 @@ $rows = [
 ];
 
 $actions = [
-    ['label' => 'Add Recipient', 'url' => site_url('ui/recipients/new')],
-    ['label' => 'Add Donor',     'url' => site_url('ui/donors/new')],
-    ['label' => 'Add Pair',      'url' => site_url('ui/pairs/new')],
+    ['label' => 'Add Recipient', 'url' => site_url('recipients/new')],
+    ['label' => 'Add Donor',     'url' => site_url('donors/new')],
+    ['label' => 'Add Pair',      'url' => site_url('pairs/new')],
 ];
 ?>
 <div class="page">
@@ -40,7 +40,7 @@ $actions = [
         </div>
         <div class="organ-toggle">
             <?php foreach (UiStore::ORGANS as $option): ?>
-                <a class="organ-toggle-btn<?= $option === $organ ? ' is-active' : '' ?>" href="<?= site_url('ui/dashboard') . '?organ=' . $option ?>"><?= esc($option) ?></a>
+                <a class="organ-toggle-btn<?= $option === $organ ? ' is-active' : '' ?>" href="<?= site_url('dashboard') . '?organ=' . $option ?>"><?= esc($option) ?></a>
             <?php endforeach; ?>
         </div>
     </div>
@@ -79,7 +79,7 @@ $actions = [
                     <h2 class="dash-card-title dash-card-title--mb4">High-priority waitlist</h2>
                     <div class="stack-3">
                         <?php foreach ($topUrgent as $recipient): ?>
-                            <a class="urgent-item" href="<?= site_url('ui/recipients/' . rawurlencode($recipient['id'])) ?>">
+                            <a class="urgent-item" href="<?= site_url('recipients/' . rawurlencode($recipient['id'])) ?>">
                                 <div>
                                     <div class="urgent-name"><?= esc($recipient['name']) ?></div>
                                     <div class="urgent-meta"><?= esc($recipient['bloodType']) ?> &middot; <?= esc($recipient['id']) ?></div>

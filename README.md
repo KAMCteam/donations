@@ -58,52 +58,48 @@ alias to `public/` rather than the old `.htaccess` rewrite.
 
 ## Screens
 
-| Route | Controller | Purpose |
-| --- | --- | --- |
-| `/Organ` | `Organ` | Pick kidney or liver; everything else is gated on this |
-| `/` , `/Patient` | `Patient` | Add a recipient/donor for the selected programme |
-| `/MRP` | `MRP` | Add labs and MRPs (most responsible physicians) |
-| `/WaitingList` | `WaitingList` | Unmatched recipients, ranked by urgency and score |
-| `/UpdatePatient` | `UpdatePatient` | Find a patient, then edit them and their pairing |
-| `/Pairs` | `Pairs` | All pairs, and the single-pair comparison view |
-| `/Dashboard` | `Dashboard` | Chart.js counters |
-
-Every route except `/Organ` runs behind the `organ` filter
-(`App\Filters\OrganFilter`), which sends visitors to the organ picker until they
-have chosen one.
-
-### The `ui/*` screens
-
-A second, newer front end lives under `/ui`, merged in from the
-`donations_html_ui` design package. It is **additive** — the screens above are
-untouched and still the ones behind `/`, so both can run side by side while the
-new set is reviewed.
-
 | Route | Purpose |
 | --- | --- |
-| `/ui/login` | Staff login |
-| `/ui/organ` | Programme picker (kidney / liver) |
-| `/ui/dashboard` | Programme statistics and high-priority waitlist |
-| `/ui/recipients` | Recipient waitlist, filterable by blood type |
-| `/ui/recipients/new`, `/ui/recipients/{id}` | Add / open a recipient |
-| `/ui/donors`, `/ui/donors/new`, `/ui/donors/{id}` | Donor registry and records |
-| `/ui/pairs` | Pairs register, filterable by blood type and status |
-| `/ui/pairs/export` | The filtered pairs as CSV |
-| `/ui/pairs/new`, `/ui/pairs/{id}` | Add / open a pair |
-| `/ui/mrp` | Register a Medical Responsible Person |
+| `/` | Entry point — the login screen, or the dashboard when already signed in |
+| `/login` | Staff login |
+| `/organ` | Programme picker (kidney / liver) |
+| `/dashboard` | Programme statistics and high-priority waitlist |
+| `/recipients` | Recipient waitlist, filterable by blood type |
+| `/recipients/new`, `/recipients/{id}` | Add / open a recipient |
+| `/donors`, `/donors/new`, `/donors/{id}` | Donor registry and records |
+| `/pairs` | Pairs register, filterable by blood type and status |
+| `/pairs/export` | The filtered pairs as CSV |
+| `/pairs/new`, `/pairs/{id}` | Add / open a pair |
+| `/mrp` | Register a Medical Responsible Person |
 
-These routes sit **outside** the `organ` filter on purpose: they carry their own
-login and programme picker and keep the choice in the `ui_organ` session key, so
-the filter would otherwise bounce every one of them to `/Organ`.
+Auto-routing is off, so `app/Config/Routes.php` lists every reachable endpoint.
+The programme is chosen once per session on `/organ` and kept in the `ui_organ`
+session key; there is no longer a filter gating the rest of the site on it.
 
-#### HTML is the source of these screens
+### These screens replaced the CodeIgniter 3 ones
+
+The application was migrated from CodeIgniter 3 with its original screens —
+`Patient`, `MRP`, `WaitingList`, `UpdatePatient`, `Pairs`, `Dashboard`, `Organ`
+and `Test`. They have been **removed** and the screens above, built from the
+`donations_html_ui` design package, took their place at the root of the site.
+Removed with them: those controllers, their views and partials under
+`app/Views/`, the `organ` filter (`App\Filters\OrganFilter`) that gated them,
+the now-unused `organ_chosen()` helper, and the `public/assets/css` and
+`public/assets/js` that only styled them. Their git history still holds all of
+it if any of it is wanted back.
+
+What was **kept**: `app/Models/*` (the database layer these screens will be
+wired to next), `app/Helpers/`, `app/Language/`, and the brand images, SVGs and
+font under `public/assets/{img,svg,fonts}`.
+
+### HTML is the source of these screens
 
 The design package arrived as a single-page app: one empty `<div id="app">` and
 ten JavaScript files that wrote every screen into it as concatenated strings.
 That was inverted during the merge — the markup is now HTML and JavaScript only
 reacts to it:
 
-| Concern | Where it lives now |
+| Concern | Where it lives |
 | --- | --- |
 | Every screen's markup | `app/Views/ui/*.php` — literal HTML with `foreach` loops |
 | Shell, sidebar, top bar | `app/Views/ui/layout.php`, `layout_bare.php` |
@@ -121,23 +117,37 @@ running totals), whole-row click targets and keeping "Urgency" in step with
 "Urgent?".
 
 The result was checked against the design package screen by screen with
-full-page screenshot diffs at 1440px. Login, the programme picker and the pairs
-register are pixel-identical; the rest differ by 200–400 pixels out of 1.4–3.1
-million, all of it antialiasing on a single character boundary in labels such as
-"4 unmatched donors" or "Back to Recipient Waitlist". The package built those
-strings with a helper that inserted an empty HTML comment between each part to
-imitate React's text nodes, which changes how the browser kerns the join; the
-views here emit one ordinary string and let the browser shape it normally.
+full-page screenshot diffs at 1440px. Login, the programme picker, the pairs
+register and Add MRP are pixel-identical; the rest differ by under 400 pixels
+out of 1.4–3.3 million, all of it antialiasing on a single character boundary in
+labels such as "4 unmatched donors" or "Back to Recipient Waitlist". The
+package built those strings with a helper that inserted an empty HTML comment
+between each part to imitate React's text nodes, which changes how the browser
+kerns the join; the views here emit one ordinary string and let the browser
+shape it normally.
 
-Records are held per session and seeded from `UiSeed.php`, the design package's
-demo data converted to PHP — nothing is read from or written to the database
-yet. Point the read methods in `UiStore` at `App\Models\*` to put the screens
-on the live `patients` / `pairs` tables; the views take plain arrays and need no
-changes. The login accepts any non-empty Staff ID and password, exactly as the
-package's did, and must be wired to the real staff directory before these
-screens go anywhere near production.
+### Not wired up yet
+
+Two things still stand between these screens and production use:
+
+- **No database.** Records are held per session and seeded from `UiSeed.php`,
+  the design package's demo data converted to PHP — nothing is read from or
+  written to the database. Point the read methods in `UiStore` at
+  `App\Models\*` to put the screens on the live `patients` / `pairs` tables;
+  the views take plain arrays and need no changes.
+- **No real login.** `/login` accepts any non-empty Staff ID and password,
+  exactly as the design package's did. It must be wired to the real staff
+  directory before this is deployed anywhere reachable.
 
 ## Migration notes (CodeIgniter 3 → 4)
+
+This section records the CodeIgniter 3 → 4 migration as it stood when it was
+done. The screens it discusses — `Patient`, `MRP`, `WaitingList`,
+`UpdatePatient`, `Pairs`, `Dashboard`, `Organ`, `Test` — have since been
+replaced by the ones under [Screens](#screens) and no longer exist in the tree;
+it is kept because the models, helpers and query notes below still apply, and
+because it is the reference for anything that has to be brought back from git
+history.
 
 ### Where files moved
 
@@ -194,10 +204,10 @@ expression and the `NOT IN` sub-selects are unchanged.
 These were needed to run on CodeIgniter 4 and PHP 8.2+, and are the only places
 where behaviour differs from the CodeIgniter 3 original:
 
-- **`organ_chosen()` became a filter.** CI4 cannot redirect from inside a helper
-  called by a constructor, so the guard is now `App\Filters\OrganFilter`, applied
-  to a route group. The helper is still there for any remaining call sites, but
-  it returns a redirect rather than sending one.
+- **`organ_chosen()` became a filter**, because CI4 cannot redirect from inside
+  a helper called by a constructor. Both that filter and the helper have since
+  been removed along with the screens they guarded; the current screens ask for
+  the programme on `/organ` instead.
 - **Redirects return instead of exiting.** `Patient::validation()` and the auth
   helpers hand a `RedirectResponse` back to the caller.
 - **`exit('...')` on bad input became flash-message redirects** in `MRP::addLab()`
@@ -224,12 +234,14 @@ where behaviour differs from the CodeIgniter 3 original:
   `application/views/add_form.php-disabled`, which were disabled in the CI3
   project.
 
-### Still outstanding
+### Resolved by the UI replacement
 
 `Patient::add()` was unfinished in the CodeIgniter 3 project — it dumped the
-collected recipient and donor arrays instead of saving them. That behaviour is
-preserved (as a plain-text response rather than a `var_dump()`/`exit`), and the
-older working version is kept as `Patient::add_deprecated()`.
+collected recipient and donor arrays instead of saving them — and the migration
+preserved that. The controller has since been removed with the rest of the old
+screens, so the open question is no longer "finish `Patient::add()`" but
+"wire `UiStore` to `App\Models\*`", as noted under
+[Not wired up yet](#not-wired-up-yet).
 
 ## Licence
 

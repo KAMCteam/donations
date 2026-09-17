@@ -13,11 +13,11 @@
  * @var string $organ    Current programme, for the top-bar title.
  */
 $navItems = [
-    ['page' => 'dashboard',  'label' => 'Dashboard',          'icon' => 'dashboard', 'url' => site_url('ui/dashboard')],
-    ['page' => 'recipients', 'label' => 'Recipient Waitlist', 'icon' => 'users',     'url' => site_url('ui/recipients')],
-    ['page' => 'donors',     'label' => 'Donors List',        'icon' => 'heart',     'url' => site_url('ui/donors')],
-    ['page' => 'pairs',      'label' => 'Pairs List',         'icon' => 'link17',    'url' => site_url('ui/pairs')],
-    ['page' => 'add-mrp',    'label' => 'Add MRP',            'icon' => 'userPlus',  'url' => site_url('ui/mrp')],
+    ['page' => 'dashboard',  'label' => 'Dashboard',          'icon' => 'dashboard', 'url' => site_url('dashboard')],
+    ['page' => 'recipients', 'label' => 'Recipient Waitlist', 'icon' => 'users',     'url' => site_url('recipients')],
+    ['page' => 'donors',     'label' => 'Donors List',        'icon' => 'heart',     'url' => site_url('donors')],
+    ['page' => 'pairs',      'label' => 'Pairs List',         'icon' => 'link17',    'url' => site_url('pairs')],
+    ['page' => 'add-mrp',    'label' => 'Add MRP',            'icon' => 'userPlus',  'url' => site_url('mrp')],
 ];
 ?>
 <!doctype html>
@@ -30,8 +30,6 @@ $navItems = [
     <meta name="robots" content="noindex, nofollow">
     <title><?= esc($title ?? 'Transplant Program') ?></title>
 
-    <!-- Not partials/favicon: that partial also pulls in assets/css/all.css, whose
-         globals would fight the UI stylesheets below. Only the icon is wanted here. -->
     <link rel="icon" type="image/x-icon" href="<?= base_url('assets/img/KAMC.png') ?>">
 
     <link rel="stylesheet" href="<?= base_url('assets/ui/css/base.css') ?>">
@@ -58,7 +56,7 @@ $navItems = [
                 </nav>
 
                 <div class="sidebar-footer">
-                    <a class="signout-btn" href="<?= site_url('ui/logout') ?>"><?= ui_icon('signOut') ?>Sign out</a>
+                    <a class="signout-btn" href="<?= site_url('logout') ?>"><?= ui_icon('signOut') ?>Sign out</a>
                 </div>
             </aside>
 

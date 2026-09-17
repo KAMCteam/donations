@@ -12,11 +12,14 @@ use App\Libraries\UiStore;
  * they are links carrying `?bt=` now, and the controller hands back the rows
  * already filtered and sorted, so the table below is a plain `<table>`.
  *
- * @var list<array<string, mixed>> $recipients  Filtered, urgency-sorted.
+ * @var list<array<string, mixed>> $recipients  Unpaired, urgency- then score-sorted.
  * @var string                     $btFilter
  */
-$headers  = ['#', 'Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Score', 'Urgent'];
-$scoreMap = ['critical' => 1.8, 'high' => 5.2, 'medium' => 9.5, 'low' => 20.1];
+$headers = ['#', 'Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Score', 'Urgent'];
+// The score is a real number now: a tenth of a point per month waiting plus a
+// tenth per month on dialysis, computed by the query. It is NULL for a
+// recipient with no dialysis date, which shows as a dash rather than as zero.
+$score = static fn (?float $value): string => $value === null ? '—' : number_format($value, 1);
 ?>
 <div class="page">
     <div class="page-header page-header--center">
@@ -56,9 +59,9 @@ $scoreMap = ['critical' => 1.8, 'high' => 5.2, 'medium' => 9.5, 'low' => 20.1];
                             <td class="cell-name"><a href="<?= site_url('recipients/' . rawurlencode($recipient['id'])) ?>"><?= esc($recipient['name']) ?></a></td>
                             <td class="mono"><?= esc(preg_replace('/\D/', '', (string) $recipient['id'])) ?></td>
                             <td><?= esc($recipient['age']) ?></td>
-                            <td>—</td>
+                            <td><?= esc($recipient['gender']) ?></td>
                             <td class="mono"><?= esc($recipient['bloodType']) ?></td>
-                            <td><?= esc($scoreMap[$recipient['urgency']] ?? '—') ?></td>
+                            <td class="mono"><?= esc($score($recipient['score'] ?? null)) ?></td>
                             <td><?= $isUrgent ? 'Urgent' : 'Not Urgent' ?></td>
                         </tr>
                     <?php endforeach; ?>

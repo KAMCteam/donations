@@ -1,6 +1,7 @@
 <?php
 
 use App\Database\Seeds\DatabaseSeeder;
+use App\Libraries\UiStore;
 use App\Models\CoordinatorModel;
 use App\Models\DonorModel;
 use App\Models\LabModel;
@@ -9,7 +10,6 @@ use App\Models\MrpModel;
 use App\Models\OrganProgramModel;
 use App\Models\PairModel;
 use App\Models\RecipientModel;
-use App\Libraries\UiStore;
 use App\Models\StaffModel;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;

@@ -10,8 +10,9 @@ use App\Libraries\UiStore;
  *
  * Same layout as Add Pair with the values filled in, plus the Match Status
  * dropdown. The fields the source left unbound — gender, MRP, coordinator,
- * first dialysis, donor status — are still unbound here: they render but carry
- * no `name`, so posting the form leaves them alone exactly as before.
+ * first dialysis, donor status — are bound here: they now have columns behind
+ * them, and a control that shows a stored value but throws an edit away is a
+ * way to lose a record, not fidelity to the design.
  *
  * @var array<string, mixed>                  $pair
  * @var array<string, mixed>|null             $recipient
@@ -85,8 +86,12 @@ use App\Libraries\UiStore;
 
                 <div class="form-grid-5">
                     <div>
-                        <label class="field-label">Recipient Gender</label>
-                        <input type="text" class="input-ro" value="—" readonly>
+                        <label class="field-label" for="f-r-gender">Recipient Gender</label>
+                        <select id="f-r-gender" name="rGender" class="input">
+                            <?php foreach (UiStore::GENDER_OPTIONS as $value => $label): ?>
+                                <option value="<?= esc($value) ?>"<?= $v['rGender'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                     <div>
                         <label class="field-label" for="f-r-age">Recipient Age</label>
@@ -102,10 +107,10 @@ use App\Libraries\UiStore;
                     </div>
                     <div>
                         <label class="field-label" for="f-r-mrp">Recipient MRP</label>
-                        <select id="f-r-mrp" class="input">
-                            <option value="" selected>Choose MRP</option>
+                        <select id="f-r-mrp" name="rMrp" class="input">
+                            <option value=""<?= $v['rMrp'] === '' ? ' selected' : '' ?>>Choose MRP</option>
                             <?php foreach ($mrps as $mrp): ?>
-                                <option value="<?= esc($mrp['id']) ?>"><?= esc($mrp['name']) ?></option>
+                                <option value="<?= esc($mrp['id']) ?>"<?= $v['rMrp'] === $mrp['id'] ? ' selected' : '' ?>><?= esc($mrp['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -122,7 +127,7 @@ use App\Libraries\UiStore;
                     </div>
                     <div>
                         <label class="field-label" for="f-r-dialysis">First Dialysis</label>
-                        <input type="text" id="f-r-dialysis" class="input" placeholder="DD/MM/YYYY">
+                        <input type="text" id="f-r-dialysis" name="rFirstDialysis" class="input" value="<?= esc($v['rFirstDialysis']) ?>" placeholder="DD/MM/YYYY">
                     </div>
                     <div>
                         <label class="field-label">Entry Date</label>
@@ -179,8 +184,12 @@ use App\Libraries\UiStore;
                         <input type="tel" id="f-d-phone" name="dPhone" class="input" value="<?= esc($v['dPhone']) ?>" placeholder="+966 5x xxx xxxx">
                     </div>
                     <div>
-                        <label class="field-label">Donor Gender</label>
-                        <input type="text" class="input-ro" value="—" readonly>
+                        <label class="field-label" for="f-d-gender">Donor Gender</label>
+                        <select id="f-d-gender" name="dGender" class="input">
+                            <?php foreach (UiStore::GENDER_OPTIONS as $value => $label): ?>
+                                <option value="<?= esc($value) ?>"<?= $v['dGender'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                 </div>
 
@@ -199,22 +208,22 @@ use App\Libraries\UiStore;
                     </div>
                     <div>
                         <label class="field-label" for="f-d-mrp">Donor MRP</label>
-                        <select id="f-d-mrp" class="input">
-                            <option value="" selected>Choose MRP</option>
+                        <select id="f-d-mrp" name="dMrp" class="input">
+                            <option value=""<?= $v['dMrp'] === '' ? ' selected' : '' ?>>Choose MRP</option>
                             <?php foreach ($mrps as $mrp): ?>
-                                <option value="<?= esc($mrp['id']) ?>"><?= esc($mrp['name']) ?></option>
+                                <option value="<?= esc($mrp['id']) ?>"<?= $v['dMrp'] === $mrp['id'] ? ' selected' : '' ?>><?= esc($mrp['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div>
                         <label class="field-label" for="f-d-coordinator">Donor Coordinator</label>
-                        <input type="text" id="f-d-coordinator" class="input" placeholder="Choose Coordinator">
+                        <input type="text" id="f-d-coordinator" name="dCoordinator" class="input" value="<?= esc($v['dCoordinator']) ?>" placeholder="Choose Coordinator">
                     </div>
                     <div>
                         <label class="field-label" for="f-d-status">Donor Status</label>
-                        <select id="f-d-status" class="input">
+                        <select id="f-d-status" name="dStatus" class="input">
                             <?php foreach (UiStore::DONOR_STATUS_OPTIONS as $value => $label): ?>
-                                <option value="<?= esc($value) ?>"<?= $value === 'On Hold' ? ' selected' : '' ?>><?= esc($label) ?></option>
+                                <option value="<?= esc($value) ?>"<?= $v['dStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>

@@ -4,14 +4,14 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-/** Most responsible physicians. */
-class MrpModel extends Model
+/** Transplant coordinators. */
+class CoordinatorModel extends Model
 {
-    protected $table         = 'mrp';
+    protected $table         = 'coordinators';
     protected $primaryKey    = 'id';
     protected $returnType    = 'array';
     protected $useTimestamps = true;
-    protected $allowedFields = ['code', 'name', 'is_active'];
+    protected $allowedFields = ['name', 'is_active'];
 
     /** @return list<array<string, mixed>> */
     public function active(): array

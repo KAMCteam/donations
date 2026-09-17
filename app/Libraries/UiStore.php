@@ -5,17 +5,18 @@ namespace App\Libraries;
 use CodeIgniter\Session\Session;
 
 /**
- * Per-session working copy of the transplant registry used by the HTML UI.
+ * Per-session working copy of the registry the screens read and write.
  *
- * The HTML prototype kept recipients, donors, pairs and MRPs in a JavaScript
- * object that every page re-rendered from. Now that the screens are plain HTML
- * rendered by PHP, the same data lives here: seeded from {@see UiSeed} the
- * first time a session touches it, then mutated by the form posts. It is
- * session scoped, so — exactly like the prototype — one user's edits never
- * reach another's, and signing out clears them.
+ * It starts **empty**. The design package this UI came from shipped a set of
+ * invented patients, donors and pairs; they were removed, so a fresh session
+ * shows the empty states the screens already have ("No recipients found.",
+ * "No unmatched donors.", "No pairs found.") until real records are entered.
  *
- * Replace the read methods with model calls to put the screens on the real
- * `patients` / `pairs` tables; the views need no changes.
+ * Still session scoped, so one user's entries never reach another's and
+ * signing out clears them. That is the temporary part: the read and write
+ * methods below are shaped so their bodies can be reimplemented on top of
+ * `App\Models\*` — the tables in `app/Database/Migrations` — without the
+ * controller or any view changing, because they all take plain arrays.
  */
 final class UiStore
 {
@@ -100,10 +101,10 @@ final class UiStore
         $stored = $this->session->get(self::SESSION_KEY);
 
         $this->data = is_array($stored) ? $stored : [
-            'recipients' => UiSeed::recipients(),
-            'donors'     => UiSeed::donors(),
-            'pairs'      => UiSeed::pairs(),
-            'mrps'       => UiSeed::mrps(),
+            'recipients' => [],
+            'donors'     => [],
+            'pairs'      => [],
+            'mrps'       => [],
         ];
     }
 
@@ -112,7 +113,7 @@ final class UiStore
         $this->session->set(self::SESSION_KEY, $this->data);
     }
 
-    /** Drops the working copy; the next request re-seeds it. */
+    /** Drops the working copy; the next request starts from empty again. */
     public function reset(): void
     {
         $this->session->remove([self::SESSION_KEY, 'ui_organ', 'ui_staff_id']);

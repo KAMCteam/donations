@@ -32,7 +32,7 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
     $query[$key] = $value;
     $query = array_filter($query, static fn (string $v): bool => $v !== 'all');
 
-    return site_url('ui/pairs') . ($query === [] ? '' : '?' . http_build_query($query));
+    return site_url('pairs') . ($query === [] ? '' : '?' . http_build_query($query));
 };
 ?>
 <div class="page">
@@ -43,8 +43,8 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
             <p class="page-subtitle"><?= esc(ui_plural(count($rows), 'pair')) ?></p>
         </div>
         <div class="header-actions">
-            <a class="btn-outline" href="<?= site_url('ui/pairs/export') . '?' . http_build_query(['bt' => $btFilter, 'status' => $statusFilter]) ?>"><?= ui_icon('download') ?>Export CSV</a>
-            <a class="btn-primary" href="<?= site_url('ui/pairs/new') ?>"><?= ui_icon('plus') ?>Add Pair</a>
+            <a class="btn-outline" href="<?= site_url('pairs/export') . '?' . http_build_query(['bt' => $btFilter, 'status' => $statusFilter]) ?>"><?= ui_icon('download') ?>Export CSV</a>
+            <a class="btn-primary" href="<?= site_url('pairs/new') ?>"><?= ui_icon('plus') ?>Add Pair</a>
         </div>
     </div>
 
@@ -85,7 +85,7 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                         $donor       = $row['donor'];
                         $rowBg       = $index % 2 === 0 ? '#ffffff' : '#f8fafc';
                         $statusLabel = ucfirst(str_replace('-', ' ', $pair['status']));
-                        $url         = site_url('ui/pairs/' . rawurlencode($pair['id']));
+                        $url         = site_url('pairs/' . rawurlencode($pair['id']));
                         ?>
                         <tr class="row-recipient" data-href="<?= $url ?>" style="background-color:<?= $rowBg ?>">
                             <td rowspan="2" class="cell-pairno" style="background-color:<?= $rowBg ?>">

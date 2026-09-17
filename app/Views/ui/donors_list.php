@@ -19,7 +19,7 @@ $headers = ['ID', 'Name', 'Age', 'Blood Type', 'Type', 'Relationship', 'Hospital
             <h1 class="page-title">Donors List</h1>
             <p class="page-subtitle"><?= esc(ui_plural(count($donors), 'unmatched donor')) ?></p>
         </div>
-        <a class="btn-primary" href="<?= site_url('ui/donors/new') ?>"><?= ui_icon('plus') ?>Add Donor</a>
+        <a class="btn-primary" href="<?= site_url('donors/new') ?>"><?= ui_icon('plus') ?>Add Donor</a>
     </div>
 
     <div class="card card--scroll">
@@ -38,7 +38,7 @@ $headers = ['ID', 'Name', 'Age', 'Blood Type', 'Type', 'Relationship', 'Hospital
                     <?php foreach ($donors as $donor): ?>
                         <?php
                         $progress = UiStore::labProgress($donor['labTests']);
-                        $url      = site_url('ui/donors/' . rawurlencode($donor['id']));
+                        $url      = site_url('donors/' . rawurlencode($donor['id']));
                         ?>
                         <tr data-href="<?= $url ?>">
                             <td class="cell-id"><a href="<?= $url ?>"><?= esc($donor['id']) ?></a></td>

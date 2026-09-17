@@ -22,14 +22,14 @@ use App\Libraries\UiStore;
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
         <div>
-            <a class="back-link" href="<?= site_url('ui/pairs') ?>"><?= ui_icon('back') ?>Back to Pairs List</a>
+            <a class="back-link" href="<?= site_url('pairs') ?>"><?= ui_icon('back') ?>Back to Pairs List</a>
             <div class="eyebrow">New Pair</div>
             <h1 class="page-title">Add Pair</h1>
         </div>
         <button type="submit" form="pair-form" class="btn-save">Save</button>
     </div>
 
-    <form id="pair-form" class="stack-5" method="post" action="<?= site_url('ui/pairs/new') ?>">
+    <form id="pair-form" class="stack-5" method="post" action="<?= site_url('pairs/new') ?>">
         <?= csrf_field() ?>
 
         <div class="card card--pad">

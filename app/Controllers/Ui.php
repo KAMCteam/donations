@@ -47,7 +47,7 @@ class Ui extends BaseController
 
     public function index(): RedirectResponse
     {
-        return redirect()->to(site_url($this->store->isSignedIn() ? 'ui/dashboard' : 'ui/login'));
+        return redirect()->to(site_url($this->store->isSignedIn() ? 'dashboard' : 'login'));
     }
 
     public function login(): string
@@ -72,14 +72,14 @@ class Ui extends BaseController
 
         $this->store->signIn($id);
 
-        return redirect()->to(site_url('ui/organ'));
+        return redirect()->to(site_url('organ'));
     }
 
     public function logout(): RedirectResponse
     {
         $this->store->reset();
 
-        return redirect()->to(site_url('ui/login'));
+        return redirect()->to(site_url('login'));
     }
 
     public function organSelector(): string
@@ -97,7 +97,7 @@ class Ui extends BaseController
     {
         $this->store->setOrgan($organ);
 
-        return redirect()->to(site_url('ui/dashboard'));
+        return redirect()->to(site_url('dashboard'));
     }
 
     // ---- Dashboard ---------------------------------------------------------
@@ -173,7 +173,7 @@ class Ui extends BaseController
         $recipient = $this->store->findRecipient($id);
 
         if ($recipient === null) {
-            return redirect()->to(site_url('ui/recipients'));
+            return redirect()->to(site_url('recipients'));
         }
 
         return $this->personScreen('recipient', $recipient);
@@ -206,7 +206,7 @@ class Ui extends BaseController
         $donor = $this->store->findDonor($id);
 
         if ($donor === null) {
-            return redirect()->to(site_url('ui/donors'));
+            return redirect()->to(site_url('donors'));
         }
 
         return $this->personScreen('donor', $donor);
@@ -299,12 +299,12 @@ class Ui extends BaseController
             if ($person === null) {
                 $this->store->addRecipient(array_merge($fields, ['id' => $this->store->nextRecipientId()]));
 
-                return redirect()->to(site_url('ui/recipients'));
+                return redirect()->to(site_url('recipients'));
             }
 
             $this->store->updateRecipient($person['id'], $fields);
 
-            return redirect()->to(site_url('ui/recipients/' . rawurlencode($person['id'])));
+            return redirect()->to(site_url('recipients/' . rawurlencode($person['id'])));
         }
 
         $fields = array_merge($base, [
@@ -316,12 +316,12 @@ class Ui extends BaseController
         if ($person === null) {
             $this->store->addDonor(array_merge($fields, ['id' => $this->store->nextDonorId()]));
 
-            return redirect()->to(site_url('ui/donors'));
+            return redirect()->to(site_url('donors'));
         }
 
         $this->store->updateDonor($person['id'], $fields);
 
-        return redirect()->to(site_url('ui/donors/' . rawurlencode($person['id'])));
+        return redirect()->to(site_url('donors/' . rawurlencode($person['id'])));
     }
 
     // ---- Pairs -------------------------------------------------------------
@@ -518,7 +518,7 @@ class Ui extends BaseController
             'createdDate'   => $entryDate,
         ]);
 
-        return redirect()->to(site_url('ui/pairs'));
+        return redirect()->to(site_url('pairs'));
     }
 
     public function pair(string $id): string|RedirectResponse
@@ -526,7 +526,7 @@ class Ui extends BaseController
         $pair = $this->store->findPair($id);
 
         if ($pair === null || $pair['organ'] !== $this->store->organ()) {
-            return redirect()->to(site_url('ui/pairs'));
+            return redirect()->to(site_url('pairs'));
         }
 
         $recipient = $this->store->findRecipient($pair['recipientId']);
@@ -615,7 +615,7 @@ class Ui extends BaseController
             ]);
         }
 
-        return redirect()->to(site_url('ui/pairs/' . rawurlencode($pair['id'])));
+        return redirect()->to(site_url('pairs/' . rawurlencode($pair['id'])));
     }
 
     // ---- MRPs --------------------------------------------------------------
@@ -642,7 +642,7 @@ class Ui extends BaseController
             $this->session->setFlashdata('ui_mrp_saved', true);
         }
 
-        return redirect()->to(site_url('ui/mrp'));
+        return redirect()->to(site_url('mrp'));
     }
 
     // ---- Shared ------------------------------------------------------------

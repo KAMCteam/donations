@@ -25,7 +25,7 @@
             <div class="mrp-success"><?= ui_icon('check') ?>MRP added successfully.</div>
         <?php endif; ?>
 
-        <form class="card card--pad stack-5" method="post" action="<?= site_url('ui/mrp') ?>" novalidate>
+        <form class="card card--pad stack-5" method="post" action="<?= site_url('mrp') ?>" novalidate>
             <?= csrf_field() ?>
             <div>
                 <label class="mrp-label" for="mrp-id">MRP ID</label>

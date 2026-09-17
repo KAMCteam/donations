@@ -18,6 +18,8 @@ This application was migrated from CodeIgniter 3 (see
 ```bash
 composer install
 cp env .env          # then edit .env (see below)
+php spark migrate                          # create the schema
+php spark db:seed LabCatalogueSeeder       # fill the lab catalogue
 php spark serve      # http://localhost:8080
 ```
 
@@ -130,14 +132,144 @@ shape it normally.
 
 Two things still stand between these screens and production use:
 
-- **No database.** Records are held per session and seeded from `UiSeed.php`,
-  the design package's demo data converted to PHP — nothing is read from or
-  written to the database. Point the read methods in `UiStore` at
-  `App\Models\*` to put the screens on the live `patients` / `pairs` tables;
-  the views take plain arrays and need no changes.
+- **The screens do not read the database yet.** The schema exists and every
+  field they collect has a column (see [Database](#database)), but records are
+  still held per session and seeded from `UiSeed.php`, the design package's
+  demo data converted to PHP. Reimplement the read and write methods in
+  `UiStore` on top of `App\Models\*` — the views take plain arrays and need
+  no changes, which is what that class's interface is shaped for.
 - **No real login.** `/login` accepts any non-empty Staff ID and password,
-  exactly as the design package's did. It must be wired to the real staff
-  directory before this is deployed anywhere reachable.
+  exactly as the design package's did. The `staff` table is there for it to
+  check against; until `Ui::attemptLogin()` does, this must not be deployed
+  anywhere reachable.
+
+## Database
+
+The schema lives in `app/Database/Migrations/` and is created with:
+
+```bash
+php spark migrate
+php spark db:seed LabCatalogueSeeder
+```
+
+`app/Database/schema/donations_schema.sql` is the same schema as a single
+importable dump, for phpMyAdmin or the `mysql` client. It carries the
+`migrations` rows too, so importing it and then running `php spark migrate` is
+a no-op rather than an attempt to create everything twice. Regenerate it with
+`app/Database/schema/regenerate.sh` after changing a migration.
+
+Neither route inserts people: no patients, no staff accounts, no physicians or
+coordinators. Only structure and the lab catalogue.
+
+### Tables
+
+| Table | Holds |
+| --- | --- |
+| `patients` | One row per person, recipient or donor, keyed by `mrn` |
+| `pairs` | Recipient/donor matches, their status and dates |
+| `labs` | The catalogue of tests — what *can* be run, per organ and person type |
+| `lab_parents` | The group each lab is listed under (Virology, Imaging, ...) |
+| `lab_results` | One row per patient per lab: status, result, date, comment |
+| `mrp` | Most responsible physicians |
+| `coordinators` | Transplant coordinators |
+| `staff` | Sign-in accounts for the login screen (new) |
+| `waiting_list` | A **view**: unmatched recipients with their score |
+
+### The waiting-list score is unchanged
+
+`waiting_list` carries the score expression over character for character from
+`PairsModel::SCORE_CALC`:
+
+```sql
+(0.1 * TIMESTAMPDIFF(MONTH, entry_date, CURDATE())) +
+(0.1 * TIMESTAMPDIFF(MONTH, dialysis,   CURDATE()))
+```
+
+So a recipient 20 months on the list and 30 months on dialysis still scores
+5.0. Its one quirk is preserved too: `dialysis` is nullable and NULL plus a
+number is NULL, so a recipient with no dialysis date scores NULL rather than
+counting only the waiting time. That is the original behaviour and is left
+alone — `score_entry_only` sits beside it for anyone who wants the
+waiting-time half on its own.
+
+Two subtleties that keep the retained models working:
+
+- **`urgency` is declared least-urgent-first** — `ENUM('low','medium','high','critical')`.
+  MySQL sorts an ENUM by declaration index, so `ORDER BY urgency DESC`, which
+  `PairsModel::get_unmatched_recipients()` still does, keeps meaning
+  most-urgent-first exactly as it did when the column held 0 or 1. Declaring
+  it critical-first would silently invert the waiting list. The screens take
+  their own order from `UiStore::URGENCY_OPTIONS`.
+- **`patients.organs` and `pairs.programs` keep their original plural names**,
+  because `ListsModel` reads them back by name with `SHOW COLUMNS` to build
+  its dropdowns.
+
+### What was added, and why
+
+Everything the original schema had is present under the same name. These are
+the additions, all of them fields the platform's screens collect and the old
+schema had nowhere to put:
+
+| Added | Table | Why |
+| --- | --- | --- |
+| `coordinator_id` | `patients` | The add-patient form always had a Coordinator dropdown, but no column existed, so the choice was silently dropped on save |
+| `hospital` | `patients` | Shown on every record screen and in the donors table |
+| `diagnosis` | `patients` | Recipient screens collect a primary diagnosis |
+| `donation_type` | `patients` | living / deceased, rendered as a badge in the donors table |
+| `relationship` | `patients` | "Brother of recipient R-001"; survives before a pair exists |
+| `is_urgent`, `urgency_rank` | `patients` | Generated, never written: the old 0/1 urgency and a sortable rank |
+| `status` values | `patients` | `completed` and `cancelled`, from the Donor Status dropdown |
+| `note` | `pairs` | The pairs table has a Note column and the pair screen a notes box |
+| `match_status` values | `pairs` | `active`, `scheduled`, `on_hold`, from the Match Status dropdown; the original five are untouched |
+| `status` | `lab_results` | The pending / completed / flagged state every lab card shows and the progress bar counts |
+| `result_date` | `lab_results` | Each card shows the date the result came back |
+| `sort_order`, `is_active` | `labs` | Order a workup without depending on `lab_id` order; retire a test without deleting its history |
+| `staff` (whole table) | — | The login screen had nothing to authenticate against |
+| Foreign keys, indexes | all | None existed. Deleting a paired patient now fails loudly; the filter columns are indexed |
+
+Two deliberate omissions:
+
+- **`tests`** existed in the old database but no code referenced it, so its
+  columns could not be recovered. It was not carried over. If it holds
+  anything, its `SHOW CREATE TABLE` is all that is needed to add it.
+- **No unique index for "one open pair per recipient/donor".** The natural way
+  to write it is a unique index over a generated column that is NULL while the
+  pair is closed, but MariaDB rejects a generated column reading a column that
+  belongs to an `ON UPDATE CASCADE` foreign key (error 1901), and both MRN
+  columns do so that a corrected MRN still propagates. The cascade is worth
+  more; the rule stays in `PairsModel::pair_exists()`, where it already lived.
+
+### Verifying it
+
+`tests/database/SchemaTest.php` checks the schema against both of the things
+it has to satisfy — every retained model, and every field the screens collect.
+It needs a MySQL `tests` group and skips otherwise:
+
+```ini
+database.tests.hostname = 127.0.0.1
+database.tests.database = donations_test
+database.tests.username = ...
+database.tests.password = ...
+database.tests.DBDriver = MySQLi
+database.tests.DBPrefix =
+```
+
+The empty prefix is not incidental: `PairsModel`'s `NOT IN (SELECT ... FROM
+pairs)` sub-select and `ListsModel`'s `SHOW COLUMNS FROM <table>` were carried
+over from CodeIgniter 3 naming their tables directly, so neither survives a
+`DBPrefix`. The `default` group has no prefix either, so this matches how the
+application runs — but it is a real limitation of those two models if a
+prefixed install is ever wanted.
+
+### Creating the first staff account
+
+Nothing is seeded, and `Ui::attemptLogin()` does not check this table yet — it
+still accepts any non-empty credentials. Once it does, an account is:
+
+```php
+php spark db:query "INSERT INTO staff (staff_id, name, password_hash, role)
+  VALUES ('DR-00421', 'Full Name', '$(php -r "echo password_hash('the-password', PASSWORD_DEFAULT);")', 'admin')"
+```
 
 ## Migration notes (CodeIgniter 3 → 4)
 

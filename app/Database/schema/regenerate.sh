@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Regenerates donations_schema.sql from a freshly migrated and seeded database.
 #
-#   php spark migrate && php spark db:seed LabCatalogueSeeder
+#   php spark migrate && php spark db:seed DatabaseSeeder
 #   bash app/Database/schema/regenerate.sh [db] [user]
 #
 # The migrations remain the source of truth; this file only mirrors them for
@@ -25,7 +25,7 @@ echo "Run the header by hand if it needs updating; this script refreshes the SQL
     echo "-- log so the framework knows this schema is already at the latest version."
     echo "-- ---------------------------------------------------------------------------"
     echo ""
-    mariadb-dump -u "$USER" --no-create-info --skip-comments --complete-insert --skip-set-charset "$DB" lab_parents labs migrations | grep -v '^/\*!999999'
+    mariadb-dump -u "$USER" --no-create-info --skip-comments --complete-insert --skip-set-charset "$DB" organ_programs lab_parents labs migrations | grep -v '^/\*!999999'
     echo ""
     echo "SET FOREIGN_KEY_CHECKS = 1;"
 } > "$OUT.tmp"

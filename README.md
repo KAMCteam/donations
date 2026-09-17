@@ -19,7 +19,7 @@ This application was migrated from CodeIgniter 3 (see
 composer install
 cp env .env          # then edit .env (see below)
 php spark migrate                          # create the schema
-php spark db:seed LabCatalogueSeeder       # fill the lab catalogue
+php spark db:seed DatabaseSeeder           # programmes + lab catalogue
 php spark serve      # http://localhost:8080
 ```
 
@@ -149,7 +149,7 @@ The schema lives in `app/Database/Migrations/` and is created with:
 
 ```bash
 php spark migrate
-php spark db:seed LabCatalogueSeeder
+php spark db:seed DatabaseSeeder
 ```
 
 `app/Database/schema/donations_schema.sql` is the same schema as a single
@@ -159,7 +159,7 @@ a no-op rather than an attempt to create everything twice. Regenerate it with
 `app/Database/schema/regenerate.sh` after changing a migration.
 
 Neither route inserts people: no patients, no staff accounts, no physicians or
-coordinators. Only structure and the lab catalogue.
+coordinators. Only structure, the two organ programmes and the lab catalogue.
 
 ### Tables
 
@@ -172,8 +172,50 @@ coordinators. Only structure and the lab catalogue.
 | `lab_results` | One row per patient per lab: status, result, date, comment |
 | `mrp` | Most responsible physicians |
 | `coordinators` | Transplant coordinators |
+| `organ_programs` | The programmes the picker offers: label, description, icon (new) |
 | `staff` | Sign-in accounts for the login screen (new) |
-| `waiting_list` | A **view**: unmatched recipients with their score |
+
+### One database object per screen
+
+Every screen in the design that shows data has something in the database named
+after it and shaped the way it reads:
+
+| Screen | Object | |
+| --- | --- | --- |
+| Recipient Waitlist | `waiting_list` | view — unmatched recipients, with the score |
+| Donors List | `donors` | view — every donor, lab progress, `is_matched` |
+| Pairs List | `pairs_overview` | view — one row per pair, both sides flattened |
+| Dashboard | `dashboard_stats` | view — one row per programme, the four counters |
+| (the recipient register) | `recipients` | view — the symmetric counterpart of `donors` |
+| Organ picker | `organ_programs` | table — its label, description and icon |
+
+**`donors` is a view over `patients WHERE type = 'donor'`, not a table of its
+own.** A donor is a person, and so is a recipient: the same MRN, the same lab
+results, the same two foreign keys from `pairs`. The original schema worked
+this way and every retained model assumes it —
+`PairsModel::get_unmatched_donors()` queries `patients WHERE type = 'donor'`,
+and `expand_pairs()` calls `get_patient_info_modified()` for both halves of a
+pair. A physical `donors` table would mean duplicating fifteen columns, giving
+`pairs` two different foreign-key targets, splitting `lab_results.patient_id`
+in two, and deciding what happens when the same person donates on one
+programme and receives on another. The view gives the screen its own name and
+its own shape with none of that.
+
+`recipients` and `donors` hold *everyone* of that type and expose an
+`is_matched` flag; each screen renders `WHERE is_matched = 0` for the unmatched
+list. `waiting_list` is the one that filters for you, because "waiting list"
+means unmatched.
+
+The views are read-only. `patients` and `pairs` stay the only things written
+to, so there is nothing to keep in sync.
+
+`organ_programs` is a real table because it is content, not derivation: the
+picker's heading, its subtitle and its icon were hardcoded in
+`Ui::organSelector()`, which made adding a third programme a code change.
+`patients.organs` and `labs.organ_type` stay ENUMs, since `ListsModel` reads
+their values back with `SHOW COLUMNS` to build dropdowns, and a test asserts
+the ENUMs and `organ_programs.code` never drift apart. So adding a programme is
+a row here plus a migration widening those two ENUMs.
 
 ### The waiting-list score is unchanged
 
@@ -225,6 +267,8 @@ schema had nowhere to put:
 | `result_date` | `lab_results` | Each card shows the date the result came back |
 | `sort_order`, `is_active` | `labs` | Order a workup without depending on `lab_id` order; retire a test without deleting its history |
 | `staff` (whole table) | — | The login screen had nothing to authenticate against |
+| `organ_programs` (whole table) | — | The picker's label, description and icon were hardcoded in the controller |
+| `recipients`, `donors`, `pairs_overview`, `dashboard_stats` | — | A view per list screen in the design, so each has an object shaped the way it reads |
 | Foreign keys, indexes | all | None existed. Deleting a paired patient now fails loudly; the filter columns are indexed |
 
 Two deliberate omissions:
@@ -241,9 +285,10 @@ Two deliberate omissions:
 
 ### Verifying it
 
-`tests/database/SchemaTest.php` checks the schema against both of the things
-it has to satisfy — every retained model, and every field the screens collect.
-It needs a MySQL `tests` group and skips otherwise:
+`tests/database/SchemaTest.php` checks the schema against the three things it
+has to satisfy — every retained model, every field the screens collect, and
+every list screen's view returning what that screen renders. It needs a MySQL
+`tests` group and skips otherwise:
 
 ```ini
 database.tests.hostname = 127.0.0.1

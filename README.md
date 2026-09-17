@@ -134,10 +134,12 @@ Two things still stand between these screens and production use:
 
 - **The screens do not read the database yet.** The schema exists and every
   field they collect has a column (see [Database](#database)), but records are
-  still held per session and seeded from `UiSeed.php`, the design package's
-  demo data converted to PHP. Reimplement the read and write methods in
-  `UiStore` on top of `App\Models\*` — the views take plain arrays and need
-  no changes, which is what that class's interface is shaped for.
+  still held per session in `UiStore`. That store now starts **empty** — the
+  design package's invented patients, donors and pairs were deleted — so the
+  screens show their empty states until real records are entered. Reimplement
+  the read and write methods in `UiStore` on top of `App\Models\*`; the views
+  take plain arrays and need no changes, which is what that class's interface
+  is shaped for.
 - **No real login.** `/login` accepts any non-empty Staff ID and password,
   exactly as the design package's did. The `staff` table is there for it to
   check against; until `Ui::attemptLogin()` does, this must not be deployed
@@ -145,180 +147,123 @@ Two things still stand between these screens and production use:
 
 ## Database
 
-The schema lives in `app/Database/Migrations/` and is created with:
+The schema is the migrations in `app/Database/Migrations`. There is no `.sql`
+file — the migrations are the only definition, so there is nothing to keep in
+step with them:
 
 ```bash
 php spark migrate
 php spark db:seed DatabaseSeeder
 ```
 
-`app/Database/schema/donations_schema.sql` is the same schema as a single
-importable dump, for phpMyAdmin or the `mysql` client. It carries the
-`migrations` rows too, so importing it and then running `php spark migrate` is
-a no-op rather than an attempt to create everything twice. Regenerate it with
-`app/Database/schema/regenerate.sh` after changing a migration.
+The seeder inserts **reference rows only** — the two programmes and the lab
+catalogue. No patients, no donors, no pairs, no staff accounts, no physicians
+or coordinators. It is re-runnable and skips anything already there, so it will
+not undo edits made through the screens.
 
-Neither route inserts people: no patients, no staff accounts, no physicians or
-coordinators. Only structure, the two organ programmes and the lab catalogue.
+### The tables, and why each one is there
 
-### Tables
+Ten tables, arrived at by walking the screens and asking what each reads and
+writes.
 
-| Table | Holds |
+| Table | Exists because |
 | --- | --- |
-| `recipients` | One row per recipient, keyed by `mrn` |
-| `donors` | One row per donor, keyed by `mrn` |
-| `pairs` | Recipient/donor matches, their status and dates |
-| `labs` | The catalogue of tests — what *can* be run, per organ and person type |
-| `lab_parents` | The group each lab is listed under (Virology, Imaging, ...) |
-| `lab_results` | One row per person per lab: status, result, date, comment |
-| `mrp` | Most responsible physicians |
-| `coordinators` | Transplant coordinators |
-| `organ_programs` | The programmes the picker offers: label, description, icon |
-| `staff` | Sign-in accounts for the login screen |
+| `staff` | The login screen needs something to authenticate against |
+| `organ_programs` | The picker's cards are content — label, description, icon — not code |
+| `mrp` | Every record screen assigns a most responsible physician |
+| `coordinators` | Every record screen assigns a coordinator |
+| `lab_parents` | The workup is shown grouped: Virology, Imaging, Cardiac |
+| `labs` | The catalogue: which tests a workup is made of, per programme and side |
+| `recipients` | The waiting list, and the two dates the score is computed from |
+| `donors` | The donor register |
+| `pairs` | The link between a recipient and a donor, and its history |
+| `lab_results` | One row per person per test: status, value, date |
 
-### Two registers, not one patients table
+Two tables rather than one for people, because a recipient and a donor are not
+the same record. A recipient has `entry_date`, `dialysis_start`, `urgency` and
+`diagnosis`; a donor has `donation_type` and `relationship`. Sharing one table
+means four columns that are always NULL on one side. The same person can hold a
+row in both under one MRN — they may donate on one programme and be listed on
+another.
 
-The original schema kept everyone in one `patients` table with a
-`type ENUM('recipient','donor')`. This schema has **a table each**, because the
-design does: it has a Recipient Waitlist screen and a Donors List screen, and
-their forms ask for different things. The split also removes columns that were
-always NULL for one side:
+`labs` is separate from `lab_results` for the same reason: the definition of a
+workup changes, and when it does no patient record should be touched. Retiring
+a test hides it from new workups and leaves the results already recorded
+against it alone.
 
-| Only on `recipients` | Only on `donors` |
-| --- | --- |
-| `entry_date`, `urgency` (+ `is_urgent`, `urgency_rank`), `diagnosis`, `dialysis` | `donation_type`, `relationship` |
+### The score
 
-Everything else — `mrn`, `name`, `city`, `phone_number`, `gender`, `age`,
-`blood_group`, `organs`, `status`, `hospital`, `mrp_id`, `coordinator_id`,
-`note` — is on both, under the original schema's names.
-
-`pairs` points each side at its own table, which is stricter than before: a
-recipient's MRN can no longer be filed as the donor half by mistake.
-
-The same person can appear in both registers under one MRN — they may donate on
-one programme and receive on another, and it is still one person with one set
-of lab results.
-
-### The views
-
-Five, and none of them stores anything:
-
-| View | Is |
-| --- | --- |
-| `patients` | `recipients UNION ALL donors`, with `type` back — the compatibility shim |
-| `waiting_list` | Unmatched recipients with the score — the Recipient Waitlist screen |
-| `donors_list` | Every donor with lab progress and `is_matched` — the Donors List screen |
-| `pairs_overview` | One row per pair, both sides flattened under `r_` / `d_` — the Pairs List |
-| `dashboard_stats` | One row per programme — the Dashboard's counters |
-
-**`patients` is what keeps the retained models working.** `PatientModel`,
-`PairsModel`, `QueriesModel` and `ListsModel` were written against the single
-table, and they all still read the names and shape they expect —
-`get_all_patients()`, `get_unmatched_donors()`, the score, the ENUM discovery.
-What the view cannot do is take an INSERT: MySQL will not write through a
-UNION, so new people are written to `recipients` and `donors` directly.
-
-`waiting_list` and `donors_list` exist because those two screens show things no
-column can hold — the score, how many of someone's labs are done, and whether
-they are already in an open pair — so those are counted at read time. A report
-cannot be a table without something to refresh it, which is why these are views
-while the two registers are not.
-
-`organ_programs` is a real table because it is content, not derivation: the
-picker's heading, its subtitle and its icon were hardcoded in
-`Ui::organSelector()`, which made adding a programme a code change.
-`recipients.organs`, `donors.organs` and `labs.organ_type` stay ENUMs, since
-`ListsModel` reads their values back with `SHOW COLUMNS` to build dropdowns,
-and a test asserts the ENUMs and `organ_programs.code` never drift apart. So
-adding a programme is a row here plus a migration widening those three ENUMs.
-
-### `lab_results` has no foreign key on the person, and two triggers instead
-
-`lab_results.patient_id` is an MRN that matches a row in `recipients`, in
-`donors`, or in both. MySQL has no way to point one column at either of two
-tables, so there is no foreign key there — the `lab_id` one is still in place.
-In its stead, `recipients_delete_lab_results` and `donors_delete_lab_results`
-do the `ON DELETE CASCADE` a foreign key would have given, so removing someone
-does not leave their results behind. The dump carries both triggers.
-
-This is the one integrity guarantee the two-register design costs, and it is
-the reason the original schema had a single table. It is stated here rather
-than hidden.
-
-### The waiting-list score is unchanged
-
-`waiting_list` carries the score expression over character for character from
-`PairsModel::SCORE_CALC`:
+Two columns on `recipients` carry it — `entry_date` and `dialysis_start` — and
+the expression lives in one place, `RecipientModel::SCORE_CALC`:
 
 ```sql
-(0.1 * TIMESTAMPDIFF(MONTH, entry_date, CURDATE())) +
-(0.1 * TIMESTAMPDIFF(MONTH, dialysis,   CURDATE()))
+(0.1 * TIMESTAMPDIFF(MONTH, entry_date,     CURDATE())) +
+(0.1 * TIMESTAMPDIFF(MONTH, dialysis_start, CURDATE()))
 ```
 
-So a recipient 20 months on the list and 30 months on dialysis still scores
-5.0. Its one quirk is preserved too: `dialysis` is nullable and NULL plus a
-number is NULL, so a recipient with no dialysis date scores NULL rather than
-counting only the waiting time. That is the original behaviour and is left
-alone — `score_entry_only` sits beside it for anyone who wants the
-waiting-time half on its own.
+A tenth of a point per month waiting, plus a tenth per month on dialysis: 20
+months on the list and 30 on dialysis is 5.0. Unchanged from the original
+system.
 
-Two subtleties that keep the retained models working:
+It is **computed at read time and never stored**, so it keeps counting up on
+its own and cannot go stale — there is no job to run and no column to refresh.
+Its one quirk is kept: `dialysis_start` is nullable and NULL plus a number is
+NULL in SQL, so a recipient with no dialysis date scores NULL rather than
+counting only the waiting time. `score_waiting_only` sits beside it for anyone
+who needs a number in that case.
 
-- **`urgency` is declared least-urgent-first** — `ENUM('low','medium','high','critical')`.
-  MySQL sorts an ENUM by declaration index, so `ORDER BY urgency DESC`, which
-  `PairsModel::get_unmatched_recipients()` still does, keeps meaning
-  most-urgent-first exactly as it did when the column held 0 or 1. Declaring
-  it critical-first would silently invert the waiting list. The screens take
-  their own order from `UiStore::URGENCY_OPTIONS`.
-- **`organs` and `pairs.programs` keep their original plural names**, because
-  `ListsModel` reads them back by name with `SHOW COLUMNS` to build its
-  dropdowns.
+`urgency` is declared `ENUM('low','medium','high','critical')` — least-urgent
+first — because MySQL sorts an ENUM by declaration index, so the waiting list's
+`ORDER BY urgency DESC, score DESC` reads most-urgent-first, then highest score
+inside each band.
 
-### What was added, and why
+### The linking system
 
-Everything the original schema had is present under the same name. These are
-the additions, all of them fields the platform's screens collect and the old
-schema had nowhere to put:
+One rule runs through all of it, written once as `PairModel::CLOSED`:
 
-| Added | Table | Why |
-| --- | --- | --- |
-| `coordinator_id` | `patients` | The add-patient form always had a Coordinator dropdown, but no column existed, so the choice was silently dropped on save |
-| `hospital` | `patients` | Shown on every record screen and in the donors table |
-| `diagnosis` | `patients` | Recipient screens collect a primary diagnosis |
-| `donation_type` | `patients` | living / deceased, rendered as a badge in the donors table |
-| `relationship` | `patients` | "Brother of recipient R-001"; survives before a pair exists |
-| `is_urgent`, `urgency_rank` | `patients` | Generated, never written: the old 0/1 urgency and a sortable rank |
-| `status` values | `patients` | `completed` and `cancelled`, from the Donor Status dropdown |
-| `note` | `pairs` | The pairs table has a Note column and the pair screen a notes box |
-| `match_status` values | `pairs` | `active`, `scheduled`, `on_hold`, from the Match Status dropdown; the original five are untouched |
-| `status` | `lab_results` | The pending / completed / flagged state every lab card shows and the progress bar counts |
-| `result_date` | `lab_results` | Each card shows the date the result came back |
-| `sort_order`, `is_active` | `labs` | Order a workup without depending on `lab_id` order; retire a test without deleting its history |
-| `staff` (whole table) | — | The login screen had nothing to authenticate against |
-| `organ_programs` (whole table) | — | The picker's label, description and icon were hardcoded in the controller |
-| `recipients` / `donors` split | — | A table each, as the design has them; drops the columns that were always NULL for one side |
-| `patients` (now a view) | — | Unions the two back together so every retained model keeps working |
-| `waiting_list`, `donors_list`, `pairs_overview`, `dashboard_stats` | — | A view per list screen, for the parts no column can hold |
-| Foreign keys, indexes | all | None existed. Deleting a paired patient now fails loudly; the filter columns are indexed |
+> **A pair is open unless its status is `closed`.**
 
-Two deliberate omissions:
+Everything follows from that:
 
-- **`tests`** existed in the old database but no code referenced it, so its
-  columns could not be recovered. It was not carried over. If it holds
-  anything, its `SHOW CREATE TABLE` is all that is needed to add it.
-- **No unique index for "one open pair per recipient/donor".** The natural way
-  to write it is a unique index over a generated column that is NULL while the
-  pair is closed, but MariaDB rejects a generated column reading a column that
-  belongs to an `ON UPDATE CASCADE` foreign key (error 1901), and both MRN
-  columns do so that a corrected MRN still propagates. The cascade is worth
-  more; the rule stays in `PairsModel::pair_exists()`, where it already lived.
+- A recipient is on the waiting list when no open pair holds them.
+- A donor is on the register when no open pair holds them.
+- Closing a pair releases both sides, and either can be linked again — to each
+  other or to somebody else.
+- `closed` is a status, not a deleted row, so a failed match stays on the
+  record with its `closed_reason`.
+
+`PairModel::link()` refuses to link somebody who is already in an open pair.
+That check is in the model rather than the database because the natural way to
+express it — a unique index over a generated column that goes NULL once closed
+— is something MySQL rejects when the column belongs to an `ON UPDATE CASCADE`
+foreign key, and both MRN columns do, so that a corrected MRN still follows
+through to the pair. The cascade is worth more than the index.
+
+Both sides are foreign keys into their own register with `ON DELETE RESTRICT`,
+so a recipient's MRN cannot be filed as the donor half, neither side can name
+somebody who does not exist, and deleting someone who is half of a pair fails
+loudly instead of quietly dropping the match.
+
+### `lab_results` has no foreign key on the person
+
+`person_mrn` plus `person_type` identifies the row, because a result belongs to
+the person in the role they were being worked up for. MySQL cannot point one
+column at either of two tables, so there is no foreign key there — `lab_id` is
+still a real one. Two `AFTER DELETE` triggers,
+`recipients_delete_lab_results` and `donors_delete_lab_results`, do the cascade
+a foreign key would have.
+
+This is the one integrity guarantee the two-register design costs. It is stated
+here rather than hidden.
 
 ### Verifying it
 
-`tests/database/SchemaTest.php` checks the schema against the three things it
-has to satisfy — every retained model, every field the screens collect, and
-every list screen's view returning what that screen renders. It needs a MySQL
-`tests` group and skips otherwise:
+`tests/database/SchemaTest.php` covers exactly the two systems above: the score
+(the arithmetic, the NULL case, that it counts up on its own, and the waiting
+list's ordering and filters) and the linking rules (linking, closing,
+re-linking, refusing a double link, refusing a recipient as a donor, the
+delete restriction, and the MRN cascade). It needs a MySQL `tests` group and
+skips otherwise:
 
 ```ini
 database.tests.hostname = 127.0.0.1
@@ -329,22 +274,12 @@ database.tests.DBDriver = MySQLi
 database.tests.DBPrefix =
 ```
 
-The empty prefix is not incidental: `PairsModel`'s `NOT IN (SELECT ... FROM
-pairs)` sub-select and `ListsModel`'s `SHOW COLUMNS FROM <table>` were carried
-over from CodeIgniter 3 naming their tables directly, so neither survives a
-`DBPrefix`. The `default` group has no prefix either, so this matches how the
-application runs — but it is a real limitation of those two models if a
-prefixed install is ever wanted.
-
 ### Creating the first staff account
 
-Nothing is seeded, and `Ui::attemptLogin()` does not check this table yet — it
-still accepts any non-empty credentials. Once it does, an account is:
-
-```php
-php spark db:query "INSERT INTO staff (staff_id, name, password_hash, role)
-  VALUES ('DR-00421', 'Full Name', '$(php -r "echo password_hash('the-password', PASSWORD_DEFAULT);")', 'admin')"
-```
+Nothing is seeded, and `Ui::attemptLogin()` does not check `staff` yet — it
+still accepts any non-empty credentials. Once it does, an account is a row with
+a `password_hash()` digest; `StaffModel::authenticate()` is already written for
+it.
 
 ## Migration notes (CodeIgniter 3 → 4)
 

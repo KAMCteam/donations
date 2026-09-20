@@ -173,6 +173,16 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                                 <span>This case is urgent</span>
                             </label>
                         </div>
+                        <div>
+                            <?php // The same list, and the same value, as the pair's
+                                  // Match Status: setting either sets the other. ?>
+                            <label class="field-label" for="f-status">Recipient Status</label>
+                            <select id="f-status" name="status" class="input">
+                                <?php foreach (UiStore::STATUS_OPTIONS as $value => $label): ?>
+                                    <option value="<?= esc($value) ?>"<?= $v['status'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                     </div>
                 </div>
             <?php else: ?>

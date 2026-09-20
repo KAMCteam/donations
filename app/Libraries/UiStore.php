@@ -44,14 +44,38 @@ final class UiStore
 
     public const BLOOD_TYPES = ['A', 'B', 'O', 'AB'];
 
-    public const PAIR_STATUSES = ['active', 'scheduled', 'completed', 'on-hold'];
+    /**
+     * One status vocabulary, shared by a recipient and the pair they are in.
+     *
+     * A recipient's status and their pair's Match Status are the same fact
+     * about the same case, so they are the same list and the same value:
+     * setting either one sets the other, and neither screen can show something
+     * the other contradicts. A recipient with no pair simply keeps their own.
+     *
+     * `closed` is the one with meaning beyond its label — it is what "open
+     * pair" is defined against, so closing a pair puts both sides back on
+     * their lists. The rest are descriptive.
+     */
+    public const STATUS_OPTIONS = [
+        'pending'         => 'Pending',
+        'confirmed'       => 'Confirmed',
+        'closed'          => 'Closed',
+        'completed'       => 'Completed',
+        'paired_exchange' => 'Paired Exchange',
+        'on_hold'         => 'On Hold',
+        'active'          => 'Active',
+        'declined'        => 'Declined',
+    ];
 
-
-    public const PAIR_STATUS_TONE = [
-        'active'    => 'tone-blue',
-        'scheduled' => 'tone-teal',
-        'completed' => 'tone-emerald',
-        'on-hold'   => 'tone-slate',
+    public const STATUS_TONE = [
+        'pending'         => 'tone-amber-soft',
+        'confirmed'       => 'tone-blue-soft',
+        'closed'          => 'tone-slate',
+        'completed'       => 'tone-emerald',
+        'paired_exchange' => 'tone-teal',
+        'on_hold'         => 'tone-amber',
+        'active'          => 'tone-blue',
+        'declined'        => 'tone-red',
     ];
 
     public const LAB_STATUS_TONE = [
@@ -75,14 +99,6 @@ final class UiStore
         'Active'    => 'Active',
         'Completed' => 'Completed',
         'Cancelled' => 'Cancelled',
-    ];
-
-    /** The "Match Status" dropdown on the pair profile, in the source's order. */
-    public const PAIR_STATUS_OPTIONS = [
-        'active'    => 'Active',
-        'scheduled' => 'Scheduled',
-        'on-hold'   => 'On Hold',
-        'completed' => 'Completed',
     ];
 
     /**
@@ -279,12 +295,20 @@ final class UiStore
      */
     public function addPair(array $pair): int
     {
-        return (int) $this->pairs->link((int) $pair['recipientId'], (int) $pair['donorId'], [
-            'status'          => $this->pairStatusToRow(($pair['status'] ?? '') ?: 'active'),
+        $status = $this->statusKey((string) ($pair['status'] ?? '')) ?: 'active';
+
+        $id = (int) $this->pairs->link((int) $pair['recipientId'], (int) $pair['donorId'], [
+            'status'          => $status,
             'relationship'    => $pair['relationship'] ?? null,
             'crossmatch_date' => $this->toDate($pair['scheduledDate'] ?? null),
             'notes'           => $pair['notes'] ?? null,
         ]);
+
+        // The two are one status from the moment the pair exists, so the
+        // recipient does not sit at Pending behind an active pair.
+        $this->recipients->update((int) $pair['recipientId'], ['status' => $status]);
+
+        return $id;
     }
 
     /**
@@ -319,6 +343,17 @@ final class UiStore
         if (isset($changes['labTests'])) {
             $this->saveLabTests((int) $id, 'recipient', $changes['labTests']);
         }
+
+        // A recipient's status and their pair's Match Status are one fact, so
+        // whichever screen sets it, the other follows. Written straight to the
+        // model rather than back through updatePair(), which would come round
+        // here again.
+        $status = $this->statusKey((string) ($changes['status'] ?? ''));
+        $pair   = $status === '' ? null : $this->pairs->openPairForRecipient((int) $id);
+
+        if ($pair !== null) {
+            $this->pairs->update((int) $pair['id'], ['status' => $status]);
+        }
     }
 
     /** @param array<string, mixed> $changes */
@@ -342,10 +377,11 @@ final class UiStore
             return;
         }
 
-        $row = [];
+        $row    = [];
+        $status = $this->statusKey((string) ($changes['status'] ?? ''));
 
-        if (($changes['status'] ?? '') !== '') {
-            $row['status'] = $this->pairStatusToRow($changes['status']);
+        if ($status !== '') {
+            $row['status'] = $status;
         }
 
         if (array_key_exists('scheduledDate', $changes)) {
@@ -362,6 +398,15 @@ final class UiStore
 
         if ($row !== []) {
             $this->pairs->update((int) $id, $row);
+        }
+
+        // The other half of the link above.
+        if ($status !== '') {
+            $pair = $this->pairs->find((int) $id);
+
+            if ($pair !== null) {
+                $this->recipients->update((int) $pair['recipient_mrn'], ['status' => $status]);
+            }
         }
     }
 
@@ -440,6 +485,7 @@ final class UiStore
             'phone'          => (string) $row['phone'],
             'address'        => (string) $row['city'],
             'urgent'         => (bool) $row['is_urgent'],
+            'status'         => $row['status'],
             'dateRegistered' => (string) $row['entry_date'],
             'firstDialysis'  => $row['dialysis_start'] === null ? '' : self::isoToDMY($row['dialysis_start']),
             'selectedMrp'    => (string) ($row['mrp_id'] ?? ''),
@@ -482,7 +528,7 @@ final class UiStore
         return [
             'id'            => (string) $row['id'],
             'organ'         => $row['organ_code'],
-            'status'        => str_replace('_', '-', $row['status']),
+            'status'        => $row['status'],
             'recipientId'   => (string) $row['recipient_mrn'],
             'donorId'       => (string) $row['donor_mrn'],
             'relationship'  => (string) $row['relationship'],
@@ -523,6 +569,10 @@ final class UiStore
 
         if (isset($ui['coordinator'])) {
             $row['coordinator_id'] = $this->coordinatorId((string) $ui['coordinator']);
+        }
+
+        if ($this->statusKey((string) ($ui['status'] ?? '')) !== '') {
+            $row['status'] = $ui['status'];
         }
 
         foreach (['entry_date', 'dialysis_start'] as $dateColumn) {
@@ -740,9 +790,16 @@ final class UiStore
         return $row === null ? '' : (string) $row['name'];
     }
 
-    private function pairStatusToRow(string $status): string
+    /**
+     * A status from the shared list, or '' for anything else.
+     *
+     * The keys are what the columns store, so there is no translation to do —
+     * only the check that a value is one of them, since both are ENUMs and
+     * anything else takes the request down.
+     */
+    private function statusKey(string $status): string
     {
-        return str_replace('-', '_', $status);
+        return isset(self::STATUS_OPTIONS[$status]) ? $status : '';
     }
 
     /** "2026-01-15" -> "15/01/2026" */

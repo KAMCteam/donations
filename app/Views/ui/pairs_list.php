@@ -17,6 +17,7 @@ use App\Libraries\UiStore;
  * @var list<array{pair: array<string, mixed>, recipient: array<string, mixed>|null, donor: array<string, mixed>|null}> $rows
  * @var string $btFilter
  * @var string $statusFilter
+ * @var list<array{id: string, name: string}> $mrps
  */
 $headers = [
     'Pair #', 'MRN', 'Name', 'Age', 'Type', 'Relationship',
@@ -25,6 +26,20 @@ $headers = [
 ];
 
 $dash = '—';
+
+// Dates are DD/MM/YYYY everywhere the screens show one; entry_date arrives as
+// the ISO the column holds, the rest are already formatted.
+$orDash  = static fn (string $value): string => $value === '' ? '—' : $value;
+$entry   = static fn (string $iso): string => $iso === '' ? '—' : UiStore::isoToDMY($iso);
+$mrpName = static function (string $id) use ($mrps): string {
+    foreach ($mrps as $mrp) {
+        if ($mrp['id'] === $id) {
+            return $mrp['name'];
+        }
+    }
+
+    return '—';
+};
 
 /** Rebuilds the current query string with one filter swapped out. */
 $filterUrl = static function (string $key, string $value) use ($btFilter, $statusFilter): string {
@@ -59,8 +74,8 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
         <div class="filter-row">
             <span class="filter-label">Status:</span>
             <a class="chip<?= $statusFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('status', 'all') ?>">All</a>
-            <?php foreach (UiStore::PAIR_STATUSES as $status): ?>
-                <a class="chip capitalize<?= $statusFilter === $status ? ' is-active' : '' ?>" href="<?= $filterUrl('status', $status) ?>"><?= esc($status) ?></a>
+            <?php foreach (UiStore::STATUS_OPTIONS as $status => $statusLabel): ?>
+                <a class="chip<?= $statusFilter === $status ? ' is-active' : '' ?>" href="<?= $filterUrl('status', $status) ?>"><?= esc($statusLabel) ?></a>
             <?php endforeach; ?>
         </div>
     </div>
@@ -84,7 +99,7 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                         $recipient   = $row['recipient'];
                         $donor       = $row['donor'];
                         $rowBg       = $index % 2 === 0 ? '#ffffff' : '#f8fafc';
-                        $statusLabel = ucfirst(str_replace('-', ' ', $pair['status']));
+                        $statusLabel = UiStore::STATUS_OPTIONS[$pair['status']] ?? $pair['status'];
                         $url         = site_url('pairs/' . rawurlencode($pair['id']));
                         ?>
                         <tr class="row-recipient" data-href="<?= $url ?>" style="background-color:<?= $rowBg ?>">
@@ -97,13 +112,13 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                             <td><span class="role-tag tone-blue-soft">recipient</span></td>
                             <td rowspan="2" class="cell-span cell-rel"><?= esc(($pair['notes'] ?? '') !== '' ? $pair['notes'] : $dash) ?></td>
                             <td class="t-mono t-semibold t-700"><?= esc($recipient['bloodType'] ?? $dash) ?></td>
-                            <td class="t-600"><?= $dash ?></td>
-                            <td class="t-600"><?= $dash ?></td>
+                            <td class="t-600"><?= esc($mrpName($recipient['selectedMrp'] ?? '')) ?></td>
+                            <td class="t-600"><?= esc($recipient['gender'] ?? $dash) ?></td>
                             <td class="t-mono t-600"><?= esc($recipient['phone'] ?? $dash) ?></td>
-                            <td class="t-mono t-500"><?= $dash ?></td>
-                            <td class="t-mono t-500"><?= esc($recipient['dateRegistered'] ?? $dash) ?></td>
+                            <td class="t-mono t-500"><?= esc($orDash($recipient['firstDialysis'] ?? '')) ?></td>
+                            <td class="t-mono t-500"><?= esc($entry($recipient['dateRegistered'] ?? '')) ?></td>
                             <td rowspan="2" class="cell-span">
-                                <span class="status-tag <?= ui_tone('pairStatus', $pair['status']) ?>"><?= esc($statusLabel) ?></span>
+                                <span class="status-tag <?= ui_tone('status', $pair['status']) ?>"><?= esc($statusLabel) ?></span>
                             </td>
                             <td class="t-mono t-500"><?= esc(($pair['scheduledDate'] ?? '') !== '' ? $pair['scheduledDate'] : $dash) ?></td>
                             <td class="t-500 cell-last"><?= ($pair['notes'] ?? '') !== '' ? '<span class="note-link">Show Note</span>' : $dash ?></td>
@@ -114,8 +129,8 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                             <td class="t-700"><?= esc($donor['age'] ?? $dash) ?></td>
                             <td><span class="role-tag tone-teal-soft">donor</span></td>
                             <td class="t-mono t-semibold t-700"><?= esc($donor['bloodType'] ?? $dash) ?></td>
-                            <td class="t-600"><?= $dash ?></td>
-                            <td class="t-600"><?= $dash ?></td>
+                            <td class="t-600"><?= esc($mrpName($donor['donorMrp'] ?? '')) ?></td>
+                            <td class="t-600"><?= esc($donor['donorGender'] ?? $dash) ?></td>
                             <td class="t-mono t-600"><?= esc($donor['phone'] ?? $dash) ?></td>
                             <td class="t-500">N/A</td>
                             <td class="t-500">N/A</td>

@@ -171,7 +171,7 @@ final class SchemaTest extends CIUnitTestCase
         $pairs  = model(PairModel::class);
         $pairId = $pairs->link(1001, 2001);
 
-        foreach (['active', 'scheduled', 'on_hold', 'completed'] as $status) {
+        foreach (['active', 'confirmed', 'on_hold', 'completed', 'pending', 'paired_exchange', 'declined'] as $status) {
             $pairs->update($pairId, ['status' => $status]);
             $this->assertCount(0, model(RecipientModel::class)->waitingList(), "{$status} should still hold the pair");
         }
@@ -253,7 +253,7 @@ final class SchemaTest extends CIUnitTestCase
     {
         $this->addRecipient(1001, ['name' => 'Recipient One', 'blood_group' => 'A']);
         $this->addDonor(2001, ['name' => 'Donor One', 'blood_group' => 'O', 'donation_type' => 'deceased']);
-        model(PairModel::class)->link(1001, 2001, ['status' => 'scheduled', 'surgery_date' => '2026-10-05']);
+        model(PairModel::class)->link(1001, 2001, ['status' => 'confirmed', 'surgery_date' => '2026-10-05']);
 
         $rows = model(PairModel::class)->overview();
         $this->assertCount(1, $rows);
@@ -262,7 +262,7 @@ final class SchemaTest extends CIUnitTestCase
         $this->assertSame('Donor One', $rows[0]['d_name']);
         $this->assertSame('deceased', $rows[0]['d_donation_type']);
         $this->assertSame('kidney', $rows[0]['organ_code'], 'taken from the recipient');
-        $this->assertSame('scheduled', $rows[0]['status']);
+        $this->assertSame('confirmed', $rows[0]['status']);
 
         // The blood-group filter matches a pair on either side.
         $this->assertCount(1, model(PairModel::class)->overview(null, null, 'A'));

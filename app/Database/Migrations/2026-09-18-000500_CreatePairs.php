@@ -61,10 +61,13 @@ class CreatePairs extends Migration
             // on_hold    paused, but still spoken for
             // completed  transplanted
             // closed     the only status that frees both sides again
+            // Shared with `recipients.status`: one vocabulary, one value. Every
+            // status except `closed` counts as an open pair, which is what
+            // keeps both sides off their lists until the pair is closed.
             'status' => [
                 'type'       => 'ENUM',
-                'constraint' => ['active', 'scheduled', 'on_hold', 'completed', 'closed'],
-                'default'    => 'active',
+                'constraint' => ['pending', 'confirmed', 'closed', 'completed', 'paired_exchange', 'on_hold', 'active', 'declined'],
+                'default'    => 'pending',
             ],
             // How the two are related, as recorded for this pair.
             'relationship' => [

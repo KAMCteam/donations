@@ -92,9 +92,13 @@ class CreateRecipients extends Migration
                 'unsigned'   => true,
                 'default'    => 0,
             ],
+            // The same list the pair's Match Status uses, because they are the
+            // same fact: a recipient in a pair and that pair carry one status
+            // between them. `closed` is the one with meaning beyond its label —
+            // it is what "open pair" is defined against.
             'status' => [
                 'type'       => 'ENUM',
-                'constraint' => ['pending', 'ready', 'active', 'on_hold', 'completed', 'cancelled'],
+                'constraint' => ['pending', 'confirmed', 'closed', 'completed', 'paired_exchange', 'on_hold', 'active', 'declined'],
                 'default'    => 'pending',
             ],
             'mrp_id' => [

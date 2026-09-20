@@ -60,12 +60,12 @@ if (! function_exists('ui_tone')) {
     /**
      * CSS tone class for a badge: ui_tone('labStatus', 'flagged') === 'tone-amber'.
      *
-     * @param 'pairStatus'|'labStatus' $kind
+     * @param 'status'|'labStatus' $kind
      */
     function ui_tone(string $kind, string $value): string
     {
         $map = match ($kind) {
-            'pairStatus' => UiStore::PAIR_STATUS_TONE,
+            'status'     => UiStore::STATUS_TONE,
             'labStatus'  => UiStore::LAB_STATUS_TONE,
             default      => [],
         };

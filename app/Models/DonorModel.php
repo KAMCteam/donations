@@ -15,7 +15,7 @@ class DonorModel extends Model
     protected $useTimestamps = true;
     protected $allowedFields = [
         'mrn', 'name', 'organ_code', 'blood_group', 'gender', 'age', 'city', 'phone',
-        'hospital', 'donation_type', 'relationship', 'status', 'mrp_id',
+        'donation_type', 'relationship', 'status', 'mrp_id',
         'coordinator_id', 'registered_on', 'notes',
     ];
 

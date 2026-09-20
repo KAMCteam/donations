@@ -84,7 +84,10 @@ $actions = [
                                     <div class="urgent-name"><?= esc($recipient['name']) ?></div>
                                     <div class="urgent-meta"><?= esc($recipient['bloodType']) ?> &middot; <?= esc($recipient['id']) ?></div>
                                 </div>
-                                <span class="badge <?= ui_tone('urgency', $recipient['urgency']) ?>"><?= esc($recipient['urgency']) ?></span>
+                                <?php // The panel is the top of the waiting list, which is
+                                      // urgent-first then by score — so the top three are not
+                                      // all necessarily urgent, and only the ones that are say so. ?>
+                                <span class="badge <?= $recipient['urgent'] ? 'tone-red' : 'tone-slate' ?>"><?= $recipient['urgent'] ? 'Urgent' : 'Waiting' ?></span>
                             </a>
                         <?php endforeach; ?>
                     </div>

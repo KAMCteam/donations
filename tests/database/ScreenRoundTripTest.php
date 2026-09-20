@@ -58,9 +58,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'gender'        => 'Male',
             'phone'         => '+966500000001',
             'address'       => 'Riyadh',
-            'hospital'      => 'KAMC',
-            'diagnosis'     => 'ESRD',
-            'urgency'       => 'critical',
+            'urgent'        => '1',
+            'coordinator'   => 'Coordinator Zero',
             'selectedMrp'   => (string) $this->mrpId,
             'firstDialysis' => '01/03/2024',
             'notes'         => 'clinical note',
@@ -73,13 +72,12 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'gender'         => 'male',
             'phone'          => '+966500000001',
             'city'           => 'Riyadh',
-            'hospital'       => 'KAMC',
-            'diagnosis'      => 'ESRD',
-            'urgency'        => 'critical',
+            'is_urgent'      => 1,
             'mrp_id'         => $this->mrpId,
             'dialysis_start' => '2024-03-01',
             'notes'          => 'clinical note',
         ]);
+        $this->seeInDatabase('coordinators', ['name' => 'Coordinator Zero']);
     }
 
     /**
@@ -95,7 +93,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'age'           => '41',
             'bloodType'     => 'O',
             'gender'        => 'Female',
-            'urgency'       => 'high',
+            'urgent'        => '1',
             'selectedMrp'   => (string) $this->mrpId,
             'firstDialysis' => '01/03/2024',
         ]);
@@ -173,9 +171,9 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'mrn'       => '9006',
             'name'      => 'Layla Test',
             'age'       => '38',
-            'bloodType' => 'B',
-            'address'   => 'Taif',
-            'diagnosis' => 'ESRD',
+            'bloodType'   => 'B',
+            'address'     => 'Taif',
+            'coordinator' => 'Coordinator Test',
         ]);
 
         $html = $this->get('pairs/new?recipient=9006')->getBody();
@@ -202,7 +200,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'name'      => 'Layla Test',
             'age'       => '38',
             'bloodType' => 'B',
-            'diagnosis' => 'ESRD',
+            'address'   => 'Taif',
         ]);
 
         $this->post('pairs/new', [
@@ -217,7 +215,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         ]);
 
         $this->assertSame(1, $this->db->table('recipients')->countAllResults(), 'the known recipient is not written again');
-        $this->seeInDatabase('recipients', ['mrn' => 9007, 'name' => 'Layla Test', 'diagnosis' => 'ESRD']);
+        $this->seeInDatabase('recipients', ['mrn' => 9007, 'name' => 'Layla Test', 'city' => 'Taif']);
         $this->seeInDatabase('donors', ['mrn' => 9008, 'name' => 'Nasser Test']);
         $this->seeInDatabase('pairs', [
             'recipient_mrn'   => 9007,
@@ -385,18 +383,18 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'age'       => '41',
             'bloodType' => 'O',
             'phone'     => '+966500000001',
-            'diagnosis' => 'ESRD',
+            'address'   => 'Riyadh',
             'notes'     => 'original note',
         ]);
 
         $this->post('recipients/8004', ['section' => 'notes', 'notes' => 'replaced']);
 
         $this->seeInDatabase('recipients', [
-            'mrn'       => 8004,
-            'name'      => 'Ahmed Test',
-            'phone'     => '+966500000001',
-            'diagnosis' => 'ESRD',
-            'notes'     => 'replaced',
+            'mrn'   => 8004,
+            'name'  => 'Ahmed Test',
+            'phone' => '+966500000001',
+            'city'  => 'Riyadh',
+            'notes' => 'replaced',
         ]);
     }
 
@@ -411,21 +409,21 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'name'      => 'Ahmed Test',
             'age'       => '41',
             'bloodType' => 'O',
-            'diagnosis' => 'ESRD',
+            'address'   => 'Riyadh',
         ]);
 
         $this->post('recipients/8005', [
-            'section'   => 'notes',
-            'notes'     => 'a note',
-            'name'      => 'Should Not Land',
-            'diagnosis' => 'Should Not Land',
+            'section' => 'notes',
+            'notes'   => 'a note',
+            'name'    => 'Should Not Land',
+            'address' => 'Should Not Land',
         ]);
 
         $this->seeInDatabase('recipients', [
-            'mrn'       => 8005,
-            'name'      => 'Ahmed Test',
-            'diagnosis' => 'ESRD',
-            'notes'     => 'a note',
+            'mrn'   => 8005,
+            'name'  => 'Ahmed Test',
+            'city'  => 'Riyadh',
+            'notes' => 'a note',
         ]);
     }
 
@@ -549,11 +547,11 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testARecordWithoutAUsableMrnIsRefused(string $mrn, string $expected): void
     {
         $this->post('recipients/new', [
-            'mrn'       => $mrn,
-            'name'      => 'Ahmed Test',
-            'age'       => '41',
-            'bloodType' => 'O',
-            'diagnosis' => 'ESRD',
+            'mrn'         => $mrn,
+            'name'        => 'Ahmed Test',
+            'age'         => '41',
+            'bloodType'   => 'O',
+            'coordinator' => 'Coordinator Test',
         ]);
 
         $this->assertSame(0, $this->db->table('recipients')->countAllResults(), 'nothing should have been stored');
@@ -569,17 +567,17 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testARefusedSaveCarriesTheRestOfTheFormBack(): void
     {
         $this->post('recipients/new', [
-            'mrn'       => '',
-            'name'      => 'Ahmed Test',
-            'age'       => '41',
-            'bloodType' => 'AB',
-            'diagnosis' => 'ESRD stage 5',
+            'mrn'         => '',
+            'name'        => 'Ahmed Test',
+            'age'         => '41',
+            'bloodType'   => 'AB',
+            'coordinator' => 'Coordinator Test',
         ]);
 
         $posted = session('_ci_old_input')['post'] ?? [];
 
         $this->assertSame('Ahmed Test', $posted['name'] ?? null);
-        $this->assertSame('ESRD stage 5', $posted['diagnosis'] ?? null);
+        $this->assertSame('Coordinator Test', $posted['coordinator'] ?? null);
         $this->assertSame('AB', $posted['bloodType'] ?? null);
     }
 
@@ -658,6 +656,115 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertSame(0, $this->db->table('pairs')->countAllResults());
     }
 
+    // ---- What a recipient record holds now ---------------------------------
+
+    /**
+     * Diagnosis, Hospital and the four-level Urgency scale came off the
+     * recipient; Urgent is the one question that is left, and Recipient
+     * Coordinator was added.
+     */
+    public function testTheRecipientFormAsksTheAgreedQuestions(): void
+    {
+        $html = $this->get('recipients/new')->getBody();
+
+        foreach (['diagnosis', 'urgency', 'hospital'] as $gone) {
+            $this->assertStringNotContainsString('name="' . $gone . '"', $html);
+        }
+
+        $this->assertStringContainsString('name="coordinator"', $html);
+        $this->assertStringContainsString('type="checkbox" id="f-urgent" name="urgent"', $html);
+    }
+
+    /**
+     * A checkbox posts nothing when it is unticked, so a hidden 0 goes first
+     * and the box overrides it — otherwise an urgent case could never be made
+     * un-urgent again.
+     */
+    public function testTheUrgentCheckboxStoresBothAnswers(): void
+    {
+        $this->post('recipients/new', [
+            'mrn'       => '3001',
+            'name'      => 'Urgent Test',
+            'age'       => '41',
+            'bloodType' => 'O',
+            'urgent'    => '1',
+        ]);
+        $this->seeInDatabase('recipients', ['mrn' => 3001, 'is_urgent' => 1]);
+
+        // Unticked: the browser sends only the hidden field.
+        $this->post('recipients/3001', [
+            'section'   => 'personal',
+            'name'      => 'Urgent Test',
+            'age'       => '41',
+            'bloodType' => 'O',
+            'urgent'    => '0',
+        ]);
+        $this->seeInDatabase('recipients', ['mrn' => 3001, 'is_urgent' => 0]);
+    }
+
+    public function testTheRecipientCoordinatorIsRegisteredByBeingTyped(): void
+    {
+        $this->post('recipients/new', [
+            'mrn'         => '3002',
+            'name'        => 'Ahmed Test',
+            'age'         => '41',
+            'bloodType'   => 'O',
+            'coordinator' => 'Noura Al-Harbi',
+        ]);
+
+        $this->seeInDatabase('coordinators', ['name' => 'Noura Al-Harbi']);
+        $row = $this->db->table('recipients')->where('mrn', 3002)->get()->getRowArray();
+        $this->assertNotNull($row['coordinator_id']);
+    }
+
+    // ---- Dates -------------------------------------------------------------
+
+    /**
+     * Each date is a text box holding DD/MM/YYYY plus a picker that posts
+     * nothing. The picker used to inherit the previous field's name, because
+     * CodeIgniter carries view data between `view()` calls — which made the
+     * read-only Entry Date post as First Dialysis and move it on every save.
+     */
+    public function testEachDateFieldCarriesItsOwnNameAndAPickerThatPostsNothing(): void
+    {
+        $this->post('recipients/new', [
+            'mrn'           => '3003',
+            'name'          => 'Ahmed Test',
+            'age'           => '41',
+            'bloodType'     => 'O',
+            'firstDialysis' => '01/03/2024',
+        ]);
+
+        $html = $this->get('recipients/3003?edit=personal')->getBody();
+
+        $this->assertSame(1, substr_count($html, 'name="firstDialysis"'), 'only the dialysis box carries that name');
+        // Entry Date renders read-only, with no name and no picker.
+        $this->assertMatchesRegularExpression('/id="f-entry"(?![^>]*name=)/', $html);
+        // The picker is unnamed, so it posts nothing.
+        $this->assertStringNotContainsString('<input type="date" name', $html);
+    }
+
+    public function testSavingTheCardDoesNotMoveTheDialysisDate(): void
+    {
+        $this->post('recipients/new', [
+            'mrn'           => '3004',
+            'name'          => 'Ahmed Test',
+            'age'           => '41',
+            'bloodType'     => 'O',
+            'firstDialysis' => '01/03/2024',
+        ]);
+
+        $this->post('recipients/3004', [
+            'section'       => 'personal',
+            'name'          => 'Ahmed Test',
+            'age'           => '42',
+            'bloodType'     => 'O',
+            'firstDialysis' => '01/03/2024',
+        ]);
+
+        $this->seeInDatabase('recipients', ['mrn' => 3004, 'age' => 42, 'dialysis_start' => '2024-03-01']);
+    }
+
     // ---- The score on the waiting list ------------------------------------
 
     /**
@@ -666,16 +773,21 @@ final class ScreenRoundTripTest extends CIUnitTestCase
      */
     public function testTheWaitingListShowsTheComputedScoreAndOrdersByIt(): void
     {
-        $this->addRecipient(1001, 'Waited Longer', 'high', 30, 30);
-        $this->addRecipient(1002, 'Waited Less', 'high', 5, 5);
-        $this->addRecipient(1003, 'Most Urgent', 'critical', 1, 1);
+        $this->addRecipient(1001, 'Urgent, Waited Longer', true, 30, 30);
+        $this->addRecipient(1002, 'Urgent, Waited Less', true, 5, 5);
+        $this->addRecipient(1003, 'Not Urgent, Waited Longest', false, 60, 60);
 
         $list = (new UiStore())->waitingList();
 
-        // Most urgent first, then by score.
-        $this->assertSame(['Most Urgent', 'Waited Longer', 'Waited Less'], array_column($list, 'name'));
-        $this->assertEqualsWithDelta(6.0, $list[1]['score'], 0.001);
-        $this->assertEqualsWithDelta(1.0, $list[2]['score'], 0.001);
+        // Urgent first, whatever the score; score orders within each group, so
+        // the longest wait of all still comes last for not being urgent.
+        $this->assertSame(
+            ['Urgent, Waited Longer', 'Urgent, Waited Less', 'Not Urgent, Waited Longest'],
+            array_column($list, 'name')
+        );
+        $this->assertEqualsWithDelta(6.0, $list[0]['score'], 0.001);
+        $this->assertEqualsWithDelta(1.0, $list[1]['score'], 0.001);
+        $this->assertEqualsWithDelta(12.0, $list[2]['score'], 0.001);
 
         $html = $this->get('recipients')->getBody();
         $this->assertStringContainsString('6.0', $html);
@@ -685,7 +797,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     /** No dialysis date means no score, shown as a dash rather than as zero. */
     public function testARecipientWithoutADialysisDateScoresNothing(): void
     {
-        $this->addRecipient(1001, 'No Dialysis', 'medium', 12, null);
+        $this->addRecipient(1001, 'No Dialysis', false, 12, null);
 
         $this->assertNull((new UiStore())->waitingList()[0]['score']);
         $this->assertStringContainsString('&mdash;', $this->get('recipients')->getBody());
@@ -703,7 +815,6 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'donorGender'      => 'Female',
             'phone'            => '+966500000002',
             'address'          => 'Jeddah',
-            'hospital'         => 'KAMC',
             'donorMrp'         => (string) $this->mrpId,
             'donorStatus'      => 'Active',
             'donorCoordinator' => 'Coordinator One',
@@ -757,7 +868,6 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'age'         => '35',
             'bloodType'   => 'AB',
             'donorGender' => 'Female',
-            'hospital'    => 'KAMC',
         ]);
 
         $html = $this->get('donors')->getBody();
@@ -790,9 +900,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'rBloodType'     => 'A',
             'rGender'        => 'Female',
             'rCity'          => 'Dammam',
-            'rHospital'      => 'KAMC',
-            'rDiagnosis'     => 'ESRD',
-            'rUrgency'       => 'high',
+            'rUrgent'        => '1',
+            'rCoordinator'   => 'Coordinator Pair',
             'rMrp'           => (string) $this->mrpId,
             'rFirstDialysis' => '10/01/2023',
             'dName'          => 'Donor Pair',
@@ -812,7 +921,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'gender'         => 'female',
             'mrp_id'         => $this->mrpId,
             'dialysis_start' => '2023-01-10',
-            'urgency'        => 'high',
+            'is_urgent'      => 1,
         ]);
         $this->seeInDatabase('donors', [
             'name'   => 'Donor Pair',
@@ -889,7 +998,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'rName'          => 'Recipient Edited',
             'rAge'           => '53',
             'rBloodType'     => 'A',
-            'rUrgency'       => 'critical',
+            'rUrgent'        => '1',
             'rGender'        => 'Male',
             'rMrp'           => (string) $this->mrpId,
             'rFirstDialysis' => '11/02/2023',
@@ -915,7 +1024,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('recipients', [
             'name'           => 'Recipient Edited',
             'gender'         => 'male',
-            'urgency'        => 'critical',
+            'is_urgent'      => 1,
             'mrp_id'         => $this->mrpId,
             'dialysis_start' => '2023-02-11',
         ]);
@@ -974,14 +1083,14 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
     // ---- Helpers ----------------------------------------------------------
 
-    private function addRecipient(int $mrn, string $name, string $urgency, int $monthsWaiting, ?int $monthsOnDialysis): void
+    private function addRecipient(int $mrn, string $name, bool $urgent, int $monthsWaiting, ?int $monthsOnDialysis): void
     {
         $this->db->table('recipients')->insert([
             'mrn'            => $mrn,
             'name'           => $name,
             'organ_code'     => 'kidney',
             'blood_group'    => 'O',
-            'urgency'        => $urgency,
+            'is_urgent'      => $urgent ? 1 : 0,
             'entry_date'     => date('Y-m-d', strtotime("-{$monthsWaiting} months")),
             'dialysis_start' => $monthsOnDialysis === null ? null : date('Y-m-d', strtotime("-{$monthsOnDialysis} months")),
         ]);

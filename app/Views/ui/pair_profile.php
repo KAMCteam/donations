@@ -62,7 +62,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                 </div>
                 <div>
                     <label class="field-label" for="f-crossmatch">Date of Crossmatch</label>
-                    <input type="text" id="f-crossmatch" name="crossmatchDate" class="input" value="<?= esc($v['crossmatchDate']) ?>" placeholder="DD/MM/YYYY">
+                    <?= view('ui/partials/date_field', ['id' => 'f-crossmatch', 'name' => 'crossmatchDate', 'value' => $v['crossmatchDate']], ['saveData' => false]) ?>
                 </div>
                 <div>
                     <label class="field-label" for="f-status">Match Status</label>
@@ -148,39 +148,27 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                         </select>
                     </div>
                     <div>
-                        <label class="field-label" for="f-r-hospital">Hospital</label>
-                        <input type="text" id="f-r-hospital" name="rHospital" class="input" value="<?= esc($v['rHospital']) ?>" placeholder="Hospital">
+                        <label class="field-label" for="f-r-coordinator">Recipient Coordinator</label>
+                        <input type="text" id="f-r-coordinator" name="rCoordinator" class="input" value="<?= esc($v['rCoordinator']) ?>" placeholder="Choose Coordinator">
                     </div>
                 </div>
 
                 <div class="form-grid-5">
                     <div>
-                        <label class="field-label" for="f-r-diagnosis">Diagnosis</label>
-                        <input type="text" id="f-r-diagnosis" name="rDiagnosis" class="input" value="<?= esc($v['rDiagnosis']) ?>" placeholder="Primary diagnosis">
-                    </div>
-                    <div>
                         <label class="field-label" for="f-r-dialysis">First Dialysis</label>
-                        <input type="text" id="f-r-dialysis" name="rFirstDialysis" class="input" value="<?= esc($v['rFirstDialysis']) ?>" placeholder="DD/MM/YYYY">
+                        <?= view('ui/partials/date_field', ['id' => 'f-r-dialysis', 'name' => 'rFirstDialysis', 'value' => $v['rFirstDialysis']], ['saveData' => false]) ?>
                     </div>
                     <div>
-                        <label class="field-label">Entry Date</label>
-                        <input type="text" class="input-ro" value="<?= esc(UiStore::isoToDMY($entryDate)) ?>" readonly>
-                    </div>
-                    <div>
-                        <label class="field-label" for="f-r-urgency">Urgency</label>
-                        <select id="f-r-urgency" name="rUrgency" class="input" data-urgency>
-                            <?php foreach (UiStore::URGENCY_OPTIONS as $value => $label): ?>
-                                <option value="<?= esc($value) ?>"<?= $v['rUrgency'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                        <label class="field-label" for="f-r-entry">Entry Date</label>
+                        <?= view('ui/partials/date_field', ['id' => 'f-r-entry', 'name' => null, 'value' => UiStore::isoToDMY($entryDate)], ['saveData' => false]) ?>
                     </div>
                     <div>
                         <label class="field-label" for="f-r-urgent">Urgent?</label>
-                        <select id="f-r-urgent" name="rUrgent" class="input" data-urgent>
-                            <?php foreach (UiStore::URGENT_OPTIONS as $value => $label): ?>
-                                <option value="<?= esc($value) ?>"<?= UiStore::isUrgent($v['rUrgency']) === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                        <input type="hidden" name="rUrgent" value="0">
+                        <label class="check">
+                            <input type="checkbox" id="f-r-urgent" name="rUrgent" value="1"<?= $v['rUrgent'] ? ' checked' : '' ?>>
+                            <span>This case is urgent</span>
+                        </label>
                     </div>
                 </div>
             </div>

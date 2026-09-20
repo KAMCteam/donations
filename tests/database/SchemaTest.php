@@ -102,9 +102,9 @@ final class SchemaTest extends CIUnitTestCase
 
     public function testTheWaitingListRunsMostUrgentThenHighestScore(): void
     {
-        $this->addRecipient(1001, ['urgency' => 'medium', 'entry_date' => $this->monthsAgo(40), 'dialysis_start' => $this->monthsAgo(40)]);
-        $this->addRecipient(1002, ['urgency' => 'critical', 'entry_date' => $this->monthsAgo(2), 'dialysis_start' => $this->monthsAgo(2)]);
-        $this->addRecipient(1003, ['urgency' => 'medium', 'entry_date' => $this->monthsAgo(60), 'dialysis_start' => $this->monthsAgo(60)]);
+        $this->addRecipient(1001, ['is_urgent' => 0, 'entry_date' => $this->monthsAgo(40), 'dialysis_start' => $this->monthsAgo(40)]);
+        $this->addRecipient(1002, ['is_urgent' => 1, 'entry_date' => $this->monthsAgo(2), 'dialysis_start' => $this->monthsAgo(2)]);
+        $this->addRecipient(1003, ['is_urgent' => 0, 'entry_date' => $this->monthsAgo(60), 'dialysis_start' => $this->monthsAgo(60)]);
 
         $list = model(RecipientModel::class)->waitingList();
 

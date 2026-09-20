@@ -12,7 +12,7 @@ use App\Libraries\UiStore;
  * they are links carrying `?bt=` now, and the controller hands back the rows
  * already filtered and sorted, so the table below is a plain `<table>`.
  *
- * @var list<array<string, mixed>> $recipients  Unpaired, urgency- then score-sorted.
+ * @var list<array<string, mixed>> $recipients  Unpaired, urgent-first then score-sorted.
  * @var string                     $btFilter
  */
 $headers = ['#', 'Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Score', 'Urgent'];
@@ -53,8 +53,7 @@ $score = static fn (?float $value): string => $value === null ? '—' : number_f
                 </thead>
                 <tbody>
                     <?php foreach ($recipients as $index => $recipient): ?>
-                        <?php $isUrgent = in_array($recipient['urgency'], ['critical', 'high'], true); ?>
-                        <tr class="<?= $isUrgent ? 'is-urgent' : '' ?>" data-href="<?= site_url('recipients/' . rawurlencode($recipient['id'])) ?>">
+                        <tr class="<?= $recipient['urgent'] ? 'is-urgent' : '' ?>" data-href="<?= site_url('recipients/' . rawurlencode($recipient['id'])) ?>">
                             <td><?= $index + 1 ?></td>
                             <td class="cell-name"><a href="<?= site_url('recipients/' . rawurlencode($recipient['id'])) ?>"><?= esc($recipient['name']) ?></a></td>
                             <td class="mono"><?= esc($recipient['id']) ?></td>
@@ -62,7 +61,7 @@ $score = static fn (?float $value): string => $value === null ? '—' : number_f
                             <td><?= esc($recipient['gender']) ?></td>
                             <td class="mono"><?= esc($recipient['bloodType']) ?></td>
                             <td class="mono"><?= esc($score($recipient['score'] ?? null)) ?></td>
-                            <td><?= $isUrgent ? 'Urgent' : 'Not Urgent' ?></td>
+                            <td><?= $recipient['urgent'] ? 'Urgent' : 'Not Urgent' ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>

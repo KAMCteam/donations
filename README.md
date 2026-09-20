@@ -117,7 +117,7 @@ and form posts, so every screen renders, navigates and submits **with
 JavaScript switched off**. `ui.js`
 is left with the mobile sidebar, the lab cards (status buttons, result editor,
 running totals), whole-row click targets, opening the pairing choice as a
-dialog, and keeping "Urgency" in step with "Urgent?".
+dialog, and the date fields (slashes as you type, and the calendar button).
 
 The result was checked against the design package screen by screen with
 full-page screenshot diffs at 1440px. Login, the programme picker, the pairs
@@ -174,6 +174,32 @@ JavaScript off (or without `<dialog>` support) it is simply followed. Someone
 already in an open pair is sent to that pair rather than offered a second one,
 and a person who holds a row in both registers under one MRN is not offered as
 their own counterpart.
+
+### What a recipient record holds
+
+Diagnosis, Hospital and the four-level Urgency scale came off the recipient.
+Urgency is one yes/no question now — a checkbox, stored as `is_urgent` — and
+the waiting list reads urgent first, then by score, so the score still orders
+each group. Recipient Coordinator was added, and works like the donor's: the
+design collects it as free text, so typing a name looks it up and registers it
+if it is new.
+
+`donors.hospital` went with them. The donor screen never had the field; the
+column was only ever filled from the recipient form's Hospital box, so with
+that gone nothing could write it and nothing showed it.
+
+### Dates
+
+Every date the screens collect is DD/MM/YYYY, in a box you can simply type
+eight digits into — `ui.js` puts the slashes in as you reach them and drops
+anything that is not a digit. Beside it is a calendar button that opens a
+native date picker; choosing a day writes the date back in the same order.
+
+The picker is a second `<input type="date">` with no name, which posts
+nothing. It is not the field itself on purpose: a native date input renders in
+the browser's locale, which on an English profile is MM/DD/YYYY — the one
+order a clinical record must not show — and posts ISO. Typing still works with
+JavaScript off, exactly as it did before there was a picker.
 
 ### Medical record numbers
 

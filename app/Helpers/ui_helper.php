@@ -49,6 +49,7 @@ if (! function_exists('ui_icon')) {
             'edit' => '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
 
             'check' => '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+            'calendar' => '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
         ];
 
         return $icons[$name] ?? '';
@@ -57,14 +58,13 @@ if (! function_exists('ui_icon')) {
 
 if (! function_exists('ui_tone')) {
     /**
-     * CSS tone class for a badge: ui_tone('urgency', 'critical') === 'tone-red'.
+     * CSS tone class for a badge: ui_tone('labStatus', 'flagged') === 'tone-amber'.
      *
-     * @param 'urgency'|'pairStatus'|'labStatus' $kind
+     * @param 'pairStatus'|'labStatus' $kind
      */
     function ui_tone(string $kind, string $value): string
     {
         $map = match ($kind) {
-            'urgency'    => UiStore::URGENCY_TONE,
             'pairStatus' => UiStore::PAIR_STATUS_TONE,
             'labStatus'  => UiStore::LAB_STATUS_TONE,
             default      => [],

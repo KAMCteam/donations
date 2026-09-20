@@ -15,7 +15,7 @@ class RecipientModel extends Model
     protected $useTimestamps = true;
     protected $allowedFields = [
         'mrn', 'name', 'organ_code', 'blood_group', 'gender', 'age', 'city', 'phone',
-        'hospital', 'diagnosis', 'entry_date', 'dialysis_start', 'urgency', 'status',
+        'entry_date', 'dialysis_start', 'is_urgent', 'status',
         'mrp_id', 'coordinator_id', 'notes',
     ];
 
@@ -39,11 +39,10 @@ class RecipientModel extends Model
         ';
 
     /**
-     * Recipients not held by an open pair, most urgent first, then by score.
+     * Recipients not held by an open pair, urgent first, then by score.
      *
      * "Open" is every pair status except `closed`, so closing a pair puts both
-     * sides back on their lists. `ORDER BY urgency DESC` reads
-     * most-urgent-first because the ENUM is declared least-urgent-first.
+     * sides back on their lists.
      *
      * @return list<array<string, mixed>>
      */
@@ -65,7 +64,7 @@ class RecipientModel extends Model
             $builder->where('r.blood_group', $bloodGroup);
         }
 
-        return $builder->orderBy('r.urgency', 'DESC')
+        return $builder->orderBy('r.is_urgent', 'DESC')
             ->orderBy('score', 'DESC')
             ->get()
             ->getResultArray();

@@ -112,7 +112,7 @@ class PairModel extends Model
         $builder = $this->db->table('pairs p')
             ->select('p.*, r.organ_code')
             ->select('r.mrn AS r_mrn, r.name AS r_name, r.age AS r_age, r.gender AS r_gender')
-            ->select('r.blood_group AS r_blood_group, r.phone AS r_phone, r.urgency AS r_urgency')
+            ->select('r.blood_group AS r_blood_group, r.phone AS r_phone')
             ->select('r.entry_date AS r_entry_date, r.dialysis_start AS r_dialysis_start')
             ->select('d.mrn AS d_mrn, d.name AS d_name, d.age AS d_age, d.gender AS d_gender')
             ->select('d.blood_group AS d_blood_group, d.phone AS d_phone, d.donation_type AS d_donation_type')

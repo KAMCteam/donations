@@ -682,3 +682,78 @@ textarea.lab-editor-field { resize: none; }
   .link-choice:hover { border-color: #15508A; background-color: var(--slate-50); }
   .dialog-close:hover { color: var(--slate-700); background-color: var(--slate-50); }
 }
+
+/* ---- Checkbox ---- */
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Matches the height of an .input beside it, so a checkbox and a text field
+     in the same row still line up. */
+  min-height: 2.625rem;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--slate-700);
+  cursor: pointer;
+}
+
+.check input[type="checkbox"] {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: none;
+  accent-color: #15508A;
+  cursor: pointer;
+}
+
+.card-fields:disabled .check,
+.card-fields:disabled .check input[type="checkbox"] { cursor: default; }
+.card-fields:disabled .check { color: var(--slate-500); }
+
+/* ---- Date field ----
+   A text box holding DD/MM/YYYY with a calendar button. The native date input
+   beside it has no name and never posts: it is there for its picker only. */
+.date-field { position: relative; }
+
+.date-field-text { padding-right: 2.5rem; }
+
+.date-field-button {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background-color: transparent;
+  color: var(--slate-400);
+  cursor: pointer;
+  transition-property: var(--transition-colors-props);
+  transition-timing-function: var(--ease);
+  transition-duration: var(--dur);
+}
+
+/* Present for the picker, never seen: zero-sized and pinned under the button
+   so the calendar opens where you clicked. */
+.date-field-native {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.card-fields:disabled .date-field-button { display: none; }
+.card-fields:disabled .date-field-text { padding-right: 0.875rem; }
+
+@media (hover: hover) {
+  .date-field-button:hover { color: #15508A; background-color: var(--slate-50); }
+}

@@ -33,6 +33,8 @@ use CodeIgniter\Session\Session;
  *                 screens type dates as DD/MM/YYYY while the columns are dates
  *   gender        "Male" on screen, `male` in the column
  *   donorStatus   "On Hold" on screen, `on_hold` in the column
+ *   urgent        a checkbox on screen, `is_urgent` 0/1 in the column
+ *   coordinator   a name typed on screen, `coordinator_id` in the column
  *   pairedDonorId derived from `pairs`, not stored on the person
  *   labTests      one row per test in `lab_results`, joined to the catalogue
  */
@@ -44,13 +46,6 @@ final class UiStore
 
     public const PAIR_STATUSES = ['active', 'scheduled', 'completed', 'on-hold'];
 
-
-    public const URGENCY_TONE = [
-        'critical' => 'tone-red',
-        'high'     => 'tone-orange',
-        'medium'   => 'tone-amber',
-        'low'      => 'tone-emerald',
-    ];
 
     public const PAIR_STATUS_TONE = [
         'active'    => 'tone-blue',
@@ -75,18 +70,6 @@ final class UiStore
 
     public const GENDER_OPTIONS = ['Male' => 'Male', 'Female' => 'Female'];
 
-    public const URGENCY_OPTIONS = [
-        'critical' => 'Critical',
-        'high'     => 'High',
-        'medium'   => 'Medium',
-        'low'      => 'Low',
-    ];
-
-    public const URGENT_OPTIONS = [
-        'yes' => 'Yes, it is urgent.',
-        'no'  => 'No, it is not urgent.',
-    ];
-
     public const DONOR_STATUS_OPTIONS = [
         'On Hold'   => 'On Hold',
         'Active'    => 'Active',
@@ -110,7 +93,7 @@ final class UiStore
      * NOT NULL, so an empty box there is a slip and the stored value stands.
      */
     private const NULLABLE_COLUMNS = [
-        'gender', 'age', 'city', 'phone', 'hospital', 'diagnosis',
+        'gender', 'age', 'city', 'phone',
         'dialysis_start', 'mrp_id', 'coordinator_id', 'relationship', 'notes',
     ];
 
@@ -456,12 +439,11 @@ final class UiStore
             'gender'         => $this->genderToUi($row['gender']),
             'phone'          => (string) $row['phone'],
             'address'        => (string) $row['city'],
-            'hospital'       => (string) $row['hospital'],
-            'diagnosis'      => (string) $row['diagnosis'],
-            'urgency'        => $row['urgency'],
+            'urgent'         => (bool) $row['is_urgent'],
             'dateRegistered' => (string) $row['entry_date'],
             'firstDialysis'  => $row['dialysis_start'] === null ? '' : self::isoToDMY($row['dialysis_start']),
             'selectedMrp'    => (string) ($row['mrp_id'] ?? ''),
+            'coordinator'    => $this->coordinatorName($row['coordinator_id'] ?? null),
             'notes'          => (string) $row['notes'],
             'labTests'       => $this->labTestsFor($row['mrn'], 'recipient', $row['organ_code']),
             'pairedDonorId'  => $pair === null ? '' : (string) $pair['donor_mrn'],
@@ -483,7 +465,6 @@ final class UiStore
             'donorGender'       => $this->genderToUi($row['gender']),
             'phone'             => (string) $row['phone'],
             'address'           => (string) $row['city'],
-            'hospital'          => (string) $row['hospital'],
             'donationType'      => $row['donation_type'],
             'relationship'      => (string) $row['relationship'],
             'donorStatus'       => $this->statusToUi($row['status']),
@@ -523,8 +504,7 @@ final class UiStore
     {
         $map = [
             'name' => 'name', 'age' => 'age', 'bloodType' => 'blood_group',
-            'phone' => 'phone', 'address' => 'city', 'hospital' => 'hospital',
-            'diagnosis' => 'diagnosis', 'urgency' => 'urgency', 'notes' => 'notes',
+            'phone' => 'phone', 'address' => 'city', 'notes' => 'notes',
             'organ' => 'organ_code', 'selectedMrp' => 'mrp_id',
             'dateRegistered' => 'entry_date', 'firstDialysis' => 'dialysis_start',
         ];
@@ -533,6 +513,16 @@ final class UiStore
 
         if (($ui['gender'] ?? '') !== '') {
             $row['gender'] = $this->genderToRow($ui['gender']);
+        }
+
+        // A checkbox is absent from the post when it is unticked, so the card
+        // it sits on says whether the question was asked at all.
+        if (array_key_exists('urgent', $ui)) {
+            $row['is_urgent'] = $ui['urgent'] ? 1 : 0;
+        }
+
+        if (isset($ui['coordinator'])) {
+            $row['coordinator_id'] = $this->coordinatorId((string) $ui['coordinator']);
         }
 
         foreach (['entry_date', 'dialysis_start'] as $dateColumn) {
@@ -555,7 +545,7 @@ final class UiStore
     {
         $map = [
             'name' => 'name', 'age' => 'age', 'bloodType' => 'blood_group',
-            'phone' => 'phone', 'address' => 'city', 'hospital' => 'hospital',
+            'phone' => 'phone', 'address' => 'city',
             'notes' => 'notes', 'organ' => 'organ_code', 'donorMrp' => 'mrp_id',
             'donationType' => 'donation_type', 'relationship' => 'relationship',
         ];
@@ -753,12 +743,6 @@ final class UiStore
     private function pairStatusToRow(string $status): string
     {
         return str_replace('-', '_', $status);
-    }
-
-    /** The "Urgent?" dropdown is derived from urgency, as in the source. */
-    public static function isUrgent(string $urgency): string
-    {
-        return in_array($urgency, ['critical', 'high'], true) ? 'yes' : 'no';
     }
 
     /** "2026-01-15" -> "15/01/2026" */

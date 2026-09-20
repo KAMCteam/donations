@@ -169,24 +169,74 @@
     });
   }
 
-  /* ---- Urgency <-> Urgent? ---------------------------------------------- */
+  /* ---- Dates -------------------------------------------------------------
+     The screens write dates as DD/MM/YYYY. Typing eight digits is enough: the
+     slashes go in as you reach them and anything that is not a digit is
+     dropped. Beside the box sits a native date input with no name, there only
+     for its calendar — picking a day writes the formatted date back. The box
+     is the field, so with this file absent you type the date as before. */
 
-  function initUrgencySync() {
-    var urgency = document.querySelector("[data-urgency]");
-    var urgent = document.querySelector("[data-urgent]");
-    if (!urgency || !urgent) return;
+  function initDateFields() {
+    var texts = document.querySelectorAll("[data-date-text]");
 
-    function isUrgent(value) {
-      return value === "critical" || value === "high" ? "yes" : "no";
+    for (var i = 0; i < texts.length; i++) {
+      bindDateText(texts[i]);
     }
 
-    urgency.addEventListener("change", function () {
-      urgent.value = isUrgent(urgency.value);
+    var fields = document.querySelectorAll("[data-date-field]");
+
+    for (var j = 0; j < fields.length; j++) {
+      bindDatePicker(fields[j]);
+    }
+  }
+
+  /** "1" -> "1", "12" -> "12/", "1234" -> "12/34/", "12032024" -> "12/03/2024" */
+  function formatDate(digits) {
+    var out = digits.slice(0, 2);
+    if (digits.length >= 2) out += "/";
+    if (digits.length > 2) out += digits.slice(2, 4);
+    if (digits.length >= 4) out += "/";
+    if (digits.length > 4) out += digits.slice(4, 8);
+    return out;
+  }
+
+  function bindDateText(input) {
+    input.addEventListener("input", function () {
+      var digits = input.value.replace(/\D/g, "").slice(0, 8);
+      var atEnd = input.selectionStart === input.value.length;
+      input.value = formatDate(digits);
+
+      // Only chase the caret to the end when it was already there, so editing
+      // the middle of a date does not throw you to the end of it.
+      if (atEnd) input.setSelectionRange(input.value.length, input.value.length);
+    });
+  }
+
+  function bindDatePicker(field) {
+    var text = field.querySelector("[data-date-text]");
+    var native = field.querySelector("[data-date-native]");
+    var button = field.querySelector("[data-date-open]");
+    if (!text || !native || !button) return;
+
+    button.addEventListener("click", function () {
+      // Open the calendar on the date already typed, when there is one.
+      var parts = text.value.split("/");
+      if (parts.length === 3 && parts[2].length === 4) {
+        native.value = parts[2] + "-" + parts[1] + "-" + parts[0];
+      }
+
+      if (typeof native.showPicker === "function") {
+        native.showPicker();
+      } else {
+        native.focus();
+        native.click();
+      }
     });
 
-    urgent.addEventListener("change", function () {
-      urgency.value = urgent.value === "yes" ? "high" : "low";
-      urgent.value = isUrgent(urgency.value);
+    native.addEventListener("change", function () {
+      if (!native.value) return;
+      var iso = native.value.split("-");
+      text.value = iso[2] + "/" + iso[1] + "/" + iso[0];
     });
   }
 
@@ -223,7 +273,7 @@
     initSidebar();
     initRowLinks();
     initLabSections();
-    initUrgencySync();
+    initDateFields();
     initDialogs();
   });
 })();

@@ -59,11 +59,6 @@ class CreateDonors extends Migration
                 'constraint' => 30,
                 'null'       => true,
             ],
-            'hospital' => [
-                'type'       => 'VARCHAR',
-                'constraint' => 150,
-                'null'       => true,
-            ],
 
             // ---- Donor-only ------------------------------------------------
             // A deceased donor has no consent conversation, no relationship to

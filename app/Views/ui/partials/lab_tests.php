@@ -80,7 +80,7 @@ $progress = UiStore::labProgress($tests);
 
                 <div class="lab-editor stack-2" data-lab-editor hidden>
                     <input type="text" class="lab-editor-field" name="<?= $base ?>[result]" value="<?= esc($test['result'] ?? '') ?>" placeholder="Result / finding">
-                    <input type="text" class="lab-editor-field lab-editor-field--mono" name="<?= $base ?>[date]" value="<?= esc($test['date'] ?? '') ?>" placeholder="Date (DD/MM/YYYY)">
+                    <input type="text" class="lab-editor-field lab-editor-field--mono" name="<?= $base ?>[date]" value="<?= esc($test['date'] ?? '') ?>" placeholder="Date (DD/MM/YYYY)" inputmode="numeric" maxlength="10" autocomplete="off" data-date-text>
                     <textarea class="lab-editor-field" name="<?= $base ?>[notes]" placeholder="Notes (optional)" rows="2"><?= esc($test['notes'] ?? '') ?></textarea>
                     <button type="button" class="lab-editor-save" data-lab-save>Save</button>
                 </div>

@@ -70,16 +70,6 @@ class CreateRecipients extends Migration
                 'constraint' => 30,
                 'null'       => true,
             ],
-            'hospital' => [
-                'type'       => 'VARCHAR',
-                'constraint' => 150,
-                'null'       => true,
-            ],
-            'diagnosis' => [
-                'type'       => 'VARCHAR',
-                'constraint' => 255,
-                'null'       => true,
-            ],
 
             // ---- The scoring inputs ----------------------------------------
             // Required: the score is meaningless without it.
@@ -92,14 +82,15 @@ class CreateRecipients extends Migration
                 'null' => true,
             ],
 
-            // Declared least-urgent-first on purpose: MySQL sorts an ENUM by
-            // declaration index, so `ORDER BY urgency DESC` means
-            // most-urgent-first, which is how the waiting list is read. The
-            // screens take their own display order from the application.
-            'urgency' => [
-                'type'       => 'ENUM',
-                'constraint' => ['low', 'medium', 'high', 'critical'],
-                'default'    => 'medium',
+            // Urgent or not, which is the whole of it: the screens ask one
+            // yes/no question and there is no four-level scale behind it. The
+            // waiting list reads `ORDER BY is_urgent DESC, score DESC`, so
+            // urgent patients come first and the score orders each group.
+            'is_urgent' => [
+                'type'       => 'TINYINT',
+                'constraint' => 1,
+                'unsigned'   => true,
+                'default'    => 0,
             ],
             'status' => [
                 'type'       => 'ENUM',
@@ -136,7 +127,7 @@ class CreateRecipients extends Migration
         // The waiting list filters on programme and blood group, and orders on
         // urgency; the score is computed, so it cannot be indexed.
         $this->forge->addKey(['organ_code', 'blood_group']);
-        $this->forge->addKey('urgency');
+        $this->forge->addKey('is_urgent');
         $this->forge->addKey('status');
         $this->forge->addForeignKey('organ_code', 'organ_programs', 'code', 'CASCADE', 'RESTRICT');
         $this->forge->addForeignKey('mrp_id', 'mrp', 'id', 'CASCADE', 'SET NULL');

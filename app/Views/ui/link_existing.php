@@ -21,7 +21,7 @@
 $isDonorList = $counterpart === 'donor';
 $headers     = $isDonorList
     ? ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', '']
-    : ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Urgency', ''];
+    : ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Urgent', ''];
 ?>
 <div class="page">
     <div class="page-header page-header--plain">
@@ -50,7 +50,7 @@ $headers     = $isDonorList
                 </div>
                 <div>
                     <label class="field-label" for="f-crossmatch">Date of Crossmatch</label>
-                    <input type="text" id="f-crossmatch" name="crossmatchDate" class="input" value="<?= esc(old('crossmatchDate', '')) ?>" placeholder="DD/MM/YYYY">
+                    <?= view('ui/partials/date_field', ['id' => 'f-crossmatch', 'name' => 'crossmatchDate', 'value' => old('crossmatchDate', '')], ['saveData' => false]) ?>
                 </div>
             </div>
         </div>
@@ -78,7 +78,7 @@ $headers     = $isDonorList
                                 <?php if ($isDonorList): ?>
                                     <td><span class="badge <?= $candidate['donationType'] === 'living' ? 'tone-teal-soft' : 'tone-slate' ?>"><?= esc($candidate['donationType']) ?></span></td>
                                 <?php else: ?>
-                                    <td><span class="badge <?= ui_tone('urgency', $candidate['urgency']) ?>"><?= esc(ucfirst($candidate['urgency'])) ?></span></td>
+                                    <td><?= $candidate['urgent'] ? '<span class="badge tone-red">Urgent</span>' : '&mdash;' ?></td>
                                 <?php endif; ?>
                                 <td class="cell-action">
                                     <button type="submit" name="mrn" value="<?= esc($candidate['id']) ?>" class="btn-edit"><?= ui_icon('link14') ?>Link</button>

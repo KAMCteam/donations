@@ -147,39 +147,31 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                             </select>
                         </div>
                         <div>
-                            <label class="field-label" for="f-hospital">Hospital</label>
-                            <input type="text" id="f-hospital" name="hospital" class="input" value="<?= esc($v['hospital']) ?>" placeholder="Hospital">
+                            <label class="field-label" for="f-coordinator">Recipient Coordinator</label>
+                            <input type="text" id="f-coordinator" name="coordinator" class="input" value="<?= esc($v['coordinator']) ?>" placeholder="Choose Coordinator">
                         </div>
                     </div>
 
                     <div class="form-grid-5">
                         <div>
-                            <label class="field-label" for="f-diagnosis">Diagnosis</label>
-                            <input type="text" id="f-diagnosis" name="diagnosis" class="input" value="<?= esc($v['diagnosis']) ?>" placeholder="Primary diagnosis">
-                        </div>
-                        <div>
                             <label class="field-label" for="f-dialysis">First Dialysis</label>
-                            <input type="text" id="f-dialysis" name="firstDialysis" class="input" value="<?= esc($v['firstDialysis']) ?>" placeholder="DD/MM/YYYY">
+                            <?= view('ui/partials/date_field', ['id' => 'f-dialysis', 'name' => 'firstDialysis', 'value' => $v['firstDialysis']], ['saveData' => false]) ?>
                         </div>
                         <div>
-                            <label class="field-label">Entry Date</label>
-                            <input type="text" class="input-ro" value="<?= esc(UiStore::isoToDMY($v['dateRegistered'])) ?>" readonly>
+                            <label class="field-label" for="f-entry">Entry Date</label>
+                            <?= view('ui/partials/date_field', ['id' => 'f-entry', 'name' => null, 'value' => UiStore::isoToDMY($v['dateRegistered'])], ['saveData' => false]) ?>
                         </div>
                         <div>
-                            <label class="field-label" for="f-urgency">Urgency</label>
-                            <select id="f-urgency" name="urgency" class="input" data-urgency>
-                                <?php foreach (UiStore::URGENCY_OPTIONS as $value => $label): ?>
-                                    <option value="<?= esc($value) ?>"<?= $v['urgency'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div>
+                            <?php // The whole of it is one yes/no; there is no
+                                  // scale behind it any more. A checkbox posts
+                                  // nothing when it is off, so a hidden 0 goes
+                                  // first and the box overrides it when ticked. ?>
                             <label class="field-label" for="f-urgent">Urgent?</label>
-                            <select id="f-urgent" name="urgent" class="input" data-urgent>
-                                <?php foreach (UiStore::URGENT_OPTIONS as $value => $label): ?>
-                                    <option value="<?= esc($value) ?>"<?= UiStore::isUrgent($v['urgency']) === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <input type="hidden" name="urgent" value="0">
+                            <label class="check">
+                                <input type="checkbox" id="f-urgent" name="urgent" value="1"<?= $v['urgent'] ? ' checked' : '' ?>>
+                                <span>This case is urgent</span>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -239,8 +231,8 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                             </select>
                         </div>
                         <div>
-                            <label class="field-label" for="f-coordinator">Donor Coordinator</label>
-                            <input type="text" id="f-coordinator" name="donorCoordinator" class="input" value="<?= esc($v['donorCoordinator']) ?>" placeholder="Choose Coordinator">
+                            <label class="field-label" for="f-donor-coordinator">Donor Coordinator</label>
+                            <input type="text" id="f-donor-coordinator" name="donorCoordinator" class="input" value="<?= esc($v['donorCoordinator']) ?>" placeholder="Choose Coordinator">
                         </div>
                         <div>
                             <label class="field-label" for="f-donor-status">Donor Status</label>

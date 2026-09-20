@@ -50,10 +50,18 @@ class CreateLabResults extends Migration
                 'constraint' => 11,
                 'unsigned'   => true,
             ],
+            // The answers the check list offers, across every kind of test.
+            // Which of them a given test offers is its `result_type`, in
+            // UiStore::RESULT_OPTIONS — a serology is Positive or Negative, a
+            // referral Cleared or not. `not_done` is where they all start.
             'status' => [
                 'type'       => 'ENUM',
-                'constraint' => ['pending', 'completed', 'flagged'],
-                'default'    => 'pending',
+                'constraint' => [
+                    'not_done', 'pending', 'done', 'positive', 'negative', 'acceptable',
+                    'abnormal', 'cleared', 'not_cleared', 'given', 'not_required',
+                    'not_given', 'not_applicable', 'blood_a', 'blood_b', 'blood_ab', 'blood_o',
+                ],
+                'default'    => 'not_done',
             ],
             'value' => [
                 'type'       => 'VARCHAR',

@@ -224,11 +224,27 @@ sheets for one test ("Ca/Phos/Mg" and "Calcium/Phosphorus/Mg") are reconciled
 rather than stored twice, and the donor sheet's abbreviated headings use the
 recipient's fuller wording so one set of headings serves both.
 
-`result_type` carries how each test is answered, in the sheet's own wording:
-`blood_group`, `done`, `positive_negative`, `acceptable_abnormal`,
-`cleared_not_cleared`, `given_not_given`. The cards still record Pending /
-Done / Flagged with a free-text result; the vocabularies are on the catalogue
-ready for the day the cards offer them.
+Each card offers its own test's answers, from the sheet — not one generic
+Pending / Done / Flagged:
+
+| `result_type` | The card offers |
+| --- | --- |
+| `blood_group` | Not done · A · B · AB · O |
+| `done` | Not done · Pending · Done · N/A |
+| `positive_negative` | Not done · Pending · Positive · Negative · N/A |
+| `acceptable_abnormal` | Not done · Pending · Acceptable · Abnormal · N/A |
+| `cleared_not_cleared` | Not done · Pending · Cleared · Not cleared · N/A |
+| `given_not_given` | Not done · Given · Not required · Not given · N/A |
+
+`not_done` starts them all — nobody has looked yet — and N/A ends most, since
+a test that cannot apply to this patient is a real answer; the sheet adds it
+to several vocabularies by hand. The answer is stored in `lab_results.status`,
+and the bar counts the tests that have one, whichever it is. An answer a test
+does not offer is refused rather than stored, checked against the catalogue
+rather than against the form.
+
+Red marks the answer somebody has to act on — Positive, Abnormal, Not cleared
+— not merely an unwelcome one.
 
 The sheet names no organ, so both programmes carry both lists.
 

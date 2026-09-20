@@ -318,14 +318,14 @@ final class SchemaTest extends CIUnitTestCase
         ], $groups);
     }
 
-    public function testAnUnrecordedTestStillComesBackAsPending(): void
+    public function testAnUnrecordedTestStillComesBackAsNotDone(): void
     {
         $this->addRecipient(1001);
         $results = model(LabResultModel::class);
 
         $workup = $results->workupFor(1001, 'recipient', 'kidney');
         $this->assertCount(71, $workup);
-        $this->assertSame('pending', $workup[0]['status'], 'no row yet, still a pending card');
+        $this->assertSame('not_done', $workup[0]['status'], 'no row yet, so nobody has looked');
         $this->assertNull($workup[0]['result_id']);
     }
 
@@ -335,14 +335,16 @@ final class SchemaTest extends CIUnitTestCase
         $results = model(LabResultModel::class);
         $labId   = (int) model(LabModel::class)->workupFor('kidney', 'recipient')[0]['id'];
 
+        // The first test on the sheet is Blood group, which answers with one.
         $results->record(1001, 'recipient', $labId, [
-            'status' => 'completed', 'value' => 'eGFR 8', 'taken_on' => '2026-09-01',
+            'status' => 'blood_o', 'value' => 'O positive', 'taken_on' => '2026-09-01',
         ]);
 
         $this->assertSame(['done' => 1, 'total' => 1, 'pct' => 100], $results->progressFor(1001, 'recipient'));
 
         // Recording again replaces, never duplicates: the bar counts rows.
-        $results->record(1001, 'recipient', $labId, ['status' => 'flagged', 'value' => 'eGFR 5']);
+        // Back to `pending` and it is unanswered again.
+        $results->record(1001, 'recipient', $labId, ['status' => 'pending', 'value' => null]);
         $this->assertSame(1, $this->db->table('lab_results')->countAllResults());
         $this->assertSame(['done' => 0, 'total' => 1, 'pct' => 0], $results->progressFor(1001, 'recipient'));
     }
@@ -356,7 +358,7 @@ final class SchemaTest extends CIUnitTestCase
         $asRecipient = (int) model(LabModel::class)->workupFor('kidney', 'recipient')[0]['id'];
         $asDonor     = (int) model(LabModel::class)->workupFor('liver', 'donor')[0]['id'];
 
-        $results->record(1001, 'recipient', $asRecipient, ['status' => 'completed']);
+        $results->record(1001, 'recipient', $asRecipient, ['status' => 'blood_o']);
         $results->record(1001, 'donor', $asDonor, ['status' => 'pending']);
 
         $this->assertSame(1, $results->progressFor(1001, 'recipient')['done']);
@@ -370,8 +372,8 @@ final class SchemaTest extends CIUnitTestCase
         $this->addDonor(1001, ['organ_code' => 'liver']);
         $results = model(LabResultModel::class);
 
-        $results->record(1001, 'recipient', (int) model(LabModel::class)->workupFor('kidney', 'recipient')[0]['id'], ['status' => 'completed']);
-        $results->record(1001, 'donor', (int) model(LabModel::class)->workupFor('liver', 'donor')[0]['id'], ['status' => 'completed']);
+        $results->record(1001, 'recipient', (int) model(LabModel::class)->workupFor('kidney', 'recipient')[0]['id'], ['status' => 'blood_o']);
+        $results->record(1001, 'donor', (int) model(LabModel::class)->workupFor('liver', 'donor')[0]['id'], ['status' => 'blood_o']);
         $this->assertSame(2, $this->db->table('lab_results')->countAllResults());
 
         $this->db->table('recipients')->where('mrn', 1001)->delete();

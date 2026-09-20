@@ -1285,7 +1285,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->post('recipients/new', ['mrn' => '4020', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
 
         $mrn = (int) $this->db->table('recipients')->get()->getRowArray()['mrn'];
-        $lab = $this->db->table('labs')->where('organ_code', 'kidney')->get()->getRowArray();
+        // A serology, which answers Positive or Negative.
+        $lab = $this->db->table('labs')
+            ->where(['organ_code' => 'kidney', 'name' => 'HIV'])
+            ->get()->getRowArray();
 
         $this->post('recipients/' . $mrn, [
             'section'   => 'labs',
@@ -1295,8 +1298,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'labs'      => [[
                 'id'     => $lab['id'],
                 'name'   => $lab['name'],
-                'status' => 'completed',
-                'result' => 'eGFR 12',
+                'status' => 'negative',
+                'result' => 'Non-reactive',
                 'date'   => '17/09/2026',
                 'notes'  => 'repeat in 3 months',
             ]],
@@ -1306,11 +1309,98 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'person_mrn'  => $mrn,
             'person_type' => 'recipient',
             'lab_id'      => $lab['id'],
-            'status'      => 'completed',
-            'value'       => 'eGFR 12',
+            'status'      => 'negative',
+            'value'       => 'Non-reactive',
             'taken_on'    => '2026-09-17',
             'notes'       => 'repeat in 3 months',
         ]);
+    }
+
+    /**
+     * Each card offers its own test's answers, and only those. A serology is
+     * Positive or Negative; a referral is Cleared or not; nothing is offered
+     * the generic Pending / Done / Flagged the cards used to show.
+     */
+    public function testEachCardOffersItsOwnTestsAnswers(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4021', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $html = $this->get('recipients/4021?edit=labs')->getBody();
+
+        foreach ([
+            'HIV'         => ['Positive', 'Negative'],
+            'Dental'      => ['Cleared', 'Not cleared'],
+            'MMR'         => ['Given', 'Not required', 'Not given'],
+            'CBC'         => ['Acceptable', 'Abnormal'],
+            'Blood group' => ['A', 'B', 'AB', 'O'],
+        ] as $test => $answers) {
+            $card = $this->cardFor($html, $test);
+
+            foreach ($answers as $answer) {
+                $this->assertStringContainsString('>' . $answer . '</button>', $card, "{$test} should offer {$answer}");
+            }
+        }
+
+        // The serology card offers no Cleared, and the referral no Positive.
+        $this->assertStringNotContainsString('>Cleared</button>', $this->cardFor($html, 'HIV'));
+        $this->assertStringNotContainsString('>Positive</button>', $this->cardFor($html, 'Dental'));
+    }
+
+    /** An answer the test does not offer is refused rather than stored. */
+    public function testAnAnswerFromAnotherTestsVocabularyIsRefused(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4022', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $lab = $this->db->table('labs')
+            ->where(['organ_code' => 'kidney', 'name' => 'Dental'])
+            ->get()->getRowArray();
+
+        $this->post('recipients/4022', [
+            'section' => 'labs',
+            'labs'    => [[
+                'id'     => $lab['id'],
+                'name'   => $lab['name'],
+                'status' => 'negative',
+                'notes'  => 'a referral is not a serology',
+            ]],
+        ]);
+
+        // The note is kept; the answer is not one this test offers.
+        $this->seeInDatabase('lab_results', ['lab_id' => $lab['id'], 'status' => 'not_done']);
+    }
+
+    /** The bar counts answered tests, whatever the answer was. */
+    public function testTheProgressBarCountsAnsweredTests(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4023', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $hiv    = $this->db->table('labs')->where(['organ_code' => 'kidney', 'name' => 'HIV'])->get()->getRowArray();
+        $dental = $this->db->table('labs')->where(['organ_code' => 'kidney', 'name' => 'Dental'])->get()->getRowArray();
+
+        $this->post('recipients/4023', [
+            'section' => 'labs',
+            'labs'    => [
+                ['id' => $hiv['id'], 'name' => 'HIV', 'status' => 'negative'],
+                ['id' => $dental['id'], 'name' => 'Dental', 'status' => 'not_applicable'],
+            ],
+        ]);
+
+        $html = $this->get('recipients/4023')->getBody();
+        $this->assertStringContainsString('2 of 71 completed', $html);
+    }
+
+    /** @return string The markup of one test's card. */
+    private function cardFor(string $html, string $test): string
+    {
+        $cards = explode('class="lab-card', $html);
+
+        foreach ($cards as $card) {
+            if (str_contains($card, '>' . $test . '</div>')) {
+                return $card;
+            }
+        }
+
+        $this->fail("no card for {$test}");
     }
 
     // ---- MRP -------------------------------------------------------------

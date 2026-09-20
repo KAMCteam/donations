@@ -773,3 +773,7 @@ textarea.lab-editor-field { resize: none; }
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--slate-100);
 }
+
+/* Five answers rather than three, so they wrap instead of squeezing. */
+.lab-actions { flex-wrap: wrap; }
+.lab-status-btn { flex: 0 1 auto; }

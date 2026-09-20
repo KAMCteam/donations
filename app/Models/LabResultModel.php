@@ -28,7 +28,7 @@ class LabResultModel extends Model
     {
         return $this->db->table('labs l')
             ->select('l.id AS lab_id, l.name AS lab_name, l.result_type, lp.name AS parent_name')
-            ->select('lr.id AS result_id, COALESCE(lr.status, \'pending\') AS status, lr.value, lr.taken_on, lr.notes', false)
+            ->select('lr.id AS result_id, COALESCE(lr.status, \'not_done\') AS status, lr.value, lr.taken_on, lr.notes', false)
             ->join('lab_parents lp', 'lp.id = l.lab_parent_id', 'left')
             ->join(
                 'lab_results lr',
@@ -53,7 +53,9 @@ class LabResultModel extends Model
     public function progressFor(int|string $mrn, string $personType): array
     {
         $row = $this->db->table('lab_results')
-            ->select('COUNT(*) AS total, SUM(status = \'completed\') AS done', false)
+            // Answered, which is every answer but the two that mean nobody
+            // has looked yet. UiStore::RESULT_UNANSWERED is the same list.
+            ->select('COUNT(*) AS total, SUM(status NOT IN (\'not_done\', \'pending\')) AS done', false)
             ->where('person_mrn', $mrn)
             ->where('person_type', $personType)
             ->get()

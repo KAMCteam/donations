@@ -22,7 +22,15 @@ use App\Libraries\UiStore;
  * @var list<array<string, mixed>>            $dLabTests
  * @var list<array{id: string, name: string}> $mrps
  * @var string                                $entryDate
+ * @var string                                $editing    The card open for editing, '' for none
  */
+// A pair opens read-only and is edited one card at a time: each Edit is a link
+// back here with the card named, so the card returns as a form and the screen
+// works with JavaScript off. Only the open card's fieldset is enabled, so only
+// its fields post — saving the notes cannot disturb the crossmatch date.
+$viewUrl  = site_url('pairs/' . rawurlencode($pair['id']));
+$editable = static fn (string $section): bool => $editing === $section;
+$editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $section;
 ?>
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
@@ -31,14 +39,22 @@ use App\Libraries\UiStore;
             <div class="eyebrow"><?= esc($pair['id']) ?></div>
             <h1 class="page-title">Pair Profile</h1>
         </div>
-        <button type="submit" form="pair-form" class="btn-save">Save Changes</button>
     </div>
 
     <form id="pair-form" class="stack-5" method="post" action="<?= current_url() ?>">
         <?= csrf_field() ?>
 
         <div class="card card--pad">
-            <h2 class="card-title card-title--mb5">Pair Details</h2>
+            <div class="card-head">
+                <h2 class="card-title">Pair Details</h2>
+                <?php if (! $editable('pair')): ?>
+                    <a class="btn-edit" href="<?= esc($editUrl('pair')) ?>"><?= ui_icon('edit') ?>Edit</a>
+                <?php endif; ?>
+            </div>
+            <fieldset class="card-fields"<?= $editable('pair') ? '' : ' disabled' ?>>
+                <?php if ($editable('pair')): ?>
+                    <input type="hidden" name="section" value="pair">
+                <?php endif; ?>
             <div class="form-grid-3">
                 <div>
                     <label class="field-label" for="f-relationship">Relationship</label>
@@ -57,13 +73,30 @@ use App\Libraries\UiStore;
                     </select>
                 </div>
             </div>
+            </fieldset>
+
+            <?php if ($editable('pair')): ?>
+                <div class="card-actions">
+                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                    <button type="submit" class="btn-save">Save</button>
+                </div>
+            <?php endif; ?>
         </div>
 
         <div class="card card--pad">
-            <div class="section-head">
-                <div class="role-badge role-badge--recipient">R</div>
-                <h2 class="card-title">Recipient — Personal Information</h2>
+            <div class="card-head">
+                <div class="section-head">
+                    <div class="role-badge role-badge--recipient">R</div>
+                    <h2 class="card-title">Recipient — Personal Information</h2>
+                </div>
+                <?php if (! $editable('recipient')): ?>
+                    <a class="btn-edit" href="<?= esc($editUrl('recipient')) ?>"><?= ui_icon('edit') ?>Edit</a>
+                <?php endif; ?>
             </div>
+            <fieldset class="card-fields"<?= $editable('recipient') ? '' : ' disabled' ?>>
+                <?php if ($editable('recipient')): ?>
+                    <input type="hidden" name="section" value="recipient">
+                <?php endif; ?>
             <div class="stack-4">
                 <div class="form-grid-5">
                     <div>
@@ -151,20 +184,61 @@ use App\Libraries\UiStore;
                     </div>
                 </div>
             </div>
+            </fieldset>
+
+            <?php if ($editable('recipient')): ?>
+                <div class="card-actions">
+                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                    <button type="submit" class="btn-save">Save</button>
+                </div>
+            <?php endif; ?>
         </div>
 
-        <?= view('ui/partials/lab_tests', ['tests' => $rLabTests, 'field' => 'rLabs']) ?>
+        <?= view('ui/partials/lab_tests', [
+            'tests'   => $rLabTests,
+            'field'   => 'rLabs',
+            'editing' => $editable('rlabs'),
+            'editUrl' => $editUrl('rlabs'),
+            'viewUrl' => $viewUrl,
+            'section' => 'rlabs',
+        ]) ?>
 
         <div class="card card--pad">
-            <h2 class="card-title card-title--mb4">Recipient — Clinical Notes</h2>
-            <textarea class="textarea" name="rNotes" rows="4" placeholder="Add clinical notes, observations, or relevant context..."><?= esc($v['rNotes']) ?></textarea>
-        </div>
-
-        <div class="card card--pad">
-            <div class="section-head">
-                <div class="role-badge role-badge--donor">D</div>
-                <h2 class="card-title">Donor — Personal Information</h2>
+            <div class="card-head">
+                <h2 class="card-title">Recipient — Clinical Notes</h2>
+                <?php if (! $editable('rnotes')): ?>
+                    <a class="btn-edit" href="<?= esc($editUrl('rnotes')) ?>"><?= ui_icon('edit') ?>Edit</a>
+                <?php endif; ?>
             </div>
+            <fieldset class="card-fields"<?= $editable('rnotes') ? '' : ' disabled' ?>>
+                <?php if ($editable('rnotes')): ?>
+                    <input type="hidden" name="section" value="rnotes">
+                <?php endif; ?>
+                <textarea class="textarea" name="rNotes" rows="4" placeholder="Add clinical notes, observations, or relevant context..."><?= esc($v['rNotes']) ?></textarea>
+            </fieldset>
+
+            <?php if ($editable('rnotes')): ?>
+                <div class="card-actions">
+                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                    <button type="submit" class="btn-save">Save</button>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <div class="card card--pad">
+            <div class="card-head">
+                <div class="section-head">
+                    <div class="role-badge role-badge--donor">D</div>
+                    <h2 class="card-title">Donor — Personal Information</h2>
+                </div>
+                <?php if (! $editable('donor')): ?>
+                    <a class="btn-edit" href="<?= esc($editUrl('donor')) ?>"><?= ui_icon('edit') ?>Edit</a>
+                <?php endif; ?>
+            </div>
+            <fieldset class="card-fields"<?= $editable('donor') ? '' : ' disabled' ?>>
+                <?php if ($editable('donor')): ?>
+                    <input type="hidden" name="section" value="donor">
+                <?php endif; ?>
             <div class="stack-4">
                 <div class="form-grid-5">
                     <div>
@@ -229,13 +303,45 @@ use App\Libraries\UiStore;
                     </div>
                 </div>
             </div>
+            </fieldset>
+
+            <?php if ($editable('donor')): ?>
+                <div class="card-actions">
+                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                    <button type="submit" class="btn-save">Save</button>
+                </div>
+            <?php endif; ?>
         </div>
 
-        <?= view('ui/partials/lab_tests', ['tests' => $dLabTests, 'field' => 'dLabs']) ?>
+        <?= view('ui/partials/lab_tests', [
+            'tests'   => $dLabTests,
+            'field'   => 'dLabs',
+            'editing' => $editable('dlabs'),
+            'editUrl' => $editUrl('dlabs'),
+            'viewUrl' => $viewUrl,
+            'section' => 'dlabs',
+        ]) ?>
 
         <div class="card card--pad">
-            <h2 class="card-title card-title--mb4">Donor — Clinical Notes</h2>
-            <textarea class="textarea" name="dNotes" rows="4" placeholder="Add clinical notes, observations, or relevant context..."><?= esc($v['dNotes']) ?></textarea>
+            <div class="card-head">
+                <h2 class="card-title">Donor — Clinical Notes</h2>
+                <?php if (! $editable('dnotes')): ?>
+                    <a class="btn-edit" href="<?= esc($editUrl('dnotes')) ?>"><?= ui_icon('edit') ?>Edit</a>
+                <?php endif; ?>
+            </div>
+            <fieldset class="card-fields"<?= $editable('dnotes') ? '' : ' disabled' ?>>
+                <?php if ($editable('dnotes')): ?>
+                    <input type="hidden" name="section" value="dnotes">
+                <?php endif; ?>
+                <textarea class="textarea" name="dNotes" rows="4" placeholder="Add clinical notes, observations, or relevant context..."><?= esc($v['dNotes']) ?></textarea>
+            </fieldset>
+
+            <?php if ($editable('dnotes')): ?>
+                <div class="card-actions">
+                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                    <button type="submit" class="btn-save">Save</button>
+                </div>
+            <?php endif; ?>
         </div>
     </form>
 </div>

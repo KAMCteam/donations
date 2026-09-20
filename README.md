@@ -112,8 +112,9 @@ reacts to it:
 | Stylesheets and images | `public/assets/ui/` — copied byte-for-byte |
 | Behaviour only | `public/assets/ui/js/ui.js` — one file, ~190 lines |
 
-Navigation, filtering, sorting and saving are links and form posts, so every
-screen renders, navigates and submits **with JavaScript switched off**. `ui.js`
+Navigation, filtering, sorting, opening a card for editing and saving are links
+and form posts, so every screen renders, navigates and submits **with
+JavaScript switched off**. `ui.js`
 is left with the mobile sidebar, the lab cards (status buttons, result editor,
 running totals), whole-row click targets and keeping "Urgency" in step with
 "Urgent?".
@@ -127,6 +128,31 @@ package built those strings with a helper that inserted an empty HTML comment
 between each part to imitate React's text nodes, which changes how the browser
 kerns the join; the views here emit one ordinary string and let the browser
 shape it normally.
+
+### A record is read first, then edited a card at a time
+
+The recipient, donor and pair screens open read-only. Each card — personal
+information, the lab workup, clinical notes, and on a pair its own details —
+carries an **Edit** of its own, which opens just that card with Save and
+Cancel; the rest stay as they are.
+
+Edit is a link (`?edit=personal`) and the card comes back as a form, so this
+works with JavaScript switched off like everything else here. A card that is
+not open renders inside a disabled `<fieldset>`: every value sits exactly
+where it does when editable, and the browser posts none of it. That is what
+keeps saving the notes from touching the crossmatch date. The server does not
+take the browser's word for it — the post names its card, and only the fields
+that card owns are applied, so a stale tab or a hand-made post cannot reach
+past the card it claims to be.
+
+One consequence worth stating: because an open card posts all of its own
+fields, an emptied box now means the value was removed, and a nullable column
+is cleared. A wrong phone number could not be taken off a record before. A
+column that cannot be NULL — a name, a blood group — keeps what it had, since
+blanking one is a slip rather than an instruction.
+
+The add screens are unchanged: a new record has nothing to read yet, so it
+stays one open form with a single Save.
 
 ### Medical record numbers
 

@@ -757,3 +757,19 @@ textarea.lab-editor-field { resize: none; }
 @media (hover: hover) {
   .date-field-button:hover { color: #15508A; background-color: var(--slate-50); }
 }
+
+/* ---- The workup, grouped ----
+   The check list is written as groups of tests — Immunology tests, Infectious
+   workup, Imaging — so the card is too: a heading, then that group's tests
+   beneath it, then the next heading. */
+.lab-group + .lab-group { margin-top: 1.5rem; }
+
+.lab-group-name {
+  margin-bottom: 0.75rem;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  font-weight: 600;
+  color: var(--slate-700);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--slate-100);
+}

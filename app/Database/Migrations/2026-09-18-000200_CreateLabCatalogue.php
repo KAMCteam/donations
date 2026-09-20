@@ -72,14 +72,20 @@ class CreateLabCatalogue extends Migration
                 'constraint' => ['recipient', 'donor', 'both'],
                 'default'    => 'both',
             ],
-            // How the result is captured. `text` is free entry — a value, a
-            // finding, a report line. The coded shapes drive a dropdown:
-            //   positive_negative   Positive / Negative
-            //   cleared_not_cleared Cleared / Not Cleared
-            //   done_not_done       Done / Not Done
+            // How the result is captured, in the check list's own wording.
+            // `text` is free entry — a value, a finding, a report line — and
+            // `numeric` a figure. The rest are the answers the sheet offers:
+            //   blood_group          A / B / AB / O
+            //   done                 Not done / pending / done
+            //   positive_negative    Not done / pending / Positive / Negative
+            //   acceptable_abnormal  Not done / pending / acceptable / Abnormal
+            //   cleared_not_cleared  Not done / pending / Cleared / not cleared
+            //   given_not_given      Given / not required / not given
+            // "Not applicable" is added to several of them on the sheet; it is
+            // an answer any test can need, so it is not a vocabulary of its own.
             'result_type' => [
                 'type'       => 'ENUM',
-                'constraint' => ['text', 'numeric', 'positive_negative', 'cleared_not_cleared', 'done_not_done'],
+                'constraint' => ['text', 'numeric', 'blood_group', 'done', 'positive_negative', 'acceptable_abnormal', 'cleared_not_cleared', 'given_not_given'],
                 'default'    => 'text',
             ],
             'sort_order' => [
@@ -108,8 +114,11 @@ class CreateLabCatalogue extends Migration
         $this->forge->addPrimaryKey('id');
         // The lookup every record screen makes: this programme, this side.
         $this->forge->addKey(['organ_code', 'person_type', 'is_active']);
-        // The same test may appear once per programme and side, not twice.
-        $this->forge->addUniqueKey(['name', 'organ_code', 'person_type']);
+        // The same test may appear once per group, programme and side, not
+        // twice. The group belongs in the key: the check list has VZV under
+        // Infectious workup as a serology and under Vaccinations as a jab,
+        // and they are two different things to record.
+        $this->forge->addUniqueKey(['name', 'lab_parent_id', 'organ_code', 'person_type']);
         $this->forge->addForeignKey('lab_parent_id', 'lab_parents', 'id', 'CASCADE', 'SET NULL');
         $this->forge->addForeignKey('organ_code', 'organ_programs', 'code', 'CASCADE', 'RESTRICT');
 

@@ -355,42 +355,27 @@ final class UiStore
         }
     }
 
-    // ---- The next free MRN -------------------------------------------------
+    // ---- Medical record numbers --------------------------------------------
 
     /**
-     * The next unused medical record number.
+     * Whether a register already holds this MRN.
      *
-     * A placeholder: a real MRN comes from the hospital, and the record
-     * screens show it as "Auto" because the design package never collected
-     * one. Counted across both registers so a new person cannot be handed a
-     * number somebody else already has — the same person may hold both, but
-     * only deliberately.
+     * The MRN is the hospital's own number — it comes off TrakCare with the
+     * patient — so the forms collect it and the system never invents one. All
+     * it can do is refuse a number this register already has, since the MRN is
+     * the primary key and a second row under it would be a different person
+     * wearing the first one's identity.
+     *
+     * The two registers are checked separately on purpose: the same MRN on
+     * both sides is one person who is a recipient in one programme and a donor
+     * in another, which is allowed. Only the pair screen refuses it, because
+     * there it would mean donating to oneself.
      */
-    public function nextRecipientId(): string
+    public function mrnTaken(int|string $mrn, string $personType): bool
     {
-        return (string) $this->nextMrn();
-    }
+        $model = $personType === 'recipient' ? $this->recipients : $this->donors;
 
-    public function nextDonorId(): string
-    {
-        return (string) $this->nextMrn();
-    }
-
-    /** Pair ids are the table's own auto-increment; nothing to reserve. */
-    public function nextPairId(): string
-    {
-        return '';
-    }
-
-    private function nextMrn(): int
-    {
-        $highest = static fn (?array $row): int => (int) ($row['mrn'] ?? 0);
-
-        return max(
-            $highest($this->recipients->orderBy('mrn', 'DESC')->first()),
-            $highest($this->donors->orderBy('mrn', 'DESC')->first()),
-            1000
-        ) + 1;
+        return $model->find((int) $mrn) !== null;
     }
 
     /**

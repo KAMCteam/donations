@@ -225,6 +225,9 @@ class Ui extends BaseController
 
         return view('ui/person_form', [
             'title'      => $person !== null ? $person['name'] : ($isRecipient ? 'Add Recipient' : 'Add Donor'),
+            // Set when a save bounced back; the fields themselves come from
+            // old() so nothing typed is lost.
+            'error'      => (string) ($this->session->getFlashdata('ui_error') ?? ''),
             // The prototype highlighted a nav item only on the five top-level
             // screens; a record or pair sub-screen left the sidebar unhighlighted.
             'navPage'    => '',
@@ -236,6 +239,8 @@ class Ui extends BaseController
             'labTests'   => $labTests,
             'mrps'       => $mrps,
             'v'          => [
+                // Entered, not generated: a real MRN comes from the hospital.
+                'mrn'              => $person['id'] ?? '',
                 'name'             => $person['name'] ?? '',
                 'age'              => isset($person['age']) ? (string) $person['age'] : '',
                 'bloodType'        => $person['bloodType'] ?? 'O',
@@ -294,9 +299,16 @@ class Ui extends BaseController
             ]);
 
             if ($person === null) {
-                $this->store->addRecipient(array_merge($fields, ['id' => $this->store->nextRecipientId()]));
+                $mrn   = trim((string) $this->request->getPost('mrn'));
+                $error = $this->mrnError($mrn, 'recipient');
 
-                return redirect()->to(site_url('recipients'));
+                if ($error !== '') {
+                    return redirect()->back()->withInput()->with('ui_error', $error);
+                }
+
+                $this->store->addRecipient(array_merge($fields, ['id' => $mrn]));
+
+                return redirect()->to(site_url('recipients/' . rawurlencode($mrn)));
             }
 
             $this->store->updateRecipient($person['id'], $fields);
@@ -315,9 +327,16 @@ class Ui extends BaseController
         ]);
 
         if ($person === null) {
-            $this->store->addDonor(array_merge($fields, ['id' => $this->store->nextDonorId()]));
+            $mrn   = trim((string) $this->request->getPost('mrn'));
+            $error = $this->mrnError($mrn, 'donor');
 
-            return redirect()->to(site_url('donors'));
+            if ($error !== '') {
+                return redirect()->back()->withInput()->with('ui_error', $error);
+            }
+
+            $this->store->addDonor(array_merge($fields, ['id' => $mrn]));
+
+            return redirect()->to(site_url('donors/' . rawurlencode($mrn)));
         }
 
         $this->store->updateDonor($person['id'], $fields);
@@ -424,6 +443,7 @@ class Ui extends BaseController
 
         return view('ui/add_pair', [
             'title'     => 'Add Pair',
+            'error'     => (string) ($this->session->getFlashdata('ui_error') ?? ''),
             'navPage'   => '',
             'organ'     => $organ,
             'mrps'      => $mrps,
@@ -433,6 +453,7 @@ class Ui extends BaseController
             'v'         => [
                 'relationship'   => '',
                 'crossmatchDate' => '',
+                'rMrn'           => '',
                 'rName'          => '',
                 'rAge'           => '',
                 'rBloodType'     => 'O',
@@ -445,6 +466,7 @@ class Ui extends BaseController
                 'rFirstDialysis' => '',
                 'rMrp'           => $mrps[0]['id'] ?? '',
                 'rNotes'         => '',
+                'dMrn'           => '',
                 'dName'          => '',
                 'dAge'           => '',
                 'dBloodType'     => 'O',
@@ -464,9 +486,26 @@ class Ui extends BaseController
     {
         $organ        = $this->store->organ();
         $entryDate    = date('Y-m-d');
-        $recipientId  = $this->store->nextRecipientId();
         $relationship = (string) $this->request->getPost('relationship');
         $crossmatch   = (string) $this->request->getPost('crossmatchDate');
+
+        // Both numbers come off the form, and both are checked before either
+        // person is stored — half a pair is worse than none.
+        $recipientId = trim((string) $this->request->getPost('rMrn'));
+        $donorId     = trim((string) $this->request->getPost('dMrn'));
+
+        $error = $this->mrnError($recipientId, 'recipient', 'Recipient MRN')
+            ?: $this->mrnError($donorId, 'donor', 'Donor MRN');
+
+        // Separate registers, so the same number on both sides is accepted by
+        // the tables; here it would mean a person donating to themselves.
+        if ($error === '' && $recipientId === $donorId) {
+            $error = 'The recipient and the donor cannot share an MRN.';
+        }
+
+        if ($error !== '') {
+            return redirect()->back()->withInput()->with('ui_error', $error);
+        }
 
         $this->store->addRecipient([
             'id'             => $recipientId,
@@ -488,9 +527,6 @@ class Ui extends BaseController
             'labTests'       => $this->postedLabTests('rLabs'),
             'pairedDonorId'  => '',
         ]);
-
-        // Taken after the recipient is stored, so R-00n and D-00n cannot collide.
-        $donorId = $this->store->nextDonorId();
 
         $this->store->addDonor([
             'id'                => $donorId,
@@ -668,6 +704,37 @@ class Ui extends BaseController
     }
 
     // ---- Shared ------------------------------------------------------------
+
+    /**
+     * Checks a medical record number typed on a form.
+     *
+     * Returns the message to show, or '' when the number is usable. The MRN is
+     * the hospital's own — it comes with the patient, off TrakCare — so the
+     * system takes what is entered rather than inventing one. What it can
+     * check is that a number was given, that it is one, and that this register
+     * does not already hold it: the MRN is the primary key, so a second row
+     * under it would be one person filed under another's identity.
+     */
+    private function mrnError(string $mrn, string $personType, string $label = 'MRN'): string
+    {
+        $mrn = trim($mrn);
+
+        if ($mrn === '') {
+            return $label . ' is required — enter the number from the hospital record.';
+        }
+
+        if (preg_match('/^[0-9]+$/', $mrn) !== 1 || (int) $mrn < 1) {
+            return $label . ' must be a number.';
+        }
+
+        if ($this->store->mrnTaken($mrn, $personType)) {
+            $register = $personType === 'recipient' ? 'A recipient' : 'A donor';
+
+            return $register . ' with MRN ' . $mrn . ' is already registered.';
+        }
+
+        return '';
+    }
 
     /** The blood-type chip row, validated against the known types. */
     private function bloodTypeFilter(): string

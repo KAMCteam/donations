@@ -107,7 +107,7 @@ reacts to it:
 | Shell, sidebar, top bar | `app/Views/ui/layout.php`, `layout_bare.php` |
 | Lab-tests card | `app/Views/ui/partials/lab_tests.php` |
 | Screen selection, form posts | `app/Controllers/Ui.php` |
-| Records | `app/Libraries/UiStore.php`, seeded from `UiSeed.php` |
+| Records | `app/Libraries/UiStore.php`, over `app/Models/*` |
 | Inline SVG icons, tone lookups | `app/Helpers/ui_helper.php` |
 | Stylesheets and images | `public/assets/ui/` — copied byte-for-byte |
 | Behaviour only | `public/assets/ui/js/ui.js` — one file, ~190 lines |
@@ -127,6 +127,25 @@ package built those strings with a helper that inserted an empty HTML comment
 between each part to imitate React's text nodes, which changes how the browser
 kerns the join; the views here emit one ordinary string and let the browser
 shape it normally.
+
+### Medical record numbers
+
+The MRN is the hospital's own number — it arrives with the patient, off
+TrakCare — so the Add Recipient, Add Donor and Add Pair forms collect it and
+the system never invents one. It used to render as a read-only "Auto" and get
+assigned as the highest existing number plus one, which would have filed
+everybody under numbers that mean nothing to the hospital.
+
+A save is refused, with the reason on the form and the rest of what was typed
+still in it, when the number is missing, is not a number, or is already on that
+register — the MRN is the primary key, so a second row under it would be one
+person filed under another's identity. On Add Pair both numbers are checked
+before either person is written: half a pair is worse than none.
+
+The two registers are checked separately. The same MRN on both is one person
+who is a recipient on one programme and a donor on another, which is allowed;
+only the pair screen refuses it, where it would mean donating to oneself. On a
+saved record the MRN is shown but not editable: it is what identifies the row.
 
 ### Where the data lives
 

@@ -307,6 +307,25 @@ php spark migrate
 php spark db:seed DatabaseSeeder
 ```
 
+**Upgrading a database made before these changes.** The migration files have
+been edited in place rather than added to, so `php spark migrate` finds
+nothing new to run and leaves the old columns as they are — which is why a
+screen offering "Living Related" or "Paired Exchange" fails against an older
+schema. Either start clean:
+
+```bash
+php spark migrate:refresh -f && php spark db:seed DatabaseSeeder   # drops everything
+```
+
+or keep the records and apply [`docs/upgrade-schema.sql`](docs/upgrade-schema.sql),
+which carries them across (Urgency's High and Critical become urgent,
+`scheduled` becomes Confirmed, and so on):
+
+```bash
+mysqldump -u <user> -p donations > donations-backup.sql
+mysql -u <user> -p donations < docs/upgrade-schema.sql
+```
+
 The seeder inserts **reference rows only** — the two programmes and the lab
 catalogue. No patients, no donors, no pairs, no staff accounts, no physicians
 or coordinators. It is re-runnable and skips anything already there, so it will

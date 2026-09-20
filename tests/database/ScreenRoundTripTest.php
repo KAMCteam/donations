@@ -189,6 +189,39 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertSame(1, $this->db->table('coordinators')->countAllResults());
     }
 
+    /**
+     * The donors list is the same table as the waiting list — same columns
+     * where the two screens share a field, same style — because it used to
+     * carry its own, which made it read as a different kind of screen.
+     */
+    public function testTheDonorsListShowsTheAgreedColumns(): void
+    {
+        $this->post('donors/new', [
+            'name'        => 'Noura Test',
+            'age'         => '35',
+            'bloodType'   => 'AB',
+            'donorGender' => 'Female',
+            'hospital'    => 'KAMC',
+        ]);
+
+        $html = $this->get('donors')->getBody();
+
+        foreach (['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs'] as $column) {
+            $this->assertStringContainsString('<th>' . $column . '</th>', $html);
+        }
+
+        // Dropped: neither identifies a donor at a glance, and both are on the
+        // record screen.
+        $this->assertStringNotContainsString('<th>Relationship</th>', $html);
+        $this->assertStringNotContainsString('<th>Hospital</th>', $html);
+
+        // The shared style, not the one it used to have on its own.
+        $this->assertStringContainsString('class="table list-table"', $html);
+
+        $this->assertStringContainsString('Female', $html);
+        $this->assertStringContainsString('AB', $html);
+    }
+
     // ---- Add Pair --------------------------------------------------------
 
     public function testAddPairStoresBothPeopleAndTheLinkBetweenThem(): void

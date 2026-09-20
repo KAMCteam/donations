@@ -8,9 +8,14 @@ use App\Libraries\UiStore;
 /**
  * Donors registry. Was `js/pages/donors-list.js`.
  *
+ * Same table as the Recipient Waitlist — the shared `list-table` style, the
+ * row itself a link to the record — because they are the same kind of screen.
+ * Relationship and Hospital were dropped from the columns: neither identifies
+ * a donor at a glance, and both are on the record.
+ *
  * @var list<array<string, mixed>> $donors  Unmatched donors for the current programme.
  */
-$headers = ['ID', 'Name', 'Age', 'Blood Type', 'Type', 'Relationship', 'Hospital', 'Labs'];
+$headers = ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs'];
 ?>
 <div class="page">
     <div class="page-header page-header--center">
@@ -26,7 +31,7 @@ $headers = ['ID', 'Name', 'Age', 'Blood Type', 'Type', 'Relationship', 'Hospital
         <?php if ($donors === []): ?>
             <div class="empty-state">No unmatched donors.</div>
         <?php else: ?>
-            <table class="table donors-table">
+            <table class="table list-table">
                 <thead>
                     <tr>
                         <?php foreach ($headers as $header): ?>
@@ -41,14 +46,13 @@ $headers = ['ID', 'Name', 'Age', 'Blood Type', 'Type', 'Relationship', 'Hospital
                         $url      = site_url('donors/' . rawurlencode($donor['id']));
                         ?>
                         <tr data-href="<?= $url ?>">
-                            <td class="cell-id"><a href="<?= $url ?>"><?= esc($donor['id']) ?></a></td>
-                            <td class="cell-name"><?= esc($donor['name']) ?></td>
-                            <td class="cell-age"><?= esc($donor['age']) ?></td>
-                            <td class="cell-blood"><?= esc($donor['bloodType']) ?></td>
+                            <td class="cell-name"><a href="<?= $url ?>"><?= esc($donor['name']) ?></a></td>
+                            <td class="mono"><?= esc($donor['id']) ?></td>
+                            <td><?= esc($donor['age']) ?></td>
+                            <td><?= esc($donor['donorGender']) ?></td>
+                            <td class="mono"><?= esc($donor['bloodType']) ?></td>
                             <td><span class="badge <?= $donor['donationType'] === 'living' ? 'tone-teal-soft' : 'tone-slate' ?>"><?= esc($donor['donationType']) ?></span></td>
-                            <td class="cell-muted cell-rel"><?= esc(($donor['relationship'] ?? '') !== '' ? $donor['relationship'] : '—') ?></td>
-                            <td class="cell-muted cell-hospital"><?= esc($donor['hospital']) ?></td>
-                            <td class="cell-labs"><?= $progress['done'] ?>/<?= $progress['total'] ?></td>
+                            <td class="mono"><?= $progress['done'] ?>/<?= $progress['total'] ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>

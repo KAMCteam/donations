@@ -16,19 +16,6 @@
 (function () {
   "use strict";
 
-  /* Kept in step with UiStore::LAB_STATUS_TONE / LAB_STATUS_LABEL. */
-  var LAB_STATUS_TONE = {
-    completed: "tone-emerald",
-    pending: "tone-amber-soft",
-    flagged: "tone-red",
-  };
-
-  var LAB_STATUS_LABEL = {
-    completed: "Done",
-    pending: "Pending",
-    flagged: "Flagged",
-  };
-
   /* ---- Sidebar (app.js setSidebarOpen) ---------------------------------- */
 
   function initSidebar() {
@@ -72,10 +59,16 @@
 
   function labStatus(card) {
     var input = card.querySelector("[data-lab-status-value]");
-    return input ? input.value : "pending";
+    return input ? input.value : "not_done";
   }
 
+  /* Each button carries its own tone and label, because every test asks a
+     different question — Positive / Negative, Cleared / not, Given / not —
+     and this file has no business holding a copy of all of them. */
   function setLabStatus(card, status) {
+    var chosen = card.querySelector('[data-lab-status="' + status + '"]');
+    if (!chosen) return;
+
     var input = card.querySelector("[data-lab-status-value]");
     if (input) input.value = status;
 
@@ -85,13 +78,13 @@
 
     var pill = card.querySelector("[data-lab-pill]");
     if (pill) {
-      pill.className = "lab-pill " + LAB_STATUS_TONE[status];
-      pill.textContent = LAB_STATUS_LABEL[status];
+      pill.className = "lab-pill " + chosen.getAttribute("data-lab-tone");
+      pill.textContent = chosen.getAttribute("data-lab-label");
     }
 
     card.querySelectorAll("[data-lab-status]").forEach(function (btn) {
-      var value = btn.getAttribute("data-lab-status");
-      btn.className = "lab-status-btn" + (value === status ? " is-active " + LAB_STATUS_TONE[value] : "");
+      var active = btn === chosen;
+      btn.className = "lab-status-btn" + (active ? " is-active " + btn.getAttribute("data-lab-tone") : "");
     });
   }
 
@@ -101,8 +94,11 @@
     var total = cards.length;
     var done = 0;
 
+    // Answered is anything but "not done" and "pending" — which the buttons
+    // themselves say, so the count does not need the vocabulary either.
     cards.forEach(function (card) {
-      if (labStatus(card) === "completed") done += 1;
+      var chosen = card.querySelector('[data-lab-status="' + labStatus(card) + '"]');
+      if (chosen && !chosen.hasAttribute("data-lab-unanswered")) done += 1;
     });
 
     var pct = Math.round((done / Math.max(total, 1)) * 100);

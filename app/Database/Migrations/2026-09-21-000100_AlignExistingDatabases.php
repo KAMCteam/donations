@@ -126,6 +126,20 @@ class AlignExistingDatabases extends Migration
             . ' DROP INDEX ' . $this->db->protectIdentifiers('name_organ_code_person_type'));
         $this->db->query('ALTER TABLE ' . $this->table('labs')
             . ' ADD UNIQUE KEY (name, lab_parent_id, organ_code, person_type)');
+
+        // A result answers in its own test's words now. The three it used to
+        // hold map onto the new list: `completed` was Done, and `flagged` was
+        // how an abnormal finding was marked before there was a word for it.
+        $this->db->query('ALTER TABLE ' . $this->table('lab_results')
+            . " MODIFY status ENUM('not_done','pending','done','positive','negative','acceptable',"
+            . "'abnormal','cleared','not_cleared','given','not_required','not_given','not_applicable',"
+            . "'blood_a','blood_b','blood_ab','blood_o','completed','flagged') NOT NULL DEFAULT 'not_done'");
+        $this->db->query('UPDATE ' . $this->table('lab_results') . " SET status = 'done' WHERE status = 'completed'");
+        $this->db->query('UPDATE ' . $this->table('lab_results') . " SET status = 'abnormal' WHERE status = 'flagged'");
+        $this->db->query('ALTER TABLE ' . $this->table('lab_results')
+            . " MODIFY status ENUM('not_done','pending','done','positive','negative','acceptable',"
+            . "'abnormal','cleared','not_cleared','given','not_required','not_given','not_applicable',"
+            . "'blood_a','blood_b','blood_ab','blood_o') NOT NULL DEFAULT 'not_done'");
     }
 
     /** The shared list plus the retired values, so nothing is stranded. */

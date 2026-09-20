@@ -66,7 +66,7 @@ if (! function_exists('ui_tone')) {
     {
         $map = match ($kind) {
             'status'     => UiStore::STATUS_TONE,
-            'labStatus'  => UiStore::LAB_STATUS_TONE,
+            'labStatus'  => UiStore::RESULT_TONE,
             default      => [],
         };
 

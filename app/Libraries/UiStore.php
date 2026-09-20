@@ -78,19 +78,81 @@ final class UiStore
         'declined'        => 'tone-red',
     ];
 
-    public const LAB_STATUS_TONE = [
-        'completed' => 'tone-emerald',
-        'pending'   => 'tone-amber-soft',
-        'flagged'   => 'tone-red',
+    /**
+     * The answers the check list offers, and which tests offer which.
+     *
+     * Every card shows its own test's answers rather than one generic
+     * Pending / Done / Flagged: a serology is Positive or Negative, a referral
+     * is Cleared or not, a vaccination is Given or not. `not_done` starts them
+     * all — nobody has looked yet — and `not_applicable` ends most of them,
+     * since a test that cannot apply to this patient is a real answer and the
+     * sheet adds it to several vocabularies by hand.
+     *
+     * Blood group is the one that answers with a value rather than a verdict,
+     * so its answers are prefixed: in the column, `blood_ab` is unmistakably a
+     * blood group and not an abbreviation of something else.
+     */
+    public const RESULT_OPTIONS = [
+        'blood_group'         => ['not_done', 'blood_a', 'blood_b', 'blood_ab', 'blood_o'],
+        'done'                => ['not_done', 'pending', 'done', 'not_applicable'],
+        'positive_negative'   => ['not_done', 'pending', 'positive', 'negative', 'not_applicable'],
+        'acceptable_abnormal' => ['not_done', 'pending', 'acceptable', 'abnormal', 'not_applicable'],
+        'cleared_not_cleared' => ['not_done', 'pending', 'cleared', 'not_cleared', 'not_applicable'],
+        'given_not_given'     => ['not_done', 'given', 'not_required', 'not_given', 'not_applicable'],
+        'text'                => ['not_done', 'pending', 'done', 'not_applicable'],
+        'numeric'             => ['not_done', 'pending', 'done', 'not_applicable'],
     ];
 
-    public const LAB_STATUS_LABEL = [
-        'completed' => 'Done',
-        'pending'   => 'Pending',
-        'flagged'   => 'Flagged',
+    public const RESULT_LABEL = [
+        'not_done'       => 'Not done',
+        'pending'        => 'Pending',
+        'done'           => 'Done',
+        'positive'       => 'Positive',
+        'negative'       => 'Negative',
+        'acceptable'     => 'Acceptable',
+        'abnormal'       => 'Abnormal',
+        'cleared'        => 'Cleared',
+        'not_cleared'    => 'Not cleared',
+        'given'          => 'Given',
+        'not_required'   => 'Not required',
+        'not_given'      => 'Not given',
+        'not_applicable' => 'N/A',
+        'blood_a'        => 'A',
+        'blood_b'        => 'B',
+        'blood_ab'       => 'AB',
+        'blood_o'        => 'O',
     ];
 
-    public const LAB_STATUSES = ['pending', 'completed', 'flagged'];
+    /** Red is the answer somebody has to act on, not merely a bad one. */
+    public const RESULT_TONE = [
+        'not_done'       => 'tone-slate',
+        'pending'        => 'tone-amber-soft',
+        'done'           => 'tone-emerald',
+        'positive'       => 'tone-red',
+        'negative'       => 'tone-emerald',
+        'acceptable'     => 'tone-emerald',
+        'abnormal'       => 'tone-red',
+        'cleared'        => 'tone-emerald',
+        'not_cleared'    => 'tone-red',
+        'given'          => 'tone-emerald',
+        'not_required'   => 'tone-slate',
+        'not_given'      => 'tone-amber',
+        'not_applicable' => 'tone-slate',
+        'blood_a'        => 'tone-blue',
+        'blood_b'        => 'tone-blue',
+        'blood_ab'       => 'tone-blue',
+        'blood_o'        => 'tone-blue',
+    ];
+
+    /** Where a test starts: nobody has looked at it yet. */
+    public const RESULT_UNANSWERED = ['not_done', 'pending'];
+
+    /** The answers a test can hold, whichever kind it is. */
+    public const LAB_STATUSES = [
+        'not_done', 'pending', 'done', 'positive', 'negative', 'acceptable',
+        'abnormal', 'cleared', 'not_cleared', 'given', 'not_required',
+        'not_given', 'not_applicable', 'blood_a', 'blood_b', 'blood_ab', 'blood_o',
+    ];
 
     public const GENDER_OPTIONS = ['Male' => 'Male', 'Female' => 'Female'];
 
@@ -467,13 +529,14 @@ final class UiStore
     {
         return array_map(
             static fn (array $lab): array => [
-                'id'     => (string) $lab['id'],
-                'name'   => $lab['name'],
-                'group'  => (string) ($lab['parent_name'] ?? ''),
-                'status' => 'pending',
-                'result' => '',
-                'date'   => '',
-                'notes'  => '',
+                'id'         => (string) $lab['id'],
+                'name'       => $lab['name'],
+                'group'      => (string) ($lab['parent_name'] ?? ''),
+                'resultType' => (string) ($lab['result_type'] ?? 'text'),
+                'status'     => 'not_done',
+                'result'     => '',
+                'date'       => '',
+                'notes'      => '',
             ],
             model(LabModel::class)->workupFor($organ, $personType)
         );
@@ -693,13 +756,14 @@ final class UiStore
     {
         return array_map(
             static fn (array $row): array => [
-                'id'     => (string) $row['lab_id'],
-                'name'   => $row['lab_name'],
-                'group'  => (string) ($row['parent_name'] ?? ''),
-                'status' => $row['status'],
-                'result' => (string) $row['value'],
-                'date'   => $row['taken_on'] === null ? '' : self::isoToDMY($row['taken_on']),
-                'notes'  => (string) $row['notes'],
+                'id'         => (string) $row['lab_id'],
+                'name'       => $row['lab_name'],
+                'group'      => (string) ($row['parent_name'] ?? ''),
+                'resultType' => (string) ($row['result_type'] ?? 'text'),
+                'status'     => $row['status'],
+                'result'     => (string) $row['value'],
+                'date'       => $row['taken_on'] === null ? '' : self::isoToDMY($row['taken_on']),
+                'notes'      => (string) $row['notes'],
             ],
             $this->labResults->workupFor($mrn, $personType, $organCode)
         );
@@ -721,12 +785,19 @@ final class UiStore
                 continue;
             }
 
-            $status = $test['status'] ?? 'pending';
-            $value  = (string) ($test['result'] ?? '');
-            $date   = (string) ($test['date'] ?? '');
-            $notes  = (string) ($test['notes'] ?? '');
+            $value = (string) ($test['result'] ?? '');
+            $date  = (string) ($test['date'] ?? '');
+            $notes = (string) ($test['notes'] ?? '');
 
-            if ($status === 'pending' && $value === '' && $date === '' && $notes === '') {
+            // The answer has to be one this test actually offers. The form
+            // renders only those, so anything else was not typed on a screen.
+            $lab     = $this->labs->find($labId);
+            $offered = self::RESULT_OPTIONS[$lab['result_type'] ?? 'text'] ?? self::RESULT_OPTIONS['text'];
+            $status  = (string) ($test['status'] ?? 'not_done');
+            $status  = in_array($status, $offered, true) ? $status : 'not_done';
+
+            // Nothing recorded and nothing said: no row to write.
+            if ($status === 'not_done' && $value === '' && $date === '' && $notes === '') {
                 continue;
             }
 
@@ -852,7 +923,10 @@ final class UiStore
     public static function labProgress(array $labTests): array
     {
         $total = count($labTests);
-        $done  = count(array_filter($labTests, static fn (array $t): bool => $t['status'] === 'completed'));
+        $done  = count(array_filter(
+            $labTests,
+            static fn (array $t): bool => ! in_array($t['status'], self::RESULT_UNANSWERED, true)
+        ));
 
         return ['done' => $done, 'total' => $total, 'pct' => (int) round($done / max($total, 1) * 100)];
     }

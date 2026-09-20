@@ -47,7 +47,7 @@ class Ui extends BaseController
     private const PERSON_SECTIONS = [
         'personal' => [
             'name', 'age', 'bloodType', 'phone', 'address',
-            'urgent', 'coordinator', 'gender', 'selectedMrp', 'firstDialysis',
+            'urgent', 'coordinator', 'status', 'gender', 'selectedMrp', 'firstDialysis',
             'donationType', 'relationship', 'donorGender', 'donorMrp', 'donorStatus',
             'donorCoordinator',
         ],
@@ -285,6 +285,7 @@ class Ui extends BaseController
                 'notes'            => $person['notes'] ?? '',
                 'urgent'           => (bool) ($person['urgent'] ?? false),
                 'coordinator'      => $person['coordinator'] ?? '',
+                'status'           => $person['status'] ?? 'pending',
                 'dateRegistered'   => $person['dateRegistered'] ?? date('Y-m-d'),
                 // A saved record shows what was saved; only a blank form falls
                 // back to a default. These used to be hard-coded, which meant
@@ -324,6 +325,7 @@ class Ui extends BaseController
                 'type'           => 'recipient',
                 'urgent'         => (bool) $this->request->getPost('urgent'),
                 'coordinator'    => (string) $this->request->getPost('coordinator'),
+                'status'         => (string) $this->request->getPost('status'),
                 'dateRegistered' => $person['dateRegistered'] ?? date('Y-m-d'),
                 // The form has always posted these; nothing read them until
                 // there were columns to put them in.
@@ -386,6 +388,7 @@ class Ui extends BaseController
 
         return view('ui/pairs_list', [
             'title'        => 'Pairs List',
+            'mrps'         => $this->store->mrps(),
             'navPage'      => 'pairs',
             'organ'        => $this->store->organ(),
             'rows'         => $rows,
@@ -412,13 +415,17 @@ class Ui extends BaseController
             $lines[] = implode(',', [
                 $pair['id'],
                 $pair['organ'],
-                $pair['status'],
+                // The label, not the key: a spreadsheet reader should not have
+                // to know that `paired_exchange` means Paired Exchange.
+                UiStore::STATUS_OPTIONS[$pair['status']] ?? $pair['status'],
                 $recipient['name'] ?? $pair['recipientId'],
                 $recipient['bloodType'] ?? '',
                 $donor['name'] ?? $pair['donorId'],
                 $donor['bloodType'] ?? '',
                 $pair['scheduledDate'] ?? '',
-                $pair['createdDate'],
+                // Created is the ISO the column holds; the screens show dates
+                // as DD/MM/YYYY, and so does this.
+                $pair['createdDate'] === '' ? '' : UiStore::isoToDMY($pair['createdDate']),
             ]);
         }
 
@@ -439,7 +446,7 @@ class Ui extends BaseController
         $btFilter     = $this->bloodTypeFilter();
         $statusFilter = (string) ($this->request->getGet('status') ?? 'all');
 
-        if (! in_array($statusFilter, UiStore::PAIR_STATUSES, true)) {
+        if (! isset(UiStore::STATUS_OPTIONS[$statusFilter])) {
             $statusFilter = 'all';
         }
 

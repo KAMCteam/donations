@@ -499,11 +499,11 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->post('pairs/' . $pairId, [
             'section'        => 'pair',
             'relationship'   => 'Cousin',
-            'pairStatus'     => 'scheduled',
+            'pairStatus'     => 'confirmed',
             'crossmatchDate' => '11/11/2026',
         ]);
 
-        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'scheduled', 'relationship' => 'Cousin']);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'confirmed', 'relationship' => 'Cousin']);
         $this->seeInDatabase('recipients', ['mrn' => 8012, 'name' => 'Recipient Pair', 'city' => 'Dammam', 'age' => 52]);
         // The donor keeps its own fields, but the relationship is the pair's,
         // so the donors list stays in step with it.
@@ -715,6 +715,138 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('coordinators', ['name' => 'Noura Al-Harbi']);
         $row = $this->db->table('recipients')->where('mrn', 3002)->get()->getRowArray();
         $this->assertNotNull($row['coordinator_id']);
+    }
+
+    // ---- Status: one value, two screens ------------------------------------
+
+    public function testTheRecipientStatusOffersTheAgreedList(): void
+    {
+        $html = $this->get('recipients/new')->getBody();
+
+        foreach (UiStore::STATUS_OPTIONS as $value => $label) {
+            $this->assertStringContainsString('value="' . $value . '"', $html);
+            $this->assertStringContainsString('>' . $label . '</option>', $html);
+        }
+    }
+
+    /** The pair's Match Status is the same list, not a second one. */
+    public function testThePairOffersTheSameListAsTheRecipient(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '2001', 'dMrn' => '2002',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+
+        $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
+        $html   = $this->get('pairs/' . $pairId)->getBody();
+
+        foreach (array_keys(UiStore::STATUS_OPTIONS) as $value) {
+            $this->assertStringContainsString('<option value="' . $value . '"', $html);
+        }
+    }
+
+    /** They agree from the moment the pair exists. */
+    public function testANewPairSetsTheRecipientsStatusToo(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '2003', 'dMrn' => '2004',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+
+        $this->seeInDatabase('recipients', ['mrn' => 2003, 'status' => 'active']);
+        $this->seeInDatabase('pairs', ['recipient_mrn' => 2003, 'status' => 'active']);
+    }
+
+    public function testSettingTheStatusOnTheRecipientSetsThePairs(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '2005', 'dMrn' => '2006',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+
+        $this->post('recipients/2005', [
+            'section'   => 'personal',
+            'name'      => 'R',
+            'age'       => '40',
+            'bloodType' => 'A',
+            'status'    => 'paired_exchange',
+        ]);
+
+        $this->seeInDatabase('recipients', ['mrn' => 2005, 'status' => 'paired_exchange']);
+        $this->seeInDatabase('pairs', ['recipient_mrn' => 2005, 'status' => 'paired_exchange']);
+    }
+
+    public function testSettingTheMatchStatusOnThePairSetsTheRecipients(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '2007', 'dMrn' => '2008',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+
+        $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
+        $this->post('pairs/' . $pairId, ['section' => 'pair', 'pairStatus' => 'completed']);
+
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'completed']);
+        $this->seeInDatabase('recipients', ['mrn' => 2007, 'status' => 'completed']);
+    }
+
+    /**
+     * `closed` is the one status with meaning beyond its label: it is what an
+     * open pair is defined against, so it still frees both sides.
+     */
+    public function testClosingFromEitherScreenPutsBothSidesBackOnTheirLists(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '2009', 'dMrn' => '2010',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+
+        $this->post('recipients/2009', [
+            'section'   => 'personal',
+            'name'      => 'R',
+            'age'       => '40',
+            'bloodType' => 'A',
+            'status'    => 'closed',
+        ]);
+
+        $store = new UiStore();
+        $this->assertCount(1, $store->waitingList());
+        $this->assertCount(1, $store->availableDonors());
+        $this->seeInDatabase('pairs', ['recipient_mrn' => 2009, 'status' => 'closed']);
+    }
+
+    /** A recipient with no pair simply keeps their own status. */
+    public function testAnUnpairedRecipientKeepsTheirOwnStatus(): void
+    {
+        $this->post('recipients/new', [
+            'mrn'       => '2011',
+            'name'      => 'Solo',
+            'age'       => '40',
+            'bloodType' => 'A',
+            'status'    => 'on_hold',
+        ]);
+
+        $this->seeInDatabase('recipients', ['mrn' => 2011, 'status' => 'on_hold']);
+        $this->assertSame(0, $this->db->table('pairs')->countAllResults());
+    }
+
+    /** Anything outside the list is refused rather than reaching the ENUM. */
+    public function testAStatusOutsideTheListIsIgnored(): void
+    {
+        $this->post('recipients/new', [
+            'mrn'       => '2012',
+            'name'      => 'Solo',
+            'age'       => '40',
+            'bloodType' => 'A',
+            'status'    => 'nonsense',
+        ]);
+
+        $this->seeInDatabase('recipients', ['mrn' => 2012, 'status' => 'pending']);
     }
 
     // ---- Dates -------------------------------------------------------------
@@ -989,7 +1121,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->post('pairs/' . $pairId, [
             'section'        => 'pair',
             'relationship'   => 'Spouse',
-            'pairStatus'     => 'scheduled',
+            'pairStatus'     => 'confirmed',
             'crossmatchDate' => '06/10/2026',
         ]);
 
@@ -1017,7 +1149,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         $this->seeInDatabase('pairs', [
             'id'              => $pairId,
-            'status'          => 'scheduled',
+            'status'          => 'confirmed',
             'relationship'    => 'Spouse',
             'crossmatch_date' => '2026-10-06',
         ]);

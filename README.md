@@ -188,6 +188,32 @@ if it is new.
 column was only ever filled from the recipient form's Hospital box, so with
 that gone nothing could write it and nothing showed it.
 
+### Status is one value, on two screens
+
+A recipient's status and the Match Status of the pair they are in are the same
+fact about the same case, so they are one list and one value:
+
+| | |
+| --- | --- |
+| Pending | Confirmed |
+| Closed | Completed |
+| Paired Exchange | On Hold |
+| Active | Declined |
+
+`UiStore::STATUS_OPTIONS` is the only place that list exists — the recipient
+screen's **Recipient Status**, the pair profile's **Match Status**, the Pairs
+List's filter chips and its badge all read it, and both columns are that same
+ENUM. Setting it on either screen sets the other, and a new pair starts both
+sides at the same value, so the two can never disagree. A recipient with no
+pair simply keeps their own.
+
+One of them means more than its label: **Closed** is what "open pair" is
+defined against, so closing a pair — from either screen — puts both sides back
+on their lists. The rest are descriptive.
+
+A donor still has its own separate status (On Hold / Active / Completed /
+Cancelled), which is not tied to the pair.
+
 ### Dates
 
 Every date the screens collect is DD/MM/YYYY, in a box you can simply type

@@ -43,7 +43,7 @@ $score = static fn (?float $value): string => $value === null ? '—' : number_f
         <?php if ($recipients === []): ?>
             <div class="empty-state">No recipients found.</div>
         <?php else: ?>
-            <table class="table waitlist-table">
+            <table class="table list-table waitlist-table">
                 <thead>
                     <tr>
                         <?php foreach ($headers as $header): ?>
@@ -57,7 +57,7 @@ $score = static fn (?float $value): string => $value === null ? '—' : number_f
                         <tr class="<?= $isUrgent ? 'is-urgent' : '' ?>" data-href="<?= site_url('recipients/' . rawurlencode($recipient['id'])) ?>">
                             <td><?= $index + 1 ?></td>
                             <td class="cell-name"><a href="<?= site_url('recipients/' . rawurlencode($recipient['id'])) ?>"><?= esc($recipient['name']) ?></a></td>
-                            <td class="mono"><?= esc(preg_replace('/\D/', '', (string) $recipient['id'])) ?></td>
+                            <td class="mono"><?= esc($recipient['id']) ?></td>
                             <td><?= esc($recipient['age']) ?></td>
                             <td><?= esc($recipient['gender']) ?></td>
                             <td class="mono"><?= esc($recipient['bloodType']) ?></td>

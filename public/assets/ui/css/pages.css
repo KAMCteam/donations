@@ -415,15 +415,19 @@
 }
 
 /* =========================================================
-   Recipient Waitlist table  (src/pages/RecipientWaitlist.tsx)
-   ========================================================= */
+   The list tables  (Recipient Waitlist, Donors List)
+   =========================================================
+   One style, because they are the same object: a register of people, one
+   row each, the row itself a link to the record. The donors table used to
+   carry its own — a grey uppercase header on white, lighter cells — which
+   is why it read as a different kind of screen from every other list. */
 .filter-row--mb { margin-bottom: 1.5rem; }
 
 .table { width: 100%; }
 
-.waitlist-table thead tr { background-color: #15508A; }
+.list-table thead tr { background-color: #15508A; }
 
-.waitlist-table th {
+.list-table th {
   padding: 0.875rem 1.25rem;
   text-align: left;
   font-size: var(--text-sm);
@@ -431,96 +435,36 @@
   font-weight: 600;
   color: #fff;
 }
-.waitlist-table th:first-child { padding-left: 1.5rem; }
-.waitlist-table th:last-child  { padding-right: 1.5rem; }
+.list-table th:first-child { padding-left: 1.5rem; }
+.list-table th:last-child  { padding-right: 1.5rem; }
 
-.waitlist-table tbody tr:not(:last-child) { border-bottom: 1px solid var(--slate-100); }
+.list-table tbody tr:not(:last-child) { border-bottom: 1px solid var(--slate-100); }
 
-.waitlist-table tbody tr {
+.list-table tbody tr {
   cursor: pointer;
   background-color: #fff;
   transition-property: var(--transition-colors-props);
   transition-timing-function: var(--ease);
   transition-duration: var(--dur);
 }
-.waitlist-table tbody tr.is-urgent { background-color: #ffe4e6; }
 
-.waitlist-table td {
+.list-table td {
   padding: 1rem 1.25rem;
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
   font-weight: 600;
   color: #374151;
 }
-.waitlist-table td:first-child { padding-left: 1.5rem; padding-right: 1.5rem; }
-.waitlist-table td:last-child  { padding-right: 1.5rem; }
-.waitlist-table td.cell-name   { color: #1e293b; }
-.waitlist-table tr.is-urgent td { color: #be123c; }
+.list-table td:first-child { padding-left: 1.5rem; padding-right: 1.5rem; }
+.list-table td:last-child  { padding-right: 1.5rem; }
+.list-table td.cell-name   { color: #1e293b; }
 
-/* =========================================================
-   Donors List table  (src/pages/DonorsList.tsx)
-   ========================================================= */
-.donors-table thead tr { border-bottom: 1px solid var(--slate-100); }
-
-.donors-table th {
-  padding: 0.875rem 1.25rem;
-  text-align: left;
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
-  font-weight: 500;
-  color: var(--slate-500);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.donors-table th:first-child { padding-left: 1.5rem; }
-.donors-table th:last-child  { padding-right: 1.5rem; }
-
-.donors-table tbody tr:not(:last-child) { border-bottom: 1px solid var(--slate-50); }
-
-.donors-table tbody tr {
-  cursor: pointer;
-  transition-property: var(--transition-colors-props);
-  transition-timing-function: var(--ease);
-  transition-duration: var(--dur);
-}
-
-.donors-table td { padding: 1rem 1.25rem; }
-.donors-table td:first-child { padding-left: 1.5rem; padding-right: 1.5rem; }
-.donors-table td:last-child  { padding-right: 1.5rem; }
-
-.donors-table .cell-id {
-  font-size: var(--text-xs); line-height: var(--lh-xs);
-  font-family: var(--font-mono); color: var(--slate-500);
-}
-.donors-table .cell-name {
-  font-weight: 500; color: var(--slate-800);
-  font-size: var(--text-sm); line-height: var(--lh-sm);
-  transition-property: var(--transition-colors-props);
-  transition-timing-function: var(--ease);
-  transition-duration: var(--dur);
-}
-.donors-table .cell-age {
-  font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--slate-600);
-}
-.donors-table .cell-blood {
-  font-size: var(--text-xs); line-height: var(--lh-xs);
-  font-family: var(--font-mono); font-weight: 600; color: var(--slate-700);
-}
-.donors-table .cell-muted {
-  font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--slate-500);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.donors-table .cell-rel      { max-width: 160px; }
-.donors-table .cell-hospital { max-width: 180px; }
-.donors-table .cell-labs {
-  font-size: var(--text-xs); line-height: var(--lh-xs);
-  font-family: var(--font-mono); color: var(--slate-600);
-}
+/* The waitlist alone marks urgent rows. */
+.waitlist-table tbody tr.is-urgent { background-color: #ffe4e6; }
+.waitlist-table tr.is-urgent td    { color: #be123c; }
 
 @media (hover: hover) {
-  .donors-table tbody tr:hover { background-color: var(--slate-50); }
-  .donors-table tbody tr:hover .cell-name { color: #15508A; }
-  .waitlist-table tbody tr:hover,
+  .list-table tbody tr:hover,
   .pairs-table tbody tr:hover { filter: brightness(95%); }
 }
 

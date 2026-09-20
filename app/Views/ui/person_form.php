@@ -21,7 +21,15 @@ use App\Libraries\UiStore;
  * @var array<string, mixed>|null  $linked      The paired counterpart, if any
  * @var list<array<string, mixed>> $labTests
  * @var list<array{id: string, name: string}> $mrps
+ * @var string                     $error       Why the last save bounced, if it did
  */
+// A save that bounced re-renders with what was typed rather than with what the
+// record held, so a rejected MRN does not cost the rest of the form. The keys
+// of $v are the field names, which is what makes this one line.
+foreach ($v as $field => $value) {
+    $v[$field] = old($field, $value);
+}
+
 $isRecipient = $personType === 'recipient';
 $backUrl     = site_url($isRecipient ? 'recipients' : 'donors');
 $backLabel   = $isRecipient ? 'Back to Recipient Waitlist' : 'Donors List';
@@ -47,6 +55,10 @@ $eyebrow = $mode === 'add' ? 'New' : ($person['id'] ?? '');
         </div>
     </div>
 
+    <?php if ($error !== ''): ?>
+        <div class="form-error" role="alert"><?= esc($error) ?></div>
+    <?php endif; ?>
+
     <form id="person-form" class="stack-5" method="post" action="<?= current_url() ?>">
         <?= csrf_field() ?>
 
@@ -57,8 +69,12 @@ $eyebrow = $mode === 'add' ? 'New' : ($person['id'] ?? '');
                 <div class="stack-4">
                     <div class="form-grid-5">
                         <div>
-                            <label class="field-label">Recipient MRN</label>
-                            <input type="text" class="input-ro input-ro--faint input-ro--mono" value="<?= esc($person['id'] ?? 'Auto') ?>" readonly>
+                            <label class="field-label" for="f-mrn">Recipient MRN</label>
+                            <?php if ($mode === 'add'): ?>
+                                <input type="text" id="f-mrn" name="mrn" class="input input--mono" value="<?= esc($v['mrn']) ?>" inputmode="numeric" placeholder="From the hospital record" required>
+                            <?php else: ?>
+                                <input type="text" id="f-mrn" class="input-ro input-ro--mono" value="<?= esc($person['id']) ?>" readonly>
+                            <?php endif; ?>
                         </div>
                         <div class="span-lg-2">
                             <label class="field-label" for="f-name">Recipient Name</label>
@@ -145,8 +161,12 @@ $eyebrow = $mode === 'add' ? 'New' : ($person['id'] ?? '');
                 <div class="stack-4">
                     <div class="form-grid-5">
                         <div>
-                            <label class="field-label">Donor MRN</label>
-                            <input type="text" class="input-ro input-ro--faint input-ro--mono" value="<?= esc($person['id'] ?? 'Auto') ?>" readonly>
+                            <label class="field-label" for="f-mrn">Donor MRN</label>
+                            <?php if ($mode === 'add'): ?>
+                                <input type="text" id="f-mrn" name="mrn" class="input input--mono" value="<?= esc($v['mrn']) ?>" inputmode="numeric" placeholder="From the hospital record" required>
+                            <?php else: ?>
+                                <input type="text" id="f-mrn" class="input-ro input-ro--mono" value="<?= esc($person['id']) ?>" readonly>
+                            <?php endif; ?>
                         </div>
                         <div>
                             <label class="field-label" for="f-name">Donor Name</label>

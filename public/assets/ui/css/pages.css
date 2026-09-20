@@ -102,7 +102,10 @@
 
 .login .input::placeholder { color: var(--slate-400); }
 
-.login-error {
+/* Why a save was refused. The login screen had the only one of these; it is
+   shared now, since the record forms can refuse a save too. */
+.login-error,
+.form-error {
   color: var(--red-600);
   font-size: var(--text-xs);
   line-height: var(--lh-xs);
@@ -110,6 +113,14 @@
   border: 1px solid var(--red-100);
   border-radius: var(--radius-lg);
   padding: 0.5rem 0.75rem;
+}
+
+.form-error {
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-xl);
+  margin-bottom: 1.25rem;
 }
 
 .login-submit {

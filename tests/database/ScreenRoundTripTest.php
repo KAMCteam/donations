@@ -5,6 +5,7 @@ use App\Libraries\UiStore;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Every field the screens collect has to reach a column and come back.
@@ -50,6 +51,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testAddRecipientStoresEveryFieldTheFormCollects(): void
     {
         $this->post('recipients/new', [
+            'mrn'           => '4001',
             'name'          => 'Ahmed Test',
             'age'           => '41',
             'bloodType'     => 'O',
@@ -88,6 +90,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testReopeningARecipientShowsTheStoredValues(): void
     {
         $this->post('recipients/new', [
+            'mrn'           => '4002',
             'name'          => 'Ahmed Test',
             'age'           => '41',
             'bloodType'     => 'O',
@@ -103,6 +106,152 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('value="01/03/2024"', $html);
         $this->assertStringContainsString('<option value="Female" selected>', $html);
         $this->assertStringContainsString('<option value="' . $this->mrpId . '" selected>', $html);
+    }
+
+    // ---- The MRN is entered, never generated -------------------------------
+
+    /**
+     * The MRN is the hospital's own number and comes with the patient, so the
+     * form collects it. It used to be generated — max + 1 — which would have
+     * filed everyone under numbers that mean nothing to the hospital.
+     */
+    public function testTheEnteredMrnIsTheOneStored(): void
+    {
+        $this->post('recipients/new', ['mrn' => '7654321', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $this->seeInDatabase('recipients', ['mrn' => 7654321, 'name' => 'Ahmed Test']);
+    }
+
+    public function testTheAddFormAsksForTheMrnRatherThanShowingAuto(): void
+    {
+        $html = $this->get('recipients/new')->getBody();
+
+        $this->assertStringContainsString('name="mrn"', $html);
+        $this->assertStringNotContainsString('value="Auto"', $html);
+    }
+
+    /** On an existing record the MRN identifies it, so it is not editable. */
+    public function testTheMrnIsReadOnlyOnASavedRecord(): void
+    {
+        $this->post('recipients/new', ['mrn' => '7001', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $html = $this->get('recipients/7001')->getBody();
+
+        $this->assertStringNotContainsString('name="mrn"', $html);
+        $this->assertStringContainsString('value="7001" readonly', $html);
+    }
+
+    #[DataProvider('badMrns')]
+    public function testARecordWithoutAUsableMrnIsRefused(string $mrn, string $expected): void
+    {
+        $this->post('recipients/new', [
+            'mrn'       => $mrn,
+            'name'      => 'Ahmed Test',
+            'age'       => '41',
+            'bloodType' => 'O',
+            'diagnosis' => 'ESRD',
+        ]);
+
+        $this->assertSame(0, $this->db->table('recipients')->countAllResults(), 'nothing should have been stored');
+        $this->assertStringContainsString($expected, (string) session('ui_error'));
+    }
+
+    /**
+     * A refused save sends the whole form back with it, so only the number has
+     * to be retyped. This checks the controller's half — the redirect carries
+     * the input — since the view's half is `old()`, and the mock session these
+     * tests run on does not age flashdata the way a real request does.
+     */
+    public function testARefusedSaveCarriesTheRestOfTheFormBack(): void
+    {
+        $this->post('recipients/new', [
+            'mrn'       => '',
+            'name'      => 'Ahmed Test',
+            'age'       => '41',
+            'bloodType' => 'AB',
+            'diagnosis' => 'ESRD stage 5',
+        ]);
+
+        $posted = session('_ci_old_input')['post'] ?? [];
+
+        $this->assertSame('Ahmed Test', $posted['name'] ?? null);
+        $this->assertSame('ESRD stage 5', $posted['diagnosis'] ?? null);
+        $this->assertSame('AB', $posted['bloodType'] ?? null);
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function badMrns(): array
+    {
+        return [
+            'blank'       => ['', 'required'],
+            'letters'     => ['AB-12', 'must be a number'],
+            'zero'        => ['0', 'must be a number'],
+            'with spaces' => ['12 34', 'must be a number'],
+        ];
+    }
+
+    public function testAnMrnAlreadyOnTheRegisterIsRefused(): void
+    {
+        $this->post('recipients/new', ['mrn' => '7002', 'name' => 'First', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('recipients/new', ['mrn' => '7002', 'name' => 'Second', 'age' => '50', 'bloodType' => 'A']);
+
+        $this->assertSame(1, $this->db->table('recipients')->countAllResults());
+        $this->seeInDatabase('recipients', ['mrn' => 7002, 'name' => 'First']);
+        $this->assertStringContainsString('already registered', (string) session('ui_error'));
+    }
+
+    /**
+     * The registers are separate tables, so one person can be a recipient in
+     * one programme and a donor in another under their single hospital number.
+     */
+    public function testTheSameMrnMayAppearOnBothRegisters(): void
+    {
+        $this->post('recipients/new', ['mrn' => '7003', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('donors/new', ['mrn' => '7003', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $this->seeInDatabase('recipients', ['mrn' => 7003]);
+        $this->seeInDatabase('donors', ['mrn' => 7003]);
+    }
+
+    /** On a pair it would mean donating to oneself. */
+    public function testAPairCannotHaveTheSameMrnOnBothSides(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn'       => '7004',
+            'dMrn'       => '7004',
+            'rName'      => 'Recipient Pair',
+            'rAge'       => '52',
+            'rBloodType' => 'A',
+            'dName'      => 'Donor Pair',
+            'dAge'       => '30',
+            'dBloodType' => 'A',
+        ]);
+
+        $this->assertSame(0, $this->db->table('recipients')->countAllResults());
+        $this->assertSame(0, $this->db->table('donors')->countAllResults());
+        $this->assertStringContainsString('cannot share an MRN', (string) session('ui_error'));
+    }
+
+    /**
+     * Both numbers are checked before either person is stored: a pair half
+     * written is worse than one not written at all.
+     */
+    public function testABadDonorMrnStoresNeitherSideOfThePair(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn'       => '7005',
+            'dMrn'       => '',
+            'rName'      => 'Recipient Pair',
+            'rAge'       => '52',
+            'rBloodType' => 'A',
+            'dName'      => 'Donor Pair',
+            'dAge'       => '30',
+            'dBloodType' => 'A',
+        ]);
+
+        $this->assertSame(0, $this->db->table('recipients')->countAllResults(), 'the recipient should not have been stored either');
+        $this->assertSame(0, $this->db->table('donors')->countAllResults());
+        $this->assertSame(0, $this->db->table('pairs')->countAllResults());
     }
 
     // ---- The score on the waiting list ------------------------------------
@@ -143,6 +292,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testAddDonorStoresEveryFieldTheFormCollects(): void
     {
         $this->post('donors/new', [
+            'mrn'              => '4003',
             'name'             => 'Noura Test',
             'age'              => '35',
             'bloodType'        => 'AB',
@@ -177,8 +327,9 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     /** Typing the same coordinator twice must not register two of them. */
     public function testTheSameCoordinatorNameIsReusedNotDuplicated(): void
     {
-        foreach (['Noura Test', 'Sara Test'] as $name) {
+        foreach (['4004' => 'Noura Test', '4005' => 'Sara Test'] as $mrn => $name) {
             $this->post('donors/new', [
+                'mrn'              => (string) $mrn,
                 'name'             => $name,
                 'age'              => '35',
                 'bloodType'        => 'O',
@@ -197,6 +348,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testTheDonorsListShowsTheAgreedColumns(): void
     {
         $this->post('donors/new', [
+            'mrn'         => '4030',
             'name'        => 'Noura Test',
             'age'         => '35',
             'bloodType'   => 'AB',
@@ -227,6 +379,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testAddPairStoresBothPeopleAndTheLinkBetweenThem(): void
     {
         $this->post('pairs/new', [
+            'rMrn'           => '4006',
+            'dMrn'           => '4007',
             'rName'          => 'Recipient Pair',
             'rAge'           => '52',
             'rBloodType'     => 'A',
@@ -276,6 +430,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testPairingTakesBothSidesOffTheirLists(): void
     {
         $this->post('pairs/new', [
+            'rMrn'       => '4010',
+            'dMrn'       => '4011',
             'rName'      => 'Recipient Pair',
             'rAge'       => '52',
             'rBloodType' => 'A',
@@ -304,6 +460,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testEditingAPairSavesEveryFieldOnTheScreen(): void
     {
         $this->post('pairs/new', [
+            'rMrn'       => '4010',
+            'dMrn'       => '4011',
             'rName'      => 'Recipient Pair',
             'rAge'       => '52',
             'rBloodType' => 'A',
@@ -360,7 +518,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
     public function testALabResultEnteredOnARecordIsStored(): void
     {
-        $this->post('recipients/new', ['name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('recipients/new', ['mrn' => '4020', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
 
         $mrn = (int) $this->db->table('recipients')->get()->getRowArray()['mrn'];
         $lab = $this->db->table('labs')->where('organ_code', 'kidney')->get()->getRowArray();

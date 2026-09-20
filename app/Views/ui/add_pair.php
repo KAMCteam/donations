@@ -17,7 +17,13 @@ use App\Libraries\UiStore;
  * @var list<array<string, mixed>>            $dLabTests
  * @var list<array{id: string, name: string}> $mrps
  * @var string                                $entryDate  ISO, shown as DD/MM/YYYY
+ * @var string                                $error      Why the last save bounced, if it did
  */
+// A save that bounced re-renders with what was typed. The keys of $v are the
+// field names, which is what makes this one line.
+foreach ($v as $field => $value) {
+    $v[$field] = old($field, $value);
+}
 ?>
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
@@ -28,6 +34,10 @@ use App\Libraries\UiStore;
         </div>
         <button type="submit" form="pair-form" class="btn-save">Save</button>
     </div>
+
+    <?php if ($error !== ''): ?>
+        <div class="form-error" role="alert"><?= esc($error) ?></div>
+    <?php endif; ?>
 
     <form id="pair-form" class="stack-5" method="post" action="<?= site_url('pairs/new') ?>">
         <?= csrf_field() ?>
@@ -54,8 +64,8 @@ use App\Libraries\UiStore;
             <div class="stack-4">
                 <div class="form-grid-5">
                     <div>
-                        <label class="field-label">Recipient MRN</label>
-                        <input type="text" class="input-ro input-ro--faint input-ro--mono" value="Auto" readonly>
+                        <label class="field-label" for="f-r-mrn">Recipient MRN</label>
+                        <input type="text" id="f-r-mrn" name="rMrn" class="input input--mono" value="<?= esc($v['rMrn']) ?>" inputmode="numeric" placeholder="From the hospital record" required>
                     </div>
                     <div class="span-lg-2">
                         <label class="field-label" for="f-r-name">Recipient Name</label>
@@ -155,8 +165,8 @@ use App\Libraries\UiStore;
             <div class="stack-4">
                 <div class="form-grid-5">
                     <div>
-                        <label class="field-label">Donor MRN</label>
-                        <input type="text" class="input-ro input-ro--faint input-ro--mono" value="Auto" readonly>
+                        <label class="field-label" for="f-d-mrn">Donor MRN</label>
+                        <input type="text" id="f-d-mrn" name="dMrn" class="input input--mono" value="<?= esc($v['dMrn']) ?>" inputmode="numeric" placeholder="From the hospital record" required>
                     </div>
                     <div>
                         <label class="field-label" for="f-d-name">Donor Name</label>

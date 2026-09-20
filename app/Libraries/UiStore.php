@@ -294,14 +294,29 @@ final class UiStore
      *
      * @param array<string, mixed> $pair
      */
-    public function addPair(array $pair): void
+    public function addPair(array $pair): int
     {
-        $this->pairs->link((int) $pair['recipientId'], (int) $pair['donorId'], [
+        return (int) $this->pairs->link((int) $pair['recipientId'], (int) $pair['donorId'], [
             'status'          => $this->pairStatusToRow(($pair['status'] ?? '') ?: 'active'),
             'relationship'    => $pair['relationship'] ?? null,
             'crossmatch_date' => $this->toDate($pair['scheduledDate'] ?? null),
             'notes'           => $pair['notes'] ?? null,
         ]);
+    }
+
+    /**
+     * The open pair holding this person, if one does.
+     *
+     * Used before offering to link them: somebody already in a pair is sent to
+     * it rather than to a second one, which the tables would refuse anyway.
+     */
+    public function openPairFor(string $personType, int|string $mrn): ?array
+    {
+        $row = $personType === 'recipient'
+            ? $this->pairs->openPairForRecipient($mrn)
+            : $this->pairs->openPairForDonor($mrn);
+
+        return $row === null ? null : $this->findPair((string) $row['id']);
     }
 
     public function addMrp(string $code, string $name): void

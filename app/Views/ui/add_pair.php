@@ -18,7 +18,14 @@ use App\Libraries\UiStore;
  * @var list<array{id: string, name: string}> $mrps
  * @var string                                $entryDate  ISO, shown as DD/MM/YYYY
  * @var string                                $error      Why the last save bounced, if it did
+ * @var string                                $fixedSide  "recipient", "donor" or '' when both are new
+ * @var array<string, mixed>|null             $fixed      The person already on the system
  */
+// Reached from a record's "Link with a new …": that half is filled in and
+// shown read-only, the same disabled fieldset the record screens use, and the
+// form collects only the other one. Their MRN rides along in a hidden input,
+// since a disabled fieldset posts nothing.
+$fixedIs = static fn (string $side): bool => $fixedSide === $side;
 // A save that bounced re-renders with what was typed. The keys of $v are the
 // field names, which is what makes this one line.
 foreach ($v as $field => $value) {
@@ -29,8 +36,11 @@ foreach ($v as $field => $value) {
     <div class="page-header page-header--start page-header--wrap">
         <div>
             <a class="back-link" href="<?= site_url('pairs') ?>"><?= ui_icon('back') ?>Back to Pairs List</a>
-            <div class="eyebrow">New Pair</div>
-            <h1 class="page-title">Add Pair</h1>
+            <div class="eyebrow"><?= $fixedSide === '' ? 'New Pair' : 'Link' ?></div>
+            <h1 class="page-title"><?= $fixedSide === '' ? 'Add Pair' : 'Link ' . esc($fixed['name']) ?></h1>
+            <?php if ($fixedSide !== ''): ?>
+                <p class="page-subtitle">Enter the <?= esc($fixedIs('recipient') ? 'donor' : 'recipient') ?> to pair with this record.</p>
+            <?php endif; ?>
         </div>
         <button type="submit" form="pair-form" class="btn-save">Save</button>
     </div>
@@ -41,6 +51,10 @@ foreach ($v as $field => $value) {
 
     <form id="pair-form" class="stack-5" method="post" action="<?= site_url('pairs/new') ?>">
         <?= csrf_field() ?>
+        <?php if ($fixedSide !== ''): ?>
+            <input type="hidden" name="fixedSide" value="<?= esc($fixedSide) ?>">
+            <input type="hidden" name="<?= $fixedIs('recipient') ? 'rMrn' : 'dMrn' ?>" value="<?= esc($fixed['id']) ?>">
+        <?php endif; ?>
 
         <div class="card card--pad">
             <h2 class="card-title card-title--mb5">Pair Details</h2>
@@ -57,15 +71,25 @@ foreach ($v as $field => $value) {
         </div>
 
         <div class="card card--pad">
-            <div class="section-head">
-                <div class="role-badge role-badge--recipient">R</div>
-                <h2 class="card-title">Recipient — Personal Information</h2>
+            <div class="card-head">
+                <div class="section-head">
+                    <div class="role-badge role-badge--recipient">R</div>
+                    <h2 class="card-title">Recipient — Personal Information</h2>
+                </div>
+                <?php if ($fixedIs('recipient')): ?>
+                    <span class="link-fixed-note">Already registered — linking this record</span>
+                <?php endif; ?>
             </div>
+            <fieldset class="card-fields"<?= $fixedIs('recipient') ? ' disabled' : '' ?>>
             <div class="stack-4">
                 <div class="form-grid-5">
                     <div>
                         <label class="field-label" for="f-r-mrn">Recipient MRN</label>
-                        <input type="text" id="f-r-mrn" name="rMrn" class="input input--mono" value="<?= esc($v['rMrn']) ?>" inputmode="numeric" placeholder="From the hospital record" required>
+                        <?php if ($fixedIs('recipient')): ?>
+                            <input type="text" id="f-r-mrn" class="input-ro input-ro--mono" value="<?= esc($v['rMrn']) ?>" readonly>
+                        <?php else: ?>
+                            <input type="text" id="f-r-mrn" name="rMrn" class="input input--mono" value="<?= esc($v['rMrn']) ?>" inputmode="numeric" placeholder="From the hospital record" required>
+                        <?php endif; ?>
                     </div>
                     <div class="span-lg-2">
                         <label class="field-label" for="f-r-name">Recipient Name</label>
@@ -148,25 +172,43 @@ foreach ($v as $field => $value) {
                     </div>
                 </div>
             </div>
+            </fieldset>
         </div>
 
-        <?= view('ui/partials/lab_tests', ['tests' => $rLabTests, 'field' => 'rLabs', 'animated' => true]) ?>
+        <?= view('ui/partials/lab_tests', [
+            'tests'    => $rLabTests,
+            'field'    => 'rLabs',
+            'animated' => true,
+            'editing'  => ! $fixedIs('recipient'),
+        ]) ?>
 
         <div class="card card--pad">
             <h2 class="card-title card-title--mb4">Recipient — Clinical Notes</h2>
-            <textarea class="textarea" name="rNotes" rows="4" placeholder="Add clinical notes, observations, or relevant context..."><?= esc($v['rNotes']) ?></textarea>
+            <fieldset class="card-fields"<?= $fixedIs('recipient') ? ' disabled' : '' ?>>
+                <textarea class="textarea" name="rNotes" rows="4" placeholder="Add clinical notes, observations, or relevant context..."><?= esc($v['rNotes']) ?></textarea>
+            </fieldset>
         </div>
 
         <div class="card card--pad">
-            <div class="section-head">
-                <div class="role-badge role-badge--donor">D</div>
-                <h2 class="card-title">Donor — Personal Information</h2>
+            <div class="card-head">
+                <div class="section-head">
+                    <div class="role-badge role-badge--donor">D</div>
+                    <h2 class="card-title">Donor — Personal Information</h2>
+                </div>
+                <?php if ($fixedIs('donor')): ?>
+                    <span class="link-fixed-note">Already registered — linking this record</span>
+                <?php endif; ?>
             </div>
+            <fieldset class="card-fields"<?= $fixedIs('donor') ? ' disabled' : '' ?>>
             <div class="stack-4">
                 <div class="form-grid-5">
                     <div>
                         <label class="field-label" for="f-d-mrn">Donor MRN</label>
-                        <input type="text" id="f-d-mrn" name="dMrn" class="input input--mono" value="<?= esc($v['dMrn']) ?>" inputmode="numeric" placeholder="From the hospital record" required>
+                        <?php if ($fixedIs('donor')): ?>
+                            <input type="text" id="f-d-mrn" class="input-ro input-ro--mono" value="<?= esc($v['dMrn']) ?>" readonly>
+                        <?php else: ?>
+                            <input type="text" id="f-d-mrn" name="dMrn" class="input input--mono" value="<?= esc($v['dMrn']) ?>" inputmode="numeric" placeholder="From the hospital record" required>
+                        <?php endif; ?>
                     </div>
                     <div>
                         <label class="field-label" for="f-d-name">Donor Name</label>
@@ -226,13 +268,21 @@ foreach ($v as $field => $value) {
                     </div>
                 </div>
             </div>
+            </fieldset>
         </div>
 
-        <?= view('ui/partials/lab_tests', ['tests' => $dLabTests, 'field' => 'dLabs', 'animated' => true]) ?>
+        <?= view('ui/partials/lab_tests', [
+            'tests'    => $dLabTests,
+            'field'    => 'dLabs',
+            'animated' => true,
+            'editing'  => ! $fixedIs('donor'),
+        ]) ?>
 
         <div class="card card--pad">
             <h2 class="card-title card-title--mb4">Donor — Clinical Notes</h2>
-            <textarea class="textarea" name="dNotes" rows="4" placeholder="Add clinical notes, observations, or relevant context..."><?= esc($v['dNotes']) ?></textarea>
+            <fieldset class="card-fields"<?= $fixedIs('donor') ? ' disabled' : '' ?>>
+                <textarea class="textarea" name="dNotes" rows="4" placeholder="Add clinical notes, observations, or relevant context..."><?= esc($v['dNotes']) ?></textarea>
+            </fieldset>
         </div>
     </form>
 </div>

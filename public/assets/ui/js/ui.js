@@ -190,10 +190,40 @@
     });
   }
 
+  /* ---- Dialogs ----------------------------------------------------------
+     A link carrying data-dialog opens that dialog instead of navigating. The
+     href is a real page showing the same thing, so nothing here is required:
+     without this, or without <dialog> support, the link is simply followed. */
+
+  function initDialogs() {
+    var openers = document.querySelectorAll("[data-dialog]");
+
+    for (var i = 0; i < openers.length; i++) {
+      bindDialog(openers[i]);
+    }
+  }
+
+  function bindDialog(opener) {
+    var dialog = document.getElementById(opener.getAttribute("data-dialog"));
+    if (!dialog || typeof dialog.showModal !== "function") return;
+
+    opener.addEventListener("click", function (event) {
+      event.preventDefault();
+      dialog.showModal();
+    });
+
+    // Clicking the backdrop closes it. The backdrop is the dialog element
+    // itself, so a click lands on it only outside the panel.
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog) dialog.close();
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initSidebar();
     initRowLinks();
     initLabSections();
     initUrgencySync();
+    initDialogs();
   });
 })();

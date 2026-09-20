@@ -207,6 +207,31 @@ A saved donor record offers the full list rather than the two the add screen
 asks, so a donor registered through a pair as Living Related is not silently
 downgraded to Living by someone opening their record.
 
+### The workup is the check list
+
+`lab_parents` and `labs` hold the transplant check list, group for group and
+test for test — the recipient's pre-transplant sheet (71 tests) and the
+donor's pre-Tx sheet (51), in the sheet's own order:
+
+Immunology tests · Hematology/Biochemistry · Infectious workup · Urine/stool ·
+Cancer screening · Imaging · Referrals and Clearances · Vaccinations
+
+The record screens show it that way too: a group heading, then that group's
+tests beneath it. Where both sheets ask for the same test it is stored once
+and marked `both`; where only one does, it is marked for that side — so a
+donor sees 51 cards and a recipient 71. The spellings that differ between the
+sheets for one test ("Ca/Phos/Mg" and "Calcium/Phosphorus/Mg") are reconciled
+rather than stored twice, and the donor sheet's abbreviated headings use the
+recipient's fuller wording so one set of headings serves both.
+
+`result_type` carries how each test is answered, in the sheet's own wording:
+`blood_group`, `done`, `positive_negative`, `acceptable_abnormal`,
+`cleared_not_cleared`, `given_not_given`. The cards still record Pending /
+Done / Flagged with a free-text result; the vocabularies are on the catalogue
+ready for the day the cards offer them.
+
+The sheet names no organ, so both programmes carry both lists.
+
 ### Status is one value, on two screens
 
 A recipient's status and the Match Status of the pair they are in are the same
@@ -337,7 +362,7 @@ writes.
 | `organ_programs` | The picker's cards are content — label, description, icon — not code |
 | `mrp` | Every record screen assigns a most responsible physician |
 | `coordinators` | Every record screen assigns a coordinator |
-| `lab_parents` | The workup is shown grouped: Virology, Imaging, Cardiac |
+| `lab_parents` | The groups the workup is shown under: Immunology tests, Imaging, … |
 | `labs` | The catalogue: which tests a workup is made of, per programme and side |
 | `recipients` | The waiting list, and the two dates the score is computed from |
 | `donors` | The donor register |

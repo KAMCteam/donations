@@ -11,7 +11,7 @@ use App\Libraries\UiStore;
  * arrives as finished HTML and posts with the form it sits in, where the
  * prototype had to build the card and its editor from strings on each click.
  *
- * @var list<array<string, mixed>> $tests
+ * @var list<array<string, mixed>> $tests      Each carries the group it is listed under.
  * @var string                     $field      Form field prefix, e.g. "labs" or "rLabs".
  * @var bool                       $animated   Adds the colour transition (PersonForm / AddPair).
  * @var string|null                $editTitle  Tooltip on the pencil (PersonForm only).
@@ -29,6 +29,15 @@ $editUrl  = $editUrl ?? null;
 $viewUrl  = $viewUrl ?? null;
 $section  = $section ?? null;
 $progress = UiStore::labProgress($tests);
+
+// The check list's own groups, in its own order. The index has to keep
+// running across them — the form posts one flat array of tests, so a card's
+// position in it is what ties its fields together, not the group it is under.
+$groups = [];
+
+foreach ($tests as $i => $test) {
+    $groups[$test['group'] ?? ''][$i] = $test;
+}
 ?>
 <div class="card card--pad" data-lab-section>
     <div class="card-head">
@@ -53,8 +62,13 @@ $progress = UiStore::labProgress($tests);
     <?php if ($editing && $section !== null): ?>
         <input type="hidden" name="section" value="<?= esc($section) ?>">
     <?php endif; ?>
-    <div class="lab-grid">
-        <?php foreach ($tests as $i => $test): ?>
+    <?php foreach ($groups as $groupName => $groupTests): ?>
+    <div class="lab-group">
+        <?php if ($groupName !== ''): ?>
+            <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
+        <?php endif; ?>
+        <div class="lab-grid">
+        <?php foreach ($groupTests as $i => $test): ?>
             <?php // $field and $i are ours, not user input, so the name needs no escaping. ?>
             <?php $base = $field . '[' . $i . ']'; ?>
             <div class="lab-card<?= $animated ? ' lab-card--animated' : '' ?> status-<?= esc($test['status']) ?>" data-idx="<?= $i ?>">
@@ -86,7 +100,9 @@ $progress = UiStore::labProgress($tests);
                 </div>
             </div>
         <?php endforeach; ?>
+        </div>
     </div>
+    <?php endforeach; ?>
     </fieldset>
 
     <?php if ($editing && $viewUrl !== null): ?>

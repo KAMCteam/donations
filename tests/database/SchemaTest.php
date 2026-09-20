@@ -55,9 +55,15 @@ final class SchemaTest extends CIUnitTestCase
             $this->assertSame(0, $this->db->table($table)->countAllResults(), "{$table} should start empty");
         }
 
-        // Only the reference rows the system cannot start without.
+        // Only the reference rows the system cannot start without: the two
+        // programmes, and the check list's workup for each.
         $this->assertCount(2, model(OrganProgramModel::class)->active());
-        $this->assertSame(18, $this->db->table('labs')->countAllResults());
+        $this->assertCount(8, $this->db->table('lab_parents')->get()->getResultArray());
+        $this->assertSame(
+            $this->db->table('labs')->where('organ_code', 'kidney')->countAllResults(),
+            $this->db->table('labs')->where('organ_code', 'liver')->countAllResults(),
+            'the check list names no organ, so both programmes carry it'
+        );
     }
 
     // ---- The score -------------------------------------------------------
@@ -276,15 +282,40 @@ final class SchemaTest extends CIUnitTestCase
     {
         $labs = model(LabModel::class);
 
-        // Each side of each programme gets the tests marked for it plus `both`.
-        $this->assertCount(6, $labs->workupFor('kidney', 'recipient'));
-        $this->assertCount(8, $labs->workupFor('kidney', 'donor'));
-        $this->assertCount(7, $labs->workupFor('liver', 'recipient'));
-        $this->assertCount(9, $labs->workupFor('liver', 'donor'));
+        // Each side of each programme gets the tests marked for it plus
+        // `both`: 71 on the recipient's sheet, 51 on the donor's.
+        $this->assertCount(71, $labs->workupFor('kidney', 'recipient'));
+        $this->assertCount(51, $labs->workupFor('kidney', 'donor'));
+        $this->assertCount(71, $labs->workupFor('liver', 'recipient'));
+        $this->assertCount(51, $labs->workupFor('liver', 'donor'));
 
-        $names = array_column($labs->workupFor('kidney', 'donor'), 'name');
-        $this->assertContains('Renal CT Angiogram', $names, 'donor-only test');
-        $this->assertNotContains('Renal CT Angiogram', array_column($labs->workupFor('kidney', 'recipient'), 'name'));
+        $recipientNames = array_column($labs->workupFor('kidney', 'recipient'), 'name');
+        $donorNames     = array_column($labs->workupFor('kidney', 'donor'), 'name');
+
+        // On both sheets, so stored once and marked `both`.
+        $this->assertContains('Cross match', $recipientNames);
+        $this->assertContains('Cross match', $donorNames);
+
+        // On the recipient's sheet alone.
+        $this->assertContains('PRA', $recipientNames);
+        $this->assertNotContains('PRA', $donorNames);
+
+        // And on the donor's alone.
+        $this->assertContains('Advocate', $donorNames);
+        $this->assertNotContains('Advocate', $recipientNames);
+
+        // The workup arrives grouped, in the order the check list lists them.
+        $groups = array_values(array_unique(array_column($labs->workupFor('kidney', 'recipient'), 'parent_name')));
+        $this->assertSame([
+            'Immunology tests',
+            'Hematology/Biochemistry',
+            'Infectious workup',
+            'Urine/stool',
+            'Cancer screening',
+            'Imaging',
+            'Referrals and Clearances',
+            'Vaccinations',
+        ], $groups);
     }
 
     public function testAnUnrecordedTestStillComesBackAsPending(): void
@@ -293,7 +324,7 @@ final class SchemaTest extends CIUnitTestCase
         $results = model(LabResultModel::class);
 
         $workup = $results->workupFor(1001, 'recipient', 'kidney');
-        $this->assertCount(6, $workup);
+        $this->assertCount(71, $workup);
         $this->assertSame('pending', $workup[0]['status'], 'no row yet, still a pending card');
         $this->assertNull($workup[0]['result_id']);
     }

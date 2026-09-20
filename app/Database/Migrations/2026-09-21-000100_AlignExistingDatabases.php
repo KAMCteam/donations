@@ -33,6 +33,7 @@ class AlignExistingDatabases extends Migration
         $this->alignDonors();
         $this->alignPairs();
         $this->carryPairStatusToRecipients();
+        $this->alignLabs();
     }
 
     /**
@@ -101,6 +102,30 @@ class AlignExistingDatabases extends Migration
         $this->widen('pairs', "'scheduled'");
         $this->db->query('UPDATE ' . $this->table('pairs') . " SET status = 'confirmed' WHERE status = 'scheduled'");
         $this->narrow('pairs');
+    }
+
+    /**
+     * The workup's result vocabularies, which the check list widened.
+     *
+     * `done_not_done` was the old name for what the sheet calls `done`; it was
+     * never seeded onto a row, so there is nothing to move across.
+     */
+    private function alignLabs(): void
+    {
+        if ($this->enumHas('labs', 'result_type', 'acceptable_abnormal')) {
+            return;
+        }
+
+        $this->db->query('ALTER TABLE ' . $this->table('labs')
+            . " MODIFY result_type ENUM('text','numeric','blood_group','done','positive_negative',"
+            . "'acceptable_abnormal','cleared_not_cleared','given_not_given') NOT NULL DEFAULT 'text'");
+
+        // The group belongs in the key: the check list has VZV twice, under
+        // Infectious workup and under Vaccinations.
+        $this->db->query('ALTER TABLE ' . $this->table('labs')
+            . ' DROP INDEX ' . $this->db->protectIdentifiers('name_organ_code_person_type'));
+        $this->db->query('ALTER TABLE ' . $this->table('labs')
+            . ' ADD UNIQUE KEY (name, lab_parent_id, organ_code, person_type)');
     }
 
     /** The shared list plus the retired values, so nothing is stranded. */

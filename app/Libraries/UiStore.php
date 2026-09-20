@@ -469,6 +469,7 @@ final class UiStore
             static fn (array $lab): array => [
                 'id'     => (string) $lab['id'],
                 'name'   => $lab['name'],
+                'group'  => (string) ($lab['parent_name'] ?? ''),
                 'status' => 'pending',
                 'result' => '',
                 'date'   => '',
@@ -694,6 +695,7 @@ final class UiStore
             static fn (array $row): array => [
                 'id'     => (string) $row['lab_id'],
                 'name'   => $row['lab_name'],
+                'group'  => (string) ($row['parent_name'] ?? ''),
                 'status' => $row['status'],
                 'result' => (string) $row['value'],
                 'date'   => $row['taken_on'] === null ? '' : self::isoToDMY($row['taken_on']),

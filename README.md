@@ -116,8 +116,8 @@ Navigation, filtering, sorting, opening a card for editing and saving are links
 and form posts, so every screen renders, navigates and submits **with
 JavaScript switched off**. `ui.js`
 is left with the mobile sidebar, the lab cards (status buttons, result editor,
-running totals), whole-row click targets and keeping "Urgency" in step with
-"Urgent?".
+running totals), whole-row click targets, opening the pairing choice as a
+dialog, and keeping "Urgency" in step with "Urgent?".
 
 The result was checked against the design package screen by screen with
 full-page screenshot diffs at 1440px. Login, the programme picker, the pairs
@@ -153,6 +153,27 @@ blanking one is a slip rather than an instruction.
 
 The add screens are unchanged: a new record has nothing to read yet, so it
 stays one open form with a single Save.
+
+### Pairing somebody from their own record
+
+"Link with Donor" (and its mirror on a donor) used to drop you on the donors
+list, which said nothing about what to do once you were there. It opens the
+two real choices now:
+
+- **Link with a new donor** — Add Pair, with this record already filled in and
+  shown read-only, and only the other person to enter. Saving writes just that
+  new person and the pair; the known half is not touched or re-validated as a
+  new MRN.
+- **Link with an existing donor** — the donors on this programme who are not
+  already paired, one form: the relationship and crossmatch date are entered
+  once at the top and each row's Link button carries that person's MRN.
+
+The choice is a `<dialog>` on the record, opened by `ui.js`. The button under
+it is a real link to `…/link`, the same choice at its own URL, so with
+JavaScript off (or without `<dialog>` support) it is simply followed. Someone
+already in an open pair is sent to that pair rather than offered a second one,
+and a person who holds a row in both registers under one MRN is not offered as
+their own counterpart.
 
 ### Medical record numbers
 

@@ -57,6 +57,9 @@ class Ui extends BaseController
     /** The pair screen's cards: the pair itself, then each person's three. */
     private const PAIR_SECTIONS = ['pair', 'recipient', 'rlabs', 'rnotes', 'donor', 'dlabs', 'dnotes'];
 
+    /** The other half of a pair: a recipient is linked with a donor, and back. */
+    private const COUNTERPART = ['recipient' => 'donor', 'donor' => 'recipient'];
+
     private UiStore $store;
 
     public function initController(RequestInterface $request, ResponseInterface $response, LoggerInterface $logger): void
@@ -245,6 +248,7 @@ class Ui extends BaseController
 
         $linkedId = $isRecipient ? ($person['pairedDonorId'] ?? null) : ($person['pairedRecipientId'] ?? null);
         $linked   = $isRecipient ? $this->store->findDonor($linkedId) : $this->store->findRecipient($linkedId);
+        $links    = $person === null ? [] : $this->linkUrls($personType, $person['id']);
 
         return view('ui/person_form', [
             'title'      => $person !== null ? $person['name'] : ($isRecipient ? 'Add Recipient' : 'Add Donor'),
@@ -264,6 +268,11 @@ class Ui extends BaseController
             'linked'     => $linked,
             'labTests'   => $labTests,
             'mrps'       => $mrps,
+            // "Link with …" is a link to the choice at its own URL; the
+            // screen also carries it as a dialog for when JavaScript is on.
+            'linkUrl'         => $person === null ? '' : $links['backUrl'] . '/link',
+            'linkNewUrl'      => $person === null ? '' : $links['newUrl'],
+            'linkExistingUrl' => $person === null ? '' : $links['existingUrl'],
             'v'          => [
                 // Entered, not generated: a real MRN comes from the hospital.
                 'mrn'              => $person['id'] ?? '',
@@ -467,6 +476,26 @@ class Ui extends BaseController
             return $this->savePair();
         }
 
+        // Reached from a record's "Link with…": that person is already on the
+        // system, so their half is filled in and fixed and the form collects
+        // only the other one.
+        $fixedSide = $this->fixedSide();
+        $fixed     = $fixedSide === '' ? null : $this->findPerson($fixedSide, (string) $this->request->getGet($fixedSide));
+
+        if ($fixedSide !== '' && $fixed === null) {
+            return redirect()->to(site_url('pairs/new'));
+        }
+
+        if ($fixed !== null) {
+            $open = $this->store->openPairFor($fixedSide, $fixed['id']);
+
+            if ($open !== null) {
+                return redirect()->to(site_url('pairs/' . rawurlencode($open['id'])));
+            }
+        }
+
+        $prefix = $fixedSide === 'recipient' ? 'r' : 'd';
+
         return view('ui/add_pair', [
             'title'     => 'Add Pair',
             'error'     => (string) ($this->session->getFlashdata('ui_error') ?? ''),
@@ -474,9 +503,11 @@ class Ui extends BaseController
             'organ'     => $organ,
             'mrps'      => $mrps,
             'entryDate' => date('Y-m-d'),
-            'rLabTests' => UiStore::defaultLabTests($organ, 'recipient'),
-            'dLabTests' => UiStore::defaultLabTests($organ, 'donor'),
-            'v'         => [
+            'fixedSide' => $fixedSide,
+            'fixed'     => $fixed,
+            'rLabTests' => $fixedSide === 'recipient' ? $fixed['labTests'] : UiStore::defaultLabTests($organ, 'recipient'),
+            'dLabTests' => $fixedSide === 'donor' ? $fixed['labTests'] : UiStore::defaultLabTests($organ, 'donor'),
+            'v'         => ($fixed === null ? [] : $this->fixedValues($prefix, $fixedSide, $fixed)) + [
                 'relationship'   => '',
                 'crossmatchDate' => '',
                 'rMrn'           => '',
@@ -507,21 +538,77 @@ class Ui extends BaseController
         ]);
     }
 
-    /** Creates the recipient, the donor and the pair that links them. */
+    /**
+     * Which half of the pair Add Pair was given, or '' when both are new.
+     *
+     * Read from the query string on the way in and from a hidden field on the
+     * way back, so a save knows the same thing the form did.
+     */
+    private function fixedSide(): string
+    {
+        $side = $this->request->is('post')
+            ? (string) $this->request->getPost('fixedSide')
+            : ((string) $this->request->getGet('recipient') !== '' ? 'recipient'
+                : ((string) $this->request->getGet('donor') !== '' ? 'donor' : ''));
+
+        return isset(self::COUNTERPART[$side]) ? $side : '';
+    }
+
+    /**
+     * The known person's record in the shape Add Pair's fields expect.
+     *
+     * @param array<string, mixed> $person
+     *
+     * @return array<string, string>
+     */
+    private function fixedValues(string $prefix, string $side, array $person): array
+    {
+        $isRecipient = $side === 'recipient';
+
+        return [
+            $prefix . 'Mrn'       => (string) $person['id'],
+            $prefix . 'Name'      => (string) $person['name'],
+            $prefix . 'Age'       => (string) $person['age'],
+            $prefix . 'BloodType' => (string) $person['bloodType'],
+            $prefix . 'Phone'     => (string) $person['phone'],
+            $prefix . 'City'      => (string) $person['address'],
+            $prefix . 'Gender'    => (string) ($isRecipient ? $person['gender'] : $person['donorGender']),
+            $prefix . 'Mrp'       => (string) ($isRecipient ? $person['selectedMrp'] : $person['donorMrp']),
+            $prefix . 'Notes'     => (string) $person['notes'],
+        ] + ($isRecipient ? [
+            'rHospital'      => (string) $person['hospital'],
+            'rDiagnosis'     => (string) $person['diagnosis'],
+            'rUrgency'       => (string) $person['urgency'],
+            'rFirstDialysis' => (string) $person['firstDialysis'],
+        ] : [
+            'dCoordinator' => (string) $person['donorCoordinator'],
+            'dStatus'      => (string) $person['donorStatus'],
+            'relationship' => (string) $person['relationship'],
+        ]);
+    }
+
+    /**
+     * Creates the pair, and whichever of the two people is new.
+     *
+     * Reached from Pairs with both sides new, or from a record's "Link with a
+     * new …" with that side already on the system — `fixedSide` says which,
+     * and that half is neither re-validated as a new MRN nor written again.
+     */
     private function savePair(): RedirectResponse
     {
         $organ        = $this->store->organ();
         $entryDate    = date('Y-m-d');
         $relationship = (string) $this->request->getPost('relationship');
         $crossmatch   = (string) $this->request->getPost('crossmatchDate');
+        $fixedSide    = $this->fixedSide();
 
         // Both numbers come off the form, and both are checked before either
         // person is stored — half a pair is worse than none.
         $recipientId = trim((string) $this->request->getPost('rMrn'));
         $donorId     = trim((string) $this->request->getPost('dMrn'));
 
-        $error = $this->mrnError($recipientId, 'recipient', 'Recipient MRN')
-            ?: $this->mrnError($donorId, 'donor', 'Donor MRN');
+        $error = $fixedSide === 'recipient' ? '' : $this->mrnError($recipientId, 'recipient', 'Recipient MRN');
+        $error = $error ?: ($fixedSide === 'donor' ? '' : $this->mrnError($donorId, 'donor', 'Donor MRN'));
 
         // Separate registers, so the same number on both sides is accepted by
         // the tables; here it would mean a person donating to themselves.
@@ -529,66 +616,79 @@ class Ui extends BaseController
             $error = 'The recipient and the donor cannot share an MRN.';
         }
 
+        // The known half is on the system already, so what has to hold is that
+        // nothing has paired them since the form was opened.
+        if ($error === '' && $fixedSide !== '') {
+            $side  = $fixedSide === 'recipient' ? $recipientId : $donorId;
+            $error = $this->findPerson($fixedSide, $side) === null
+                ? 'That record could not be found.'
+                : ($this->store->openPairFor($fixedSide, $side) === null ? '' : 'That record is already in an open pair.');
+        }
+
         if ($error !== '') {
             return redirect()->back()->withInput()->with('ui_error', $error);
         }
 
-        $this->store->addRecipient([
-            'id'             => $recipientId,
-            'type'           => 'recipient',
-            'organ'          => $organ,
-            'name'           => (string) $this->request->getPost('rName'),
-            'age'            => (int) $this->request->getPost('rAge'),
-            'bloodType'      => (string) $this->request->getPost('rBloodType'),
-            'phone'          => (string) $this->request->getPost('rPhone'),
-            'address'        => (string) $this->request->getPost('rCity'),
-            'hospital'       => (string) $this->request->getPost('rHospital'),
-            'diagnosis'      => (string) $this->request->getPost('rDiagnosis'),
-            'urgency'        => (string) $this->request->getPost('rUrgency'),
-            'gender'         => (string) $this->request->getPost('rGender'),
-            'selectedMrp'    => (string) $this->request->getPost('rMrp'),
-            'firstDialysis'  => (string) $this->request->getPost('rFirstDialysis'),
-            'dateRegistered' => $entryDate,
-            'notes'          => (string) $this->request->getPost('rNotes'),
-            'labTests'       => $this->postedLabTests('rLabs'),
-            'pairedDonorId'  => '',
-        ]);
+        if ($fixedSide !== 'recipient') {
+            $this->store->addRecipient([
+                'id'             => $recipientId,
+                'type'           => 'recipient',
+                'organ'          => $organ,
+                'name'           => (string) $this->request->getPost('rName'),
+                'age'            => (int) $this->request->getPost('rAge'),
+                'bloodType'      => (string) $this->request->getPost('rBloodType'),
+                'phone'          => (string) $this->request->getPost('rPhone'),
+                'address'        => (string) $this->request->getPost('rCity'),
+                'hospital'       => (string) $this->request->getPost('rHospital'),
+                'diagnosis'      => (string) $this->request->getPost('rDiagnosis'),
+                'urgency'        => (string) $this->request->getPost('rUrgency'),
+                'gender'         => (string) $this->request->getPost('rGender'),
+                'selectedMrp'    => (string) $this->request->getPost('rMrp'),
+                'firstDialysis'  => (string) $this->request->getPost('rFirstDialysis'),
+                'dateRegistered' => $entryDate,
+                'notes'          => (string) $this->request->getPost('rNotes'),
+                'labTests'       => $this->postedLabTests('rLabs'),
+            ]);
+        }
 
-        $this->store->addDonor([
-            'id'                => $donorId,
-            'type'              => 'donor',
-            'organ'             => $organ,
-            'name'              => (string) $this->request->getPost('dName'),
-            'age'               => (int) $this->request->getPost('dAge'),
-            'bloodType'         => (string) $this->request->getPost('dBloodType'),
-            'phone'             => (string) $this->request->getPost('dPhone'),
-            'address'           => (string) $this->request->getPost('dCity'),
-            'hospital'          => '',
-            'donationType'      => 'living',
-            'relationship'      => $relationship,
-            'donorGender'       => (string) $this->request->getPost('dGender'),
-            'donorMrp'          => (string) $this->request->getPost('dMrp'),
-            'donorStatus'       => (string) $this->request->getPost('dStatus'),
-            'donorCoordinator'  => (string) $this->request->getPost('dCoordinator'),
-            'notes'             => (string) $this->request->getPost('dNotes'),
-            'labTests'          => $this->postedLabTests('dLabs'),
-            'pairedRecipientId' => $recipientId,
-        ]);
+        if ($fixedSide !== 'donor') {
+            $this->store->addDonor([
+                'id'               => $donorId,
+                'type'             => 'donor',
+                'organ'            => $organ,
+                'name'             => (string) $this->request->getPost('dName'),
+                'age'              => (int) $this->request->getPost('dAge'),
+                'bloodType'        => (string) $this->request->getPost('dBloodType'),
+                'phone'            => (string) $this->request->getPost('dPhone'),
+                'address'          => (string) $this->request->getPost('dCity'),
+                'donationType'     => 'living',
+                'relationship'     => $relationship,
+                'donorGender'      => (string) $this->request->getPost('dGender'),
+                'donorMrp'         => (string) $this->request->getPost('dMrp'),
+                'donorStatus'      => (string) $this->request->getPost('dStatus'),
+                'donorCoordinator' => (string) $this->request->getPost('dCoordinator'),
+                'notes'            => (string) $this->request->getPost('dNotes'),
+                'labTests'         => $this->postedLabTests('dLabs'),
+            ]);
+        }
 
-        $this->store->updateRecipient($recipientId, ['pairedDonorId' => $donorId]);
+        // The donors list shows the relationship, so an existing donor picks
+        // up the one entered here too.
+        if ($fixedSide === 'donor' && $relationship !== '') {
+            $this->store->updateDonor($donorId, ['relationship' => $relationship]);
+        }
 
-        $this->store->addPair([
+        $pairId = $this->store->addPair([
             'organ'         => $organ,
             'status'        => 'active',
             'recipientId'   => $recipientId,
             'donorId'       => $donorId,
             'relationship'  => $relationship,
             'scheduledDate' => $crossmatch,
-            'notes'         => '',
             'createdDate'   => $entryDate,
         ]);
 
-        return redirect()->to(site_url('pairs'));
+        return redirect()->to(site_url('pairs/' . rawurlencode((string) $pairId)));
     }
 
     public function pair(string $id): string|RedirectResponse
@@ -725,6 +825,189 @@ class Ui extends BaseController
         }
 
         return $back;
+    }
+
+    // ---- Linking a person to a counterpart ---------------------------------
+
+    public function linkRecipient(string $id): string|RedirectResponse
+    {
+        return $this->linkChoice('recipient', $id);
+    }
+
+    public function linkDonor(string $id): string|RedirectResponse
+    {
+        return $this->linkChoice('donor', $id);
+    }
+
+    public function linkRecipientExisting(string $id): string|RedirectResponse
+    {
+        return $this->linkExisting('recipient', $id);
+    }
+
+    public function linkDonorExisting(string $id): string|RedirectResponse
+    {
+        return $this->linkExisting('donor', $id);
+    }
+
+    /**
+     * The two ways to pair somebody: with a counterpart who is not on the
+     * system yet, or with one who is.
+     *
+     * The record screen opens this as a dialog. This is the page behind it, so
+     * the choice is reachable with JavaScript off and by its own URL.
+     */
+    private function linkChoice(string $personType, string $id): string|RedirectResponse
+    {
+        $person = $this->findPerson($personType, $id);
+
+        if ($person === null) {
+            return redirect()->to(site_url($personType === 'recipient' ? 'recipients' : 'donors'));
+        }
+
+        $open = $this->store->openPairFor($personType, $person['id']);
+
+        // Already paired: there is nothing to choose, so show the pair.
+        if ($open !== null) {
+            return redirect()->to(site_url('pairs/' . rawurlencode($open['id'])));
+        }
+
+        return view('ui/link_choice', [
+            'title'      => 'Link ' . $person['name'],
+            'navPage'    => '',
+            'organ'      => $this->store->organ(),
+            'personType' => $personType,
+            'person'     => $person,
+        ] + $this->linkUrls($personType, $person['id']));
+    }
+
+    /**
+     * Pick the counterpart from those already registered and not yet paired.
+     *
+     * The list is one form: each row's button carries that person's MRN, and
+     * the relationship and crossmatch date at the top are filled in once and
+     * ride along with whichever row is chosen.
+     */
+    private function linkExisting(string $personType, string $id): string|RedirectResponse
+    {
+        $person = $this->findPerson($personType, $id);
+
+        if ($person === null) {
+            return redirect()->to(site_url($personType === 'recipient' ? 'recipients' : 'donors'));
+        }
+
+        $counterpart = self::COUNTERPART[$personType];
+
+        if ($this->request->is('post')) {
+            return $this->linkToExisting($personType, $person);
+        }
+
+        $candidates = $counterpart === 'donor'
+            ? $this->store->availableDonors()
+            : $this->store->waitingList();
+
+        // One person can hold a row in both registers under the one hospital
+        // number. Offering them as their own counterpart would only be
+        // refused, so they are not offered.
+        $candidates = array_values(array_filter(
+            $candidates,
+            static fn (array $row): bool => (string) $row['id'] !== (string) $person['id']
+        ));
+
+        return view('ui/link_existing', [
+            'title'       => 'Link ' . $person['name'],
+            'navPage'     => '',
+            'organ'       => $this->store->organ(),
+            'personType'  => $personType,
+            'counterpart' => $counterpart,
+            'person'      => $person,
+            'candidates'  => $candidates,
+            'error'       => (string) ($this->session->getFlashdata('ui_error') ?? ''),
+        ] + $this->linkUrls($personType, $person['id']));
+    }
+
+    /**
+     * @param array<string, mixed> $person
+     */
+    private function linkToExisting(string $personType, array $person): RedirectResponse
+    {
+        $counterpart = self::COUNTERPART[$personType];
+        $otherMrn    = trim((string) $this->request->getPost('mrn'));
+        $other       = $this->findPerson($counterpart, $otherMrn);
+
+        if ($other === null) {
+            return redirect()->back()->with('ui_error', 'Choose somebody from the list to link with.');
+        }
+
+        $recipientId = $personType === 'recipient' ? $person['id'] : $other['id'];
+        $donorId     = $personType === 'recipient' ? $other['id'] : $person['id'];
+        $error       = $this->pairableError($recipientId, $donorId);
+
+        if ($error !== '') {
+            return redirect()->back()->with('ui_error', $error);
+        }
+
+        $pairId = $this->store->addPair([
+            'organ'         => $this->store->organ(),
+            'status'        => 'active',
+            'recipientId'   => $recipientId,
+            'donorId'       => $donorId,
+            'relationship'  => (string) $this->request->getPost('relationship'),
+            'scheduledDate' => (string) $this->request->getPost('crossmatchDate'),
+        ]);
+
+        // The donors list shows the relationship, so the donor carries it too.
+        $this->store->updateDonor($donorId, ['relationship' => (string) $this->request->getPost('relationship')]);
+
+        return redirect()->to(site_url('pairs/' . rawurlencode((string) $pairId)));
+    }
+
+    /**
+     * Why these two cannot be paired, or '' when they can.
+     *
+     * PairModel::link() enforces the same rules and throws; checking here
+     * turns what would be a stack trace into a sentence on the screen.
+     */
+    private function pairableError(string $recipientMrn, string $donorMrn): string
+    {
+        if ($recipientMrn === $donorMrn) {
+            return 'The recipient and the donor cannot be the same person.';
+        }
+
+        if ($this->store->openPairFor('recipient', $recipientMrn) !== null) {
+            return 'That recipient is already in an open pair.';
+        }
+
+        if ($this->store->openPairFor('donor', $donorMrn) !== null) {
+            return 'That donor is already in an open pair.';
+        }
+
+        return '';
+    }
+
+    /** @return array<string, mixed>|null */
+    private function findPerson(string $personType, ?string $id): ?array
+    {
+        return $personType === 'recipient'
+            ? $this->store->findRecipient($id)
+            : $this->store->findDonor($id);
+    }
+
+    /**
+     * The two destinations the choice offers.
+     *
+     * @return array{newUrl: string, existingUrl: string, backUrl: string}
+     */
+    private function linkUrls(string $personType, string $id): array
+    {
+        $base = ($personType === 'recipient' ? 'recipients/' : 'donors/') . rawurlencode($id);
+
+        return [
+            // Add Pair with this person already filled in; the form collects
+            // the other one.
+            'newUrl'      => site_url('pairs/new') . '?' . $personType . '=' . rawurlencode($id),
+            'existingUrl' => site_url($base . '/link/existing'),
+            'backUrl'     => site_url($base),
+        ];
     }
 
     // ---- MRPs --------------------------------------------------------------

@@ -568,3 +568,117 @@ textarea.lab-editor-field { resize: none; }
 @media (hover: hover) {
   .btn-edit:hover { border-color: var(--slate-300); color: #15508A; }
 }
+
+/* ---- The pairing choice ----
+   "Link with a donor / recipient" is a link to the choice at its own URL, and
+   the same choice is on the page as a <dialog> that ui.js opens instead when
+   it can. One set of styles serves both. */
+.dialog {
+  border: 0;
+  padding: 0;
+  /* The reset zeroes every margin, which takes the UA's `margin: auto` with
+     it — and that is what centres a modal dialog. */
+  margin: auto;
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-lg, 0 10px 40px rgb(15 23 42 / 0.18));
+  max-width: min(32rem, calc(100vw - 2rem));
+  width: 100%;
+  background-color: #fff;
+  color: inherit;
+}
+.dialog::backdrop { background-color: rgb(15 23 42 / 0.45); }
+
+.dialog-body { padding: 1.5rem; position: relative; }
+
+.dialog-close-form { position: absolute; top: 0.75rem; right: 0.75rem; margin: 0; }
+
+.dialog-close {
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background-color: transparent;
+  color: var(--slate-400);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.link-choice-wrap { max-width: 32rem; }
+
+.link-choice-title {
+  font-size: var(--text-base);
+  line-height: var(--lh-base);
+  font-weight: 600;
+  color: var(--slate-800);
+}
+.link-choice-sub {
+  margin-top: 0.25rem;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--slate-500);
+}
+
+.link-choice-options {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.link-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-xl);
+  background-color: #fff;
+  text-align: left;
+  transition-property: var(--transition-colors-props);
+  transition-timing-function: var(--ease);
+  transition-duration: var(--dur);
+}
+
+.link-choice-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-lg);
+  background-color: var(--slate-50);
+  color: #15508A;
+}
+
+.link-choice-label {
+  display: block;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  font-weight: 600;
+  color: var(--slate-800);
+}
+.link-choice-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  color: var(--slate-500);
+}
+
+.link-pair-details { margin-bottom: 1.25rem; }
+
+.list-table td.cell-action { text-align: right; }
+
+.link-fixed-note {
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  color: var(--slate-500);
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .link-choice:hover { border-color: #15508A; background-color: var(--slate-50); }
+  .dialog-close:hover { color: var(--slate-700); background-color: var(--slate-50); }
+}

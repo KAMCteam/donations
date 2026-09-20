@@ -23,6 +23,9 @@ use App\Libraries\UiStore;
  * @var list<array{id: string, name: string}> $mrps
  * @var string                     $error       Why the last save bounced, if it did
  * @var string                     $editing     The card open for editing, '' for none
+ * @var string                     $linkUrl     The pairing choice, as a page
+ * @var string                     $linkNewUrl
+ * @var string                     $linkExistingUrl
  */
 // A save that bounced re-renders with what was typed rather than with what the
 // record held, so a rejected MRN does not cost the rest of the form. The keys
@@ -59,7 +62,9 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             <?php if ($mode === 'view' && $linked !== null): ?>
                 <a class="btn-outline" href="<?= site_url(($isRecipient ? 'donors/' : 'recipients/') . rawurlencode($linked['id'])) ?>">Linked: <?= esc($linked['name']) ?></a>
             <?php elseif ($mode === 'view'): ?>
-                <a class="btn-outline" href="<?= site_url($isRecipient ? 'donors' : 'recipients') ?>"><?= ui_icon('link14') ?>Link with <?= esc($isRecipient ? 'Donor' : 'Recipient') ?></a>
+                <?php // A real link to the choice at its own URL; ui.js opens
+                      // the dialog below instead when it can. ?>
+                <a class="btn-outline" href="<?= esc($linkUrl) ?>" data-dialog="link-choice"><?= ui_icon('link14') ?>Link with <?= esc($isRecipient ? 'Donor' : 'Recipient') ?></a>
             <?php endif; ?>
             <?php if ($mode === 'add'): ?>
                 <button type="submit" form="person-form" class="btn-save">Save</button>
@@ -291,5 +296,21 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             <?php endif; ?>
         </div>
     </form>
+
+    <?php if ($mode === 'view' && $linked === null): ?>
+        <dialog id="link-choice" class="dialog">
+            <div class="dialog-body">
+                <form method="dialog" class="dialog-close-form">
+                    <button class="dialog-close" aria-label="Close">&times;</button>
+                </form>
+                <?= view('ui/partials/link_choice', [
+                    'counterpart' => $isRecipient ? 'donor' : 'recipient',
+                    'newUrl'      => $linkNewUrl,
+                    'existingUrl' => $linkExistingUrl,
+                    'person'      => $person,
+                ]) ?>
+            </div>
+        </dialog>
+    <?php endif; ?>
 </div>
 <?= $this->endSection() ?>

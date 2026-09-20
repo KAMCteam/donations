@@ -35,10 +35,17 @@ $routes->get('dashboard', 'Ui::dashboard');
 
 $routes->get('recipients', 'Ui::recipients');
 $routes->match(['get', 'post'], 'recipients/new', 'Ui::addRecipient');
+// Both link routes come before the record route: `(:segment)` stops at a
+// slash, so they cannot be confused, but reading them in this order makes
+// that obvious.
+$routes->get('recipients/(:segment)/link', 'Ui::linkRecipient/$1');
+$routes->match(['get', 'post'], 'recipients/(:segment)/link/existing', 'Ui::linkRecipientExisting/$1');
 $routes->match(['get', 'post'], 'recipients/(:segment)', 'Ui::recipient/$1');
 
 $routes->get('donors', 'Ui::donors');
 $routes->match(['get', 'post'], 'donors/new', 'Ui::addDonor');
+$routes->get('donors/(:segment)/link', 'Ui::linkDonor/$1');
+$routes->match(['get', 'post'], 'donors/(:segment)/link/existing', 'Ui::linkDonorExisting/$1');
 $routes->match(['get', 'post'], 'donors/(:segment)', 'Ui::donor/$1');
 
 $routes->get('pairs', 'Ui::pairs');

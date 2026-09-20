@@ -108,6 +108,221 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('<option value="' . $this->mrpId . '" selected>', $html);
     }
 
+    // ---- Linking: a new counterpart, or one already registered -------------
+
+    /**
+     * "Link with Donor" used to drop you on the donors list, which said
+     * nothing about what to do there. It offers the two real choices now.
+     */
+    public function testTheLinkButtonOffersTheChoiceRatherThanLeavingForAList(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9001', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
+
+        $html = $this->get('recipients/9001')->getBody();
+
+        // A real link to the choice at its own URL, and the same choice on the
+        // page as a dialog for when JavaScript is on.
+        $this->assertStringContainsString('recipients/9001/link" data-dialog="link-choice"', $html);
+        $this->assertStringContainsString('<dialog id="link-choice"', $html);
+        $this->assertStringNotContainsString('btn-outline" href="' . site_url('donors') . '"', $html);
+    }
+
+    public function testTheChoicePageOffersBothWays(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9002', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
+
+        $html = $this->get('recipients/9002/link')->getBody();
+
+        $this->assertStringContainsString('Link with a new donor', $html);
+        $this->assertStringContainsString('Link with an existing donor', $html);
+        $this->assertStringContainsString(site_url('pairs/new') . '?recipient=9002', $html);
+        $this->assertStringContainsString(site_url('recipients/9002/link/existing'), $html);
+    }
+
+    /** A donor record offers the mirror image of it. */
+    public function testADonorIsOfferedARecipient(): void
+    {
+        $this->post('donors/new', ['mrn' => '9003', 'name' => 'Fahad Test', 'age' => '29', 'bloodType' => 'A']);
+
+        $html = $this->get('donors/9003/link')->getBody();
+
+        $this->assertStringContainsString('Link with a new recipient', $html);
+        $this->assertStringContainsString('Link with an existing recipient', $html);
+        $this->assertStringContainsString(site_url('pairs/new') . '?donor=9003', $html);
+    }
+
+    /** Somebody already paired has nothing to choose, so they see the pair. */
+    public function testAPairedPersonIsSentToTheirPair(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9004', 'dMrn' => '9005',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+
+        $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
+
+        $this->get('recipients/9004/link')->assertRedirectTo(site_url('pairs/' . $pairId));
+    }
+
+    // ---- "a new one": Add Pair with this record already filled in ----------
+
+    public function testAddPairArrivesFilledInAndFixedOnTheKnownSide(): void
+    {
+        $this->post('recipients/new', [
+            'mrn'       => '9006',
+            'name'      => 'Layla Test',
+            'age'       => '38',
+            'bloodType' => 'B',
+            'address'   => 'Taif',
+            'diagnosis' => 'ESRD',
+        ]);
+
+        $html = $this->get('pairs/new?recipient=9006')->getBody();
+
+        $this->assertStringContainsString('Link Layla Test', $html);
+        $this->assertStringContainsString('name="fixedSide" value="recipient"', $html);
+        // The known half is filled in and shut; its MRN rides in a hidden
+        // input, since a disabled fieldset posts nothing.
+        $this->assertStringContainsString('name="rMrn" value="9006"', $html);
+        $this->assertStringContainsString('value="Layla Test"', $html);
+        $this->assertStringContainsString('value="Taif"', $html);
+        // The other half is still the form to fill in.
+        $this->assertStringContainsString('name="dMrn"', $html);
+    }
+
+    /**
+     * Saving writes only the new person. The known one is already on the
+     * system, so re-validating their MRN as new would refuse the save.
+     */
+    public function testSavingCreatesOnlyTheNewHalfOfThePair(): void
+    {
+        $this->post('recipients/new', [
+            'mrn'       => '9007',
+            'name'      => 'Layla Test',
+            'age'       => '38',
+            'bloodType' => 'B',
+            'diagnosis' => 'ESRD',
+        ]);
+
+        $this->post('pairs/new', [
+            'fixedSide'      => 'recipient',
+            'rMrn'           => '9007',
+            'dMrn'           => '9008',
+            'dName'          => 'Nasser Test',
+            'dAge'           => '44',
+            'dBloodType'     => 'B',
+            'relationship'   => 'Brother',
+            'crossmatchDate' => '15/10/2026',
+        ]);
+
+        $this->assertSame(1, $this->db->table('recipients')->countAllResults(), 'the known recipient is not written again');
+        $this->seeInDatabase('recipients', ['mrn' => 9007, 'name' => 'Layla Test', 'diagnosis' => 'ESRD']);
+        $this->seeInDatabase('donors', ['mrn' => 9008, 'name' => 'Nasser Test']);
+        $this->seeInDatabase('pairs', [
+            'recipient_mrn'   => 9007,
+            'donor_mrn'       => 9008,
+            'relationship'    => 'Brother',
+            'crossmatch_date' => '2026-10-15',
+        ]);
+    }
+
+    public function testTheKnownSideIsRefusedIfSomethingPairedThemMeanwhile(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9009', 'dMrn' => '9010',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+
+        // 9009 is paired now; a form opened before that still posts.
+        $this->post('pairs/new', [
+            'fixedSide'  => 'recipient',
+            'rMrn'       => '9009',
+            'dMrn'       => '9011',
+            'dName'      => 'Someone Else',
+            'dAge'       => '30',
+            'dBloodType' => 'A',
+        ]);
+
+        $this->assertSame(1, $this->db->table('pairs')->countAllResults());
+        $this->assertSame(0, $this->db->table('donors')->where('mrn', 9011)->countAllResults());
+        $this->assertStringContainsString('already in an open pair', (string) session('ui_error'));
+    }
+
+    // ---- "an existing one": pick from the list -----------------------------
+
+    public function testThePickerListsUnpairedCounterpartsOnly(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9012', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
+        $this->post('donors/new', ['mrn' => '9013', 'name' => 'Free Donor', 'age' => '33', 'bloodType' => 'B']);
+        $this->post('pairs/new', [
+            'rMrn' => '9014', 'dMrn' => '9015',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Paired Donor', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+
+        $html = $this->get('recipients/9012/link/existing')->getBody();
+
+        $this->assertStringContainsString('Free Donor', $html);
+        $this->assertStringNotContainsString('Paired Donor', $html);
+        $this->assertStringContainsString('name="mrn" value="9013"', $html);
+    }
+
+    /**
+     * One person may hold a row in both registers under their one hospital
+     * number, so they could otherwise be offered as their own donor.
+     */
+    public function testThePickerDoesNotOfferThePersonThemselves(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9016', 'name' => 'Both Test', 'age' => '38', 'bloodType' => 'B']);
+        $this->post('donors/new', ['mrn' => '9016', 'name' => 'Both Test', 'age' => '38', 'bloodType' => 'B']);
+
+        $html = $this->get('recipients/9016/link/existing')->getBody();
+
+        $this->assertStringNotContainsString('name="mrn" value="9016"', $html);
+    }
+
+    public function testChoosingFromThePickerCreatesThePair(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9017', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
+        $this->post('donors/new', ['mrn' => '9018', 'name' => 'Free Donor', 'age' => '33', 'bloodType' => 'B']);
+
+        $this->post('recipients/9017/link/existing', [
+            'mrn'            => '9018',
+            'relationship'   => 'Brother',
+            'crossmatchDate' => '01/10/2026',
+        ]);
+
+        $this->seeInDatabase('pairs', [
+            'recipient_mrn'   => 9017,
+            'donor_mrn'       => 9018,
+            'status'          => 'active',
+            'relationship'    => 'Brother',
+            'crossmatch_date' => '2026-10-01',
+        ]);
+        // The donors list shows the relationship, so it lands there too.
+        $this->seeInDatabase('donors', ['mrn' => 9018, 'relationship' => 'Brother']);
+        // Neither person is duplicated: the pair links what was already there.
+        $this->assertSame(1, $this->db->table('recipients')->countAllResults());
+        $this->assertSame(1, $this->db->table('donors')->countAllResults());
+    }
+
+    public function testChoosingSomebodyAlreadyPairedIsRefused(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9019', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
+        $this->post('pairs/new', [
+            'rMrn' => '9020', 'dMrn' => '9021',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Paired Donor', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+
+        $this->post('recipients/9019/link/existing', ['mrn' => '9021']);
+
+        $this->assertSame(1, $this->db->table('pairs')->countAllResults());
+        $this->assertStringContainsString('already in an open pair', (string) session('ui_error'));
+    }
+
     // ---- A saved record opens read-only ------------------------------------
 
     /**

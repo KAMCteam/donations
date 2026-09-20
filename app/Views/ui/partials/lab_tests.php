@@ -15,25 +15,44 @@ use App\Libraries\UiStore;
  * @var string                     $field      Form field prefix, e.g. "labs" or "rLabs".
  * @var bool                       $animated   Adds the colour transition (PersonForm / AddPair).
  * @var string|null                $editTitle  Tooltip on the pencil (PersonForm only).
+ * @var bool                       $editing    False renders the workup read-only.
+ * @var string|null                $editUrl    Where the card's Edit goes; null hides it.
+ * @var string|null                $viewUrl    Where Cancel goes.
+ * @var string|null                $section    Which card a save is for.
  */
 $animated  = $animated ?? false;
 $editTitle = $editTitle ?? null;
-$progress  = UiStore::labProgress($tests);
+// The add screens have nothing to view yet, so they default to editable with
+// no Edit button of their own.
+$editing  = $editing ?? true;
+$editUrl  = $editUrl ?? null;
+$viewUrl  = $viewUrl ?? null;
+$section  = $section ?? null;
+$progress = UiStore::labProgress($tests);
 ?>
 <div class="card card--pad" data-lab-section>
-    <div class="lab-head">
-        <div>
-            <h2 class="card-title">Required Lab Tests</h2>
-            <p class="lab-count" data-lab-count><?= $progress['done'] ?> of <?= $progress['total'] ?> completed</p>
-        </div>
-        <div class="lab-progress">
-            <div class="progress">
-                <div class="progress-fill" data-lab-fill style="width:<?= $progress['pct'] ?>%;background-color:#15508A"></div>
+    <div class="card-head">
+        <div class="lab-head">
+            <div>
+                <h2 class="card-title">Required Lab Tests</h2>
+                <p class="lab-count" data-lab-count><?= $progress['done'] ?> of <?= $progress['total'] ?> completed</p>
             </div>
-            <span class="lab-pct" data-lab-pct><?= $progress['pct'] ?>%</span>
+            <div class="lab-progress">
+                <div class="progress">
+                    <div class="progress-fill" data-lab-fill style="width:<?= $progress['pct'] ?>%;background-color:#15508A"></div>
+                </div>
+                <span class="lab-pct" data-lab-pct><?= $progress['pct'] ?>%</span>
+            </div>
         </div>
+        <?php if (! $editing && $editUrl !== null): ?>
+            <a class="btn-edit" href="<?= esc($editUrl) ?>"><?= ui_icon('edit') ?>Edit</a>
+        <?php endif; ?>
     </div>
 
+    <fieldset class="card-fields"<?= $editing ? '' : ' disabled' ?>>
+    <?php if ($editing && $section !== null): ?>
+        <input type="hidden" name="section" value="<?= esc($section) ?>">
+    <?php endif; ?>
     <div class="lab-grid">
         <?php foreach ($tests as $i => $test): ?>
             <?php // $field and $i are ours, not user input, so the name needs no escaping. ?>
@@ -68,4 +87,12 @@ $progress  = UiStore::labProgress($tests);
             </div>
         <?php endforeach; ?>
     </div>
+    </fieldset>
+
+    <?php if ($editing && $viewUrl !== null): ?>
+        <div class="card-actions">
+            <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+            <button type="submit" class="btn-save">Save</button>
+        </div>
+    <?php endif; ?>
 </div>

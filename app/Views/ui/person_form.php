@@ -22,6 +22,7 @@ use App\Libraries\UiStore;
  * @var list<array<string, mixed>> $labTests
  * @var list<array{id: string, name: string}> $mrps
  * @var string                     $error       Why the last save bounced, if it did
+ * @var string                     $editing     The card open for editing, '' for none
  */
 // A save that bounced re-renders with what was typed rather than with what the
 // record held, so a rejected MRN does not cost the rest of the form. The keys
@@ -37,6 +38,15 @@ $title       = $mode === 'add'
     ? ($isRecipient ? 'Add Recipient' : 'Add Donor')
     : ($person['name'] ?? ($isRecipient ? 'Recipient Profile' : 'Donor Profile'));
 $eyebrow = $mode === 'add' ? 'New' : ($person['id'] ?? '');
+
+// A saved record opens read-only and is edited one card at a time. Each Edit
+// is a link back to this screen with the card named, so the card returns as a
+// form and the screen still works with JavaScript off. A new record has
+// nothing to read yet, so every card starts editable and the header keeps its
+// single Save.
+$viewUrl  = $mode === 'add' ? null : site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id']));
+$editable = static fn (string $section): bool => $mode === 'add' || $editing === $section;
+$editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $section;
 ?>
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
@@ -51,7 +61,9 @@ $eyebrow = $mode === 'add' ? 'New' : ($person['id'] ?? '');
             <?php elseif ($mode === 'view'): ?>
                 <a class="btn-outline" href="<?= site_url($isRecipient ? 'donors' : 'recipients') ?>"><?= ui_icon('link14') ?>Link with <?= esc($isRecipient ? 'Donor' : 'Recipient') ?></a>
             <?php endif; ?>
-            <button type="submit" form="person-form" class="btn-save">Save</button>
+            <?php if ($mode === 'add'): ?>
+                <button type="submit" form="person-form" class="btn-save">Save</button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -63,7 +75,16 @@ $eyebrow = $mode === 'add' ? 'New' : ($person['id'] ?? '');
         <?= csrf_field() ?>
 
         <div class="card card--pad">
-            <h2 class="card-title card-title--mb5">Personal Information</h2>
+            <div class="card-head">
+                <h2 class="card-title">Personal Information</h2>
+                <?php if (! $editable('personal')): ?>
+                    <a class="btn-edit" href="<?= esc($editUrl('personal')) ?>"><?= ui_icon('edit') ?>Edit</a>
+                <?php endif; ?>
+            </div>
+            <fieldset class="card-fields"<?= $editable('personal') ? '' : ' disabled' ?>>
+            <?php if ($mode !== 'add' && $editable('personal')): ?>
+                <input type="hidden" name="section" value="personal">
+            <?php endif; ?>
 
             <?php if ($isRecipient): ?>
                 <div class="stack-4">
@@ -227,13 +248,47 @@ $eyebrow = $mode === 'add' ? 'New' : ($person['id'] ?? '');
                     </div>
                 </div>
             <?php endif; ?>
+            </fieldset>
+
+            <?php if ($mode !== 'add' && $editable('personal')): ?>
+                <div class="card-actions">
+                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                    <button type="submit" class="btn-save">Save</button>
+                </div>
+            <?php endif; ?>
         </div>
 
-        <?= view('ui/partials/lab_tests', ['tests' => $labTests, 'field' => 'labs', 'animated' => true, 'editTitle' => 'Add result']) ?>
+        <?= view('ui/partials/lab_tests', [
+            'tests'     => $labTests,
+            'field'     => 'labs',
+            'animated'  => true,
+            'editTitle' => 'Add result',
+            'editing'   => $editable('labs'),
+            'editUrl'   => $mode === 'add' ? null : $editUrl('labs'),
+            'viewUrl'   => $mode === 'add' ? null : $viewUrl,
+            'section'   => $mode === 'add' ? null : 'labs',
+        ]) ?>
 
         <div class="card card--pad">
-            <h2 class="card-title card-title--mb4">Clinical Notes</h2>
-            <textarea class="textarea" name="notes" rows="5" placeholder="Add clinical notes, observations, or relevant context..."><?= esc($v['notes']) ?></textarea>
+            <div class="card-head">
+                <h2 class="card-title">Clinical Notes</h2>
+                <?php if (! $editable('notes')): ?>
+                    <a class="btn-edit" href="<?= esc($editUrl('notes')) ?>"><?= ui_icon('edit') ?>Edit</a>
+                <?php endif; ?>
+            </div>
+            <fieldset class="card-fields"<?= $editable('notes') ? '' : ' disabled' ?>>
+                <?php if ($mode !== 'add' && $editable('notes')): ?>
+                    <input type="hidden" name="section" value="notes">
+                <?php endif; ?>
+                <textarea class="textarea" name="notes" rows="5" placeholder="Add clinical notes, observations, or relevant context..."><?= esc($v['notes']) ?></textarea>
+            </fieldset>
+
+            <?php if ($mode !== 'add' && $editable('notes')): ?>
+                <div class="card-actions">
+                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                    <button type="submit" class="btn-save">Save</button>
+                </div>
+            <?php endif; ?>
         </div>
     </form>
 </div>

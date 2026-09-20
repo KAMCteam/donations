@@ -493,3 +493,78 @@ textarea.lab-editor-field { resize: none; }
   .form-grid-5 > .span-lg-2 { grid-column: span 2 / span 2; }
   .lab-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ---- Record cards: shown by default, edited one at a time ----
+   A record screen opens read-only. Each card carries its own Edit, which is a
+   link — the card comes back as a form, so this works with JavaScript off. The
+   cards that are not being edited are a disabled <fieldset>, so they render
+   every value exactly where it sits when editable and post nothing, which is
+   what keeps saving one card from touching another's fields. */
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.card-head .card-title,
+.card-head .section-head,
+.card-head .lab-head { margin-bottom: 0; }
+.card-head .lab-head { flex: 1; }
+
+.card-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+/* Not being edited: the design's own read-only look, which it already uses for
+   Entry Date and the MRN. */
+.card-fields:disabled .input,
+.card-fields:disabled .textarea {
+  border-color: var(--slate-100);
+  background-color: var(--slate-50);
+  color: var(--slate-500);
+  -webkit-text-fill-color: var(--slate-500);
+  opacity: 1;
+  cursor: default;
+}
+/* An empty field is empty, not a prompt to fill something that cannot be.
+   -webkit-text-fill-color has to go too: it is what paints the text in WebKit,
+   so on its own `color` never reaches the placeholder. */
+.card-fields:disabled .input::placeholder,
+.card-fields:disabled .textarea::placeholder {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.btn-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--slate-200);
+  background-color: #fff;
+  color: var(--slate-600);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  transition-property: var(--transition-colors-props);
+  transition-timing-function: var(--ease);
+  transition-duration: var(--dur);
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+@media (hover: hover) {
+  .btn-edit:hover { border-color: var(--slate-300); color: #15508A; }
+}

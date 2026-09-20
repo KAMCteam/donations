@@ -108,6 +108,195 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('<option value="' . $this->mrpId . '" selected>', $html);
     }
 
+    // ---- A saved record opens read-only ------------------------------------
+
+    /**
+     * A record is for reading; editing is deliberate. Every card renders
+     * inside a disabled fieldset with its own Edit, so nothing is a live
+     * control until one is opened.
+     */
+    public function testASavedRecordOpensWithEveryCardReadOnly(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8001', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $html = $this->get('recipients/8001')->getBody();
+
+        $this->assertSame(3, substr_count($html, 'class="card-fields" disabled'), 'personal, labs and notes');
+        $this->assertSame(3, substr_count($html, 'class="btn-edit"'), 'one Edit per card');
+        $this->assertStringNotContainsString('btn-save', $html, 'nothing to save until a card is opened');
+    }
+
+    public function testEditOpensOnlyTheCardItNames(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8002', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $html = $this->get('recipients/8002?edit=personal')->getBody();
+
+        $this->assertSame(2, substr_count($html, 'class="card-fields" disabled'), 'the other two stay shut');
+        $this->assertSame(1, substr_count($html, 'name="section" value="personal"'));
+        $this->assertSame(1, substr_count($html, 'btn-save'), 'the open card saves itself');
+    }
+
+    /** A mistyped link opens the record rather than an error. */
+    public function testAnUnknownCardNameJustOpensTheRecord(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8003', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $html = $this->get('recipients/8003?edit=nonsense')->getBody();
+
+        $this->assertSame(3, substr_count($html, 'class="card-fields" disabled'));
+        $this->assertStringNotContainsString('btn-save', $html);
+    }
+
+    /** An add screen has nothing to read yet, so it stays one open form. */
+    public function testTheAddScreenIsUnaffected(): void
+    {
+        $html = $this->get('recipients/new')->getBody();
+
+        $this->assertStringNotContainsString('card-fields" disabled', $html);
+        $this->assertStringNotContainsString('btn-edit', $html);
+        $this->assertSame(1, substr_count($html, 'btn-save'));
+    }
+
+    /**
+     * The point of the whole arrangement: the cards that are shut post
+     * nothing, so saving one cannot disturb another.
+     */
+    public function testSavingOneCardLeavesTheOthersAlone(): void
+    {
+        $this->post('recipients/new', [
+            'mrn'       => '8004',
+            'name'      => 'Ahmed Test',
+            'age'       => '41',
+            'bloodType' => 'O',
+            'phone'     => '+966500000001',
+            'diagnosis' => 'ESRD',
+            'notes'     => 'original note',
+        ]);
+
+        $this->post('recipients/8004', ['section' => 'notes', 'notes' => 'replaced']);
+
+        $this->seeInDatabase('recipients', [
+            'mrn'       => 8004,
+            'name'      => 'Ahmed Test',
+            'phone'     => '+966500000001',
+            'diagnosis' => 'ESRD',
+            'notes'     => 'replaced',
+        ]);
+    }
+
+    /**
+     * And the server keeps to the named card on its own, so a stale tab or a
+     * hand-made post cannot reach past the card it claims to be.
+     */
+    public function testAPostCannotReachPastTheCardItNames(): void
+    {
+        $this->post('recipients/new', [
+            'mrn'       => '8005',
+            'name'      => 'Ahmed Test',
+            'age'       => '41',
+            'bloodType' => 'O',
+            'diagnosis' => 'ESRD',
+        ]);
+
+        $this->post('recipients/8005', [
+            'section'   => 'notes',
+            'notes'     => 'a note',
+            'name'      => 'Should Not Land',
+            'diagnosis' => 'Should Not Land',
+        ]);
+
+        $this->seeInDatabase('recipients', [
+            'mrn'       => 8005,
+            'name'      => 'Ahmed Test',
+            'diagnosis' => 'ESRD',
+            'notes'     => 'a note',
+        ]);
+    }
+
+    /**
+     * An emptied box on an open card means the value was removed. It used to
+     * be indistinguishable from a field the form had not sent, so a wrong
+     * phone number could never be taken off a record.
+     */
+    public function testClearingAFieldOnAnOpenCardClearsTheColumn(): void
+    {
+        $this->post('recipients/new', [
+            'mrn'       => '8006',
+            'name'      => 'Ahmed Test',
+            'age'       => '41',
+            'bloodType' => 'O',
+            'phone'     => '+966500000001',
+        ]);
+
+        $this->post('recipients/8006', [
+            'section'   => 'personal',
+            'name'      => 'Ahmed Test',
+            'age'       => '41',
+            'bloodType' => 'O',
+            'phone'     => '',
+        ]);
+
+        $this->seeInDatabase('recipients', ['mrn' => 8006, 'phone' => null]);
+        // But a column that cannot be NULL keeps what it had: blanking a name
+        // is a slip, not an instruction.
+        $this->seeInDatabase('recipients', ['mrn' => 8006, 'name' => 'Ahmed Test']);
+    }
+
+    public function testAPairOpensWithEveryCardReadOnly(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn'       => '8010',
+            'dMrn'       => '8011',
+            'rName'      => 'Recipient Pair',
+            'rAge'       => '52',
+            'rBloodType' => 'A',
+            'dName'      => 'Donor Pair',
+            'dAge'       => '30',
+            'dBloodType' => 'A',
+        ]);
+
+        $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
+        $html   = $this->get('pairs/' . $pairId)->getBody();
+
+        // Pair details, and each person's information, workup and notes.
+        $this->assertSame(7, substr_count($html, 'class="card-fields" disabled'));
+        $this->assertSame(7, substr_count($html, 'class="btn-edit"'));
+        $this->assertStringNotContainsString('btn-save', $html);
+    }
+
+    /** Saving the pair's own card must not touch either person's record. */
+    public function testSavingThePairCardLeavesBothPeopleAlone(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn'       => '8012',
+            'dMrn'       => '8013',
+            'rName'      => 'Recipient Pair',
+            'rAge'       => '52',
+            'rBloodType' => 'A',
+            'rCity'      => 'Dammam',
+            'dName'      => 'Donor Pair',
+            'dAge'       => '30',
+            'dBloodType' => 'A',
+            'dCity'      => 'Dammam',
+        ]);
+
+        $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
+
+        $this->post('pairs/' . $pairId, [
+            'section'        => 'pair',
+            'relationship'   => 'Cousin',
+            'pairStatus'     => 'scheduled',
+            'crossmatchDate' => '11/11/2026',
+        ]);
+
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'scheduled', 'relationship' => 'Cousin']);
+        $this->seeInDatabase('recipients', ['mrn' => 8012, 'name' => 'Recipient Pair', 'city' => 'Dammam', 'age' => 52]);
+        // The donor keeps its own fields, but the relationship is the pair's,
+        // so the donors list stays in step with it.
+        $this->seeInDatabase('donors', ['mrn' => 8013, 'name' => 'Donor Pair', 'city' => 'Dammam', 'relationship' => 'Cousin']);
+    }
+
     // ---- The MRN is entered, never generated -------------------------------
 
     /**
@@ -472,10 +661,16 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
 
+        // One card at a time, which is how the screen now submits.
         $this->post('pairs/' . $pairId, [
+            'section'        => 'pair',
             'relationship'   => 'Spouse',
             'pairStatus'     => 'scheduled',
             'crossmatchDate' => '06/10/2026',
+        ]);
+
+        $this->post('pairs/' . $pairId, [
+            'section'        => 'recipient',
             'rName'          => 'Recipient Edited',
             'rAge'           => '53',
             'rBloodType'     => 'A',
@@ -483,13 +678,17 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'rGender'        => 'Male',
             'rMrp'           => (string) $this->mrpId,
             'rFirstDialysis' => '11/02/2023',
-            'dName'          => 'Donor Edited',
-            'dAge'           => '31',
-            'dBloodType'     => 'A',
-            'dGender'        => 'Female',
-            'dMrp'           => (string) $this->mrpId,
-            'dStatus'        => 'Completed',
-            'dCoordinator'   => 'Coordinator Three',
+        ]);
+
+        $this->post('pairs/' . $pairId, [
+            'section'      => 'donor',
+            'dName'        => 'Donor Edited',
+            'dAge'         => '31',
+            'dBloodType'   => 'A',
+            'dGender'      => 'Female',
+            'dMrp'         => (string) $this->mrpId,
+            'dStatus'      => 'Completed',
+            'dCoordinator' => 'Coordinator Three',
         ]);
 
         $this->seeInDatabase('pairs', [
@@ -524,6 +723,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $lab = $this->db->table('labs')->where('organ_code', 'kidney')->get()->getRowArray();
 
         $this->post('recipients/' . $mrn, [
+            'section'   => 'labs',
             'name'      => 'Ahmed Test',
             'age'       => '41',
             'bloodType' => 'O',

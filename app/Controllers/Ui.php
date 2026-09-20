@@ -34,6 +34,29 @@ class Ui extends BaseController
      */
     protected $helpers = ['url', 'form', 'auth', 'lang', 'ui'];
 
+    /**
+     * Which fields each card of a record screen owns.
+     *
+     * A saved record is edited one card at a time, and the cards that are not
+     * open render inside a disabled <fieldset>, so the browser posts only the
+     * open card's fields. This is the server's half of that: it applies only
+     * the fields the named card owns, so a form that arrives with anything
+     * else in it — a stale tab, a hand-made post — still cannot reach past the
+     * card it claims to be.
+     */
+    private const PERSON_SECTIONS = [
+        'personal' => [
+            'name', 'age', 'bloodType', 'phone', 'address', 'hospital', 'diagnosis',
+            'urgency', 'gender', 'selectedMrp', 'firstDialysis', 'donationType',
+            'relationship', 'donorGender', 'donorMrp', 'donorStatus', 'donorCoordinator',
+        ],
+        'labs'  => ['labTests'],
+        'notes' => ['notes'],
+    ];
+
+    /** The pair screen's cards: the pair itself, then each person's three. */
+    private const PAIR_SECTIONS = ['pair', 'recipient', 'rlabs', 'rnotes', 'donor', 'dlabs', 'dnotes'];
+
     private UiStore $store;
 
     public function initController(RequestInterface $request, ResponseInterface $response, LoggerInterface $logger): void
@@ -228,6 +251,9 @@ class Ui extends BaseController
             // Set when a save bounced back; the fields themselves come from
             // old() so nothing typed is lost.
             'error'      => (string) ($this->session->getFlashdata('ui_error') ?? ''),
+            // Which card the Edit link opened. A new record has no view mode,
+            // so every card on it is editable regardless.
+            'editing'    => $this->openSection(array_keys(self::PERSON_SECTIONS)),
             // The prototype highlighted a nav item only on the five top-level
             // screens; a record or pair sub-screen left the sidebar unhighlighted.
             'navPage'    => '',
@@ -311,7 +337,7 @@ class Ui extends BaseController
                 return redirect()->to(site_url('recipients/' . rawurlencode($mrn)));
             }
 
-            $this->store->updateRecipient($person['id'], $fields);
+            $this->store->updateRecipient($person['id'], $this->sectionFields($fields));
 
             return redirect()->to(site_url('recipients/' . rawurlencode($person['id'])));
         }
@@ -339,7 +365,7 @@ class Ui extends BaseController
             return redirect()->to(site_url('donors/' . rawurlencode($mrn)));
         }
 
-        $this->store->updateDonor($person['id'], $fields);
+        $this->store->updateDonor($person['id'], $this->sectionFields($fields));
 
         return redirect()->to(site_url('donors/' . rawurlencode($person['id'])));
     }
@@ -589,6 +615,7 @@ class Ui extends BaseController
             'donor'     => $donor,
             'mrps'      => $this->store->mrps(),
             'entryDate' => $recipient['dateRegistered'] ?? date('Y-m-d'),
+            'editing'   => $this->openSection(self::PAIR_SECTIONS),
             'rLabTests' => $recipient['labTests'] ?? [],
             'dLabTests' => $donor['labTests'] ?? [],
             'v'         => [
@@ -630,50 +657,74 @@ class Ui extends BaseController
      */
     private function updatePair(array $pair, ?array $recipient, ?array $donor): RedirectResponse
     {
-        $relationship = (string) $this->request->getPost('relationship');
+        $back    = redirect()->to(site_url('pairs/' . rawurlencode($pair['id'])));
+        $section = (string) $this->request->getPost('section');
+        $post    = fn (string $field): string => (string) $this->request->getPost($field);
 
-        $this->store->updatePair($pair['id'], [
-            'status'        => (string) $this->request->getPost('pairStatus'),
-            'scheduledDate' => (string) $this->request->getPost('crossmatchDate'),
-            'relationship'  => $relationship,
-        ]);
+        // One card at a time, so each branch writes only what its own card
+        // collects. Relationship sits on the pair and on the donor — the
+        // donors list shows it — so the pair card keeps the two in step.
+        if ($section === 'pair') {
+            $this->store->updatePair($pair['id'], [
+                'status'        => $post('pairStatus'),
+                'scheduledDate' => $post('crossmatchDate'),
+                'relationship'  => $post('relationship'),
+            ]);
 
-        if ($recipient !== null) {
+            if ($donor !== null) {
+                $this->store->updateDonor($donor['id'], ['relationship' => $post('relationship')]);
+            }
+
+            return $back;
+        }
+
+        if ($recipient !== null && $section === 'recipient') {
             $this->store->updateRecipient($recipient['id'], [
-                'name'          => (string) $this->request->getPost('rName'),
-                'age'           => (int) $this->request->getPost('rAge') ?: $recipient['age'],
-                'bloodType'     => (string) $this->request->getPost('rBloodType'),
-                'phone'         => (string) $this->request->getPost('rPhone'),
-                'address'       => (string) $this->request->getPost('rCity'),
-                'hospital'      => (string) $this->request->getPost('rHospital'),
-                'diagnosis'     => (string) $this->request->getPost('rDiagnosis'),
-                'urgency'       => (string) $this->request->getPost('rUrgency'),
-                'gender'        => (string) $this->request->getPost('rGender'),
-                'selectedMrp'   => (string) $this->request->getPost('rMrp'),
-                'firstDialysis' => (string) $this->request->getPost('rFirstDialysis'),
-                'notes'         => (string) $this->request->getPost('rNotes'),
-                'labTests'      => $this->postedLabTests('rLabs'),
+                'name'          => $post('rName'),
+                'age'           => (int) $post('rAge') ?: $recipient['age'],
+                'bloodType'     => $post('rBloodType'),
+                'phone'         => $post('rPhone'),
+                'address'       => $post('rCity'),
+                'hospital'      => $post('rHospital'),
+                'diagnosis'     => $post('rDiagnosis'),
+                'urgency'       => $post('rUrgency'),
+                'gender'        => $post('rGender'),
+                'selectedMrp'   => $post('rMrp'),
+                'firstDialysis' => $post('rFirstDialysis'),
             ]);
         }
 
-        if ($donor !== null) {
+        if ($recipient !== null && $section === 'rlabs') {
+            $this->store->updateRecipient($recipient['id'], ['labTests' => $this->postedLabTests('rLabs')]);
+        }
+
+        if ($recipient !== null && $section === 'rnotes') {
+            $this->store->updateRecipient($recipient['id'], ['notes' => $post('rNotes')]);
+        }
+
+        if ($donor !== null && $section === 'donor') {
             $this->store->updateDonor($donor['id'], [
-                'name'             => (string) $this->request->getPost('dName'),
-                'age'              => (int) $this->request->getPost('dAge') ?: $donor['age'],
-                'bloodType'        => (string) $this->request->getPost('dBloodType'),
-                'phone'            => (string) $this->request->getPost('dPhone'),
-                'address'          => (string) $this->request->getPost('dCity'),
-                'notes'            => (string) $this->request->getPost('dNotes'),
-                'relationship'     => $relationship,
-                'donorGender'      => (string) $this->request->getPost('dGender'),
-                'donorMrp'         => (string) $this->request->getPost('dMrp'),
-                'donorStatus'      => (string) $this->request->getPost('dStatus'),
-                'donorCoordinator' => (string) $this->request->getPost('dCoordinator'),
-                'labTests'         => $this->postedLabTests('dLabs'),
+                'name'             => $post('dName'),
+                'age'              => (int) $post('dAge') ?: $donor['age'],
+                'bloodType'        => $post('dBloodType'),
+                'phone'            => $post('dPhone'),
+                'address'          => $post('dCity'),
+                'donorGender'      => $post('dGender'),
+                'donorMrp'         => $post('dMrp'),
+                'donorStatus'      => $post('dStatus'),
+                'donorCoordinator' => $post('dCoordinator'),
             ]);
         }
 
-        return redirect()->to(site_url('pairs/' . rawurlencode($pair['id'])));
+        if ($donor !== null && $section === 'dlabs') {
+            $this->store->updateDonor($donor['id'], ['labTests' => $this->postedLabTests('dLabs')]);
+        }
+
+        if ($donor !== null && $section === 'dnotes') {
+            $this->store->updateDonor($donor['id'], ['notes' => $post('dNotes')]);
+        }
+
+        return $back;
     }
 
     // ---- MRPs --------------------------------------------------------------
@@ -704,6 +755,42 @@ class Ui extends BaseController
     }
 
     // ---- Shared ------------------------------------------------------------
+
+    /**
+     * The card a record screen was asked to open for editing.
+     *
+     * '' — the screen's own default — is every card read-only. An unknown name
+     * is the same as none, so a mistyped link opens the record rather than an
+     * error.
+     *
+     * @param list<string> $known
+     */
+    private function openSection(array $known): string
+    {
+        $section = (string) ($this->request->getGet('edit') ?? '');
+
+        return in_array($section, $known, true) ? $section : '';
+    }
+
+    /**
+     * Narrows a screen's posted fields to the ones the card it came from owns.
+     *
+     * @param array<string, mixed> $fields
+     *
+     * @return array<string, mixed>
+     */
+    private function sectionFields(array $fields): array
+    {
+        $section = (string) $this->request->getPost('section');
+        $owned   = self::PERSON_SECTIONS[$section] ?? [];
+
+        // `type` and `organ` say which register the row is in, not what the
+        // card collects, so every save carries them.
+        return array_intersect_key(
+            $fields,
+            array_flip([...$owned, 'type', 'organ'])
+        );
+    }
 
     /**
      * Checks a medical record number typed on a form.

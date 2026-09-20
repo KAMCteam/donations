@@ -102,6 +102,18 @@ final class UiStore
         'completed' => 'Completed',
     ];
 
+    /**
+     * The columns an empty field may clear.
+     *
+     * Everything on `recipients` and `donors` that the migrations declare
+     * nullable. The rest — name, blood group, the organ, the entry date — is
+     * NOT NULL, so an empty box there is a slip and the stored value stands.
+     */
+    private const NULLABLE_COLUMNS = [
+        'gender', 'age', 'city', 'phone', 'hospital', 'diagnosis',
+        'dialysis_start', 'mrp_id', 'coordinator_id', 'relationship', 'notes',
+    ];
+
     private Session $session;
     private RecipientModel $recipients;
     private DonorModel $donors;
@@ -566,8 +578,23 @@ final class UiStore
         $row = [];
 
         foreach ($map as $uiKey => $column) {
-            if (array_key_exists($uiKey, $ui) && $ui[$uiKey] !== '') {
+            if (! array_key_exists($uiKey, $ui)) {
+                continue;
+            }
+
+            if ($ui[$uiKey] !== '') {
                 $row[$column] = $ui[$uiKey];
+
+                continue;
+            }
+
+            // An emptied box on a card that was open for editing means the
+            // value was removed, so a nullable column is cleared rather than
+            // left as it was — otherwise a wrong phone number could never be
+            // taken off a record. A column that cannot be NULL keeps what it
+            // had: blanking a name is a mistake, not an instruction.
+            if (in_array($column, self::NULLABLE_COLUMNS, true)) {
+                $row[$column] = null;
             }
         }
 

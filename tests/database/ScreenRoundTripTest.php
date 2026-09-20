@@ -717,6 +717,115 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertNotNull($row['coordinator_id']);
     }
 
+    // ---- Donor type --------------------------------------------------------
+
+    /**
+     * Registering a donor alone can only ask living or deceased: whether a
+     * living donor is related is a question about them and a recipient, and
+     * there is no recipient on this screen.
+     */
+    public function testAddDonorAsksLivingOrDeceased(): void
+    {
+        $html = $this->get('donors/new')->getBody();
+
+        $this->assertStringContainsString('name="donationType"', $html);
+        // Whichever is selected carries an extra attribute, so match the
+        // option's opening and its label rather than the whole tag.
+        $this->assertMatchesRegularExpression('/<option value="living"[^>]*>Living</', $html);
+        $this->assertMatchesRegularExpression('/<option value="deceased"[^>]*>Deceased</', $html);
+        $this->assertStringNotContainsString('value="living_related"', $html);
+        $this->assertStringNotContainsString('value="living_unrelated"', $html);
+    }
+
+    /** On a pair the recipient is known, so the finer question can be asked. */
+    public function testAddPairAsksRelatedOrUnrelated(): void
+    {
+        $html = $this->get('pairs/new')->getBody();
+
+        $this->assertStringContainsString('name="dType"', $html);
+        $this->assertMatchesRegularExpression('/<option value="living_related"[^>]*>Living Related</', $html);
+        $this->assertMatchesRegularExpression('/<option value="living_unrelated"[^>]*>Living Unrelated</', $html);
+        $this->assertMatchesRegularExpression('/<option value="deceased"[^>]*>Deceased</', $html);
+        // "Living" on its own is what a donor registered alone holds; it is not
+        // one of the answers here.
+        $this->assertDoesNotMatchRegularExpression('/<option value="living"[^>]*>/', $html);
+    }
+
+    public function testTheTypeChosenOnEitherScreenIsStored(): void
+    {
+        $this->post('donors/new', [
+            'mrn'          => '6001',
+            'name'         => 'Deceased Donor',
+            'age'          => '40',
+            'bloodType'    => 'O',
+            'donationType' => 'deceased',
+        ]);
+        $this->seeInDatabase('donors', ['mrn' => 6001, 'donation_type' => 'deceased']);
+
+        $this->post('pairs/new', [
+            'rMrn' => '6100', 'dMrn' => '6101',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
+            'dType' => 'living_unrelated',
+        ]);
+        $this->seeInDatabase('donors', ['mrn' => 6101, 'donation_type' => 'living_unrelated']);
+    }
+
+    /**
+     * A donor registered from a pair holds a value the register screen does
+     * not offer, so that screen shows the full list once there is a record —
+     * otherwise opening it would silently downgrade them to Living.
+     */
+    public function testASavedRecordKeepsATypeTheAddScreenCannotOffer(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '6102', 'dMrn' => '6103',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
+            'dType' => 'living_related',
+        ]);
+
+        $html = $this->get('donors/6103?edit=personal')->getBody();
+        $this->assertStringContainsString('<option value="living_related" selected>', $html);
+
+        // And saving that card back leaves it where it was.
+        $this->post('donors/6103', [
+            'section'      => 'personal',
+            'name'         => 'D',
+            'age'          => '30',
+            'bloodType'    => 'A',
+            'donationType' => 'living_related',
+        ]);
+        $this->seeInDatabase('donors', ['mrn' => 6103, 'donation_type' => 'living_related']);
+    }
+
+    public function testATypeOutsideTheListIsIgnored(): void
+    {
+        $this->post('donors/new', [
+            'mrn'          => '6004',
+            'name'         => 'Donor',
+            'age'          => '40',
+            'bloodType'    => 'O',
+            'donationType' => 'nonsense',
+        ]);
+
+        $this->seeInDatabase('donors', ['mrn' => 6004, 'donation_type' => 'living']);
+    }
+
+    /** The lists show the label, not the key. */
+    public function testTheDonorsListShowsTheTypeLabel(): void
+    {
+        $this->post('donors/new', [
+            'mrn'          => '6005',
+            'name'         => 'Donor',
+            'age'          => '40',
+            'bloodType'    => 'O',
+            'donationType' => 'deceased',
+        ]);
+
+        $this->assertStringContainsString('>Deceased</span>', $this->get('donors')->getBody());
+    }
+
     // ---- Status: one value, two screens ------------------------------------
 
     public function testTheRecipientStatusOffersTheAgreedList(): void

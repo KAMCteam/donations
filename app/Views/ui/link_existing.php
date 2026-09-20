@@ -3,6 +3,8 @@
 <?= $this->section('content') ?>
 <?php
 
+use App\Libraries\UiStore;
+
 /**
  * Pick the other half of a pair from those already registered.
  *
@@ -76,7 +78,7 @@ $headers     = $isDonorList
                                 <td><?= esc($isDonorList ? $candidate['donorGender'] : $candidate['gender']) ?></td>
                                 <td class="mono"><?= esc($candidate['bloodType']) ?></td>
                                 <?php if ($isDonorList): ?>
-                                    <td><span class="badge <?= $candidate['donationType'] === 'living' ? 'tone-teal-soft' : 'tone-slate' ?>"><?= esc($candidate['donationType']) ?></span></td>
+                                    <td><span class="badge <?= str_starts_with($candidate['donationType'], 'living') ? 'tone-teal-soft' : 'tone-slate' ?>"><?= esc(UiStore::DONATION_TYPES[$candidate['donationType']] ?? $candidate['donationType']) ?></span></td>
                                 <?php else: ?>
                                     <td><?= $candidate['urgent'] ? '<span class="badge tone-red">Urgent</span>' : '&mdash;' ?></td>
                                 <?php endif; ?>

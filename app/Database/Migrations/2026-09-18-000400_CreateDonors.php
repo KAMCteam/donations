@@ -64,9 +64,14 @@ class CreateDonors extends Migration
             // A deceased donor has no consent conversation, no relationship to
             // a recipient and no follow-up; the two behave differently enough
             // that the register is filtered on this.
+            //
+            // Whether a living donor is related to the recipient is a question
+            // about the two of them together, so it can only be answered on a
+            // pair screen. Registering a donor alone records `living`, which is
+            // the same kind of donation with that part not yet known.
             'donation_type' => [
                 'type'       => 'ENUM',
-                'constraint' => ['living', 'deceased'],
+                'constraint' => ['living', 'living_related', 'living_unrelated', 'deceased'],
                 'default'    => 'living',
             ],
             // How they relate to the person they are donating to, when known

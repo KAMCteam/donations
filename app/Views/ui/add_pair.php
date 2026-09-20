@@ -247,6 +247,16 @@ foreach ($v as $field => $value) {
                         <input type="text" id="f-d-coordinator" name="dCoordinator" class="input" value="<?= esc($v['dCoordinator']) ?>" placeholder="Choose Coordinator">
                     </div>
                     <div>
+                        <?php // The recipient is on this screen, so the finer question can
+                              // be asked here: whether a living donor is related to them. ?>
+                        <label class="field-label" for="f-d-type">Donor Type</label>
+                        <select id="f-d-type" name="dType" class="input">
+                            <?php foreach (UiStore::DONATION_TYPES_ON_PAIR as $value): ?>
+                                <option value="<?= esc($value) ?>"<?= $v['dType'] === $value ? ' selected' : '' ?>><?= esc(UiStore::DONATION_TYPES[$value]) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
                         <label class="field-label" for="f-d-status">Donor Status</label>
                         <select id="f-d-status" name="dStatus" class="input">
                             <?php foreach (UiStore::DONOR_STATUS_OPTIONS as $value => $label): ?>

@@ -245,6 +245,19 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                             <input type="text" id="f-donor-coordinator" name="donorCoordinator" class="input" value="<?= esc($v['donorCoordinator']) ?>" placeholder="Choose Coordinator">
                         </div>
                         <div>
+                            <?php // Living or deceased is all this screen can ask: whether a
+                                  // living donor is related is a question about them and a
+                                  // recipient, and there is no recipient here. A saved record
+                                  // offers the full list, so a "Living Related" set on a pair
+                                  // screen is not silently downgraded by opening this one. ?>
+                            <label class="field-label" for="f-donation-type">Donor Type</label>
+                            <select id="f-donation-type" name="donationType" class="input">
+                                <?php foreach ($mode === 'add' ? UiStore::DONATION_TYPES_ON_REGISTER : array_keys(UiStore::DONATION_TYPES) as $value): ?>
+                                    <option value="<?= esc($value) ?>"<?= $v['donationType'] === $value ? ' selected' : '' ?>><?= esc(UiStore::DONATION_TYPES[$value]) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div>
                             <label class="field-label" for="f-donor-status">Donor Status</label>
                             <select id="f-donor-status" name="donorStatus" class="input">
                                 <?php foreach (UiStore::DONOR_STATUS_OPTIONS as $value => $label): ?>

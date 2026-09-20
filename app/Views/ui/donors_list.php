@@ -51,7 +51,7 @@ $headers = ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs'];
                             <td><?= esc($donor['age']) ?></td>
                             <td><?= esc($donor['donorGender']) ?></td>
                             <td class="mono"><?= esc($donor['bloodType']) ?></td>
-                            <td><span class="badge <?= $donor['donationType'] === 'living' ? 'tone-teal-soft' : 'tone-slate' ?>"><?= esc($donor['donationType']) ?></span></td>
+                            <td><span class="badge <?= str_starts_with($donor['donationType'], 'living') ? 'tone-teal-soft' : 'tone-slate' ?>"><?= esc(UiStore::DONATION_TYPES[$donor['donationType']] ?? $donor['donationType']) ?></span></td>
                             <td class="mono"><?= $progress['done'] ?>/<?= $progress['total'] ?></td>
                         </tr>
                     <?php endforeach; ?>

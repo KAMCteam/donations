@@ -94,6 +94,28 @@ final class UiStore
 
     public const GENDER_OPTIONS = ['Male' => 'Male', 'Female' => 'Female'];
 
+    /**
+     * What kind of donation this is, and the two lists the screens ask it with.
+     *
+     * Relatedness is a question about a donor *and a recipient*, so it can only
+     * be answered where both are in view. Registering a donor on their own asks
+     * the part that can be known — living or deceased — and the pair screens,
+     * where the recipient is right there, ask the finer question. `living` is
+     * therefore "living, relatedness not recorded yet", not a fourth kind.
+     */
+    public const DONATION_TYPES = [
+        'living'           => 'Living',
+        'living_related'   => 'Living Related',
+        'living_unrelated' => 'Living Unrelated',
+        'deceased'         => 'Deceased',
+    ];
+
+    /** Add Donor: no recipient in view. */
+    public const DONATION_TYPES_ON_REGISTER = ['living', 'deceased'];
+
+    /** Add Pair and the pair profile: the recipient is known. */
+    public const DONATION_TYPES_ON_PAIR = ['living_related', 'living_unrelated', 'deceased'];
+
     public const DONOR_STATUS_OPTIONS = [
         'On Hold'   => 'On Hold',
         'Active'    => 'Active',
@@ -597,13 +619,17 @@ final class UiStore
             'name' => 'name', 'age' => 'age', 'bloodType' => 'blood_group',
             'phone' => 'phone', 'address' => 'city',
             'notes' => 'notes', 'organ' => 'organ_code', 'donorMrp' => 'mrp_id',
-            'donationType' => 'donation_type', 'relationship' => 'relationship',
+            'relationship' => 'relationship',
         ];
 
         $row = $this->mapFields($ui, $map);
 
         if (($ui['donorGender'] ?? '') !== '') {
             $row['gender'] = $this->genderToRow($ui['donorGender']);
+        }
+
+        if ($this->donationTypeKey((string) ($ui['donationType'] ?? '')) !== '') {
+            $row['donation_type'] = $ui['donationType'];
         }
 
         // An absent or empty control means the screen did not offer the field,
@@ -800,6 +826,12 @@ final class UiStore
     private function statusKey(string $status): string
     {
         return isset(self::STATUS_OPTIONS[$status]) ? $status : '';
+    }
+
+    /** The same, for the donation type: both columns are ENUMs. */
+    private function donationTypeKey(string $type): string
+    {
+        return isset(self::DONATION_TYPES[$type]) ? $type : '';
     }
 
     /** "2026-01-15" -> "15/01/2026" */

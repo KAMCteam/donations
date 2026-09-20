@@ -188,6 +188,25 @@ if it is new.
 column was only ever filled from the recipient form's Hospital box, so with
 that gone nothing could write it and nothing showed it.
 
+### Donor type
+
+What kind of donation this is, asked with the list the screen can actually
+answer:
+
+| Screen | Offers |
+| --- | --- |
+| Add Donor | Living · Deceased |
+| Add Pair, pair profile | Living Related · Living Unrelated · Deceased |
+
+Relatedness is a question about a donor *and* a recipient, so it can only be
+answered where both are in view. Registering a donor on their own records
+`living`, which is the same kind of donation with that part not yet known —
+not a fourth kind. One column, `donation_type`, holds all four.
+
+A saved donor record offers the full list rather than the two the add screen
+asks, so a donor registered through a pair as Living Related is not silently
+downgraded to Living by someone opening their record.
+
 ### Status is one value, on two screens
 
 A recipient's status and the Match Status of the pair they are in are the same

@@ -1296,6 +1296,64 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('coordinators', ['name' => 'Coordinator Three']);
     }
 
+    // ---- The dashboard's per-doctor statistic ------------------------------
+
+    /**
+     * The last statistic counts one physician's recipients, not the programme's.
+     *
+     * Which physician is a dropdown, and choosing one is a GET — so the count
+     * follows the choice with JavaScript off, the same as with it on.
+     */
+    public function testTheDashboardCountsRecipientsForTheChosenDoctor(): void
+    {
+        $this->db->table('mrp')->insert(['code' => 'MRP-002', 'name' => 'Dr. Second']);
+        $second = (int) $this->db->insertID();
+
+        // Two under the first physician, one under the second.
+        foreach ([['5001', (string) $this->mrpId], ['5002', (string) $this->mrpId], ['5003', (string) $second]] as [$mrn, $mrp]) {
+            $this->post('recipients/new', [
+                'mrn' => $mrn, 'name' => 'Recipient ' . $mrn, 'age' => '40',
+                'bloodType' => 'A', 'selectedMrp' => $mrp,
+            ]);
+        }
+
+        $html = $this->get('dashboard?mrp=' . $this->mrpId)->getBody();
+        $this->assertStringContainsString('Number of Recipients for', $html);
+        $this->assertStringContainsString('>Dr. Test</option>', $html);
+        $this->assertSame(2, $this->countFor($html));
+
+        $this->assertSame(1, $this->countFor($this->get('dashboard?mrp=' . $second)->getBody()));
+
+        // Active / Scheduled was the programme-wide row this replaced.
+        $this->assertStringNotContainsString('Active / Scheduled', $html);
+    }
+
+    /** Nothing chosen, or something chosen that is gone, falls back sensibly. */
+    public function testTheDoctorStatisticFallsBackToTheFirstOnTheList(): void
+    {
+        $this->post('recipients/new', [
+            'mrn' => '5004', 'name' => 'Recipient', 'age' => '40',
+            'bloodType' => 'A', 'selectedMrp' => (string) $this->mrpId,
+        ]);
+
+        // No `?mrp=` at all, and an id belonging to nobody, both land on the
+        // first physician rather than on a count belonging to no one.
+        foreach (['dashboard', 'dashboard?mrp=999999', 'dashboard?mrp=nonsense'] as $url) {
+            $html = $this->get($url)->getBody();
+            $this->assertStringContainsString('value="' . $this->mrpId . '" selected', $html, $url);
+            $this->assertSame(1, $this->countFor($html), $url);
+        }
+    }
+
+    /** The number printed beside the doctor's name. */
+    private function countFor(string $html): int
+    {
+        $tail = substr($html, strrpos($html, 'Number of Recipients for') ?: 0);
+        preg_match('~<span class="stat-value">(\d+)</span>~', $tail, $m);
+
+        return (int) ($m[1] ?? -1);
+    }
+
     // ---- Deleting from a list --------------------------------------------
 
     /** Every list offers it, at the end of the row. */

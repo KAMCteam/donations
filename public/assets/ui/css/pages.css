@@ -483,6 +483,39 @@
 /* =========================================================
    Pairs List table  (src/pages/PairsList.tsx)
    ========================================================= */
+/* The dashboard's per-doctor statistic: a sentence with a dropdown in it,
+   sitting where the other rows have a plain label. */
+.stat-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.stat-select {
+  padding: 0.125rem 1.5rem 0.125rem 0.5rem;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-lg);
+  background-color: #fff;
+  color: var(--slate-800);
+  font: inherit;
+  font-weight: 600;
+  max-width: 14rem;
+}
+
+.stat-go {
+  padding: 0.125rem 0.625rem;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-lg);
+  background-color: #fff;
+  color: var(--slate-600);
+  font: inherit;
+  cursor: pointer;
+}
+
+.stat-link { color: #15508A; text-decoration: underline; }
+
 .filter-stack {
   display: flex;
   flex-direction: column;

@@ -355,6 +355,24 @@ final class UiStore
         );
     }
 
+    /**
+     * How many recipients this programme has under one physician.
+     *
+     * Counted in SQL rather than by filtering the list, because the dashboard
+     * only wants the number and the list is everything but.
+     */
+    public function recipientCountForMrp(?string $mrpId): int
+    {
+        if ($mrpId === null || $mrpId === '' || ! ctype_digit($mrpId)) {
+            return 0;
+        }
+
+        return $this->recipients
+            ->where('organ_code', $this->organ())
+            ->where('mrp_id', (int) $mrpId)
+            ->countAllResults();
+    }
+
     public function findRecipient(?string $id): ?array
     {
         $row = $this->rowFor($this->recipients, $id);

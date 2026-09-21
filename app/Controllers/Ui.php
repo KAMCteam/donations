@@ -145,24 +145,33 @@ class Ui extends BaseController
 
         // The same query the waiting list uses, so the dashboard's idea of
         // "most urgent" cannot drift from the screen it links to.
-        $waiting     = $this->store->waitingList();
-        $activePairs = array_filter(
-            $pairs,
-            static fn (array $p): bool => in_array($p['status'], ['active', 'scheduled'], true)
-        );
+        $waiting = $this->store->waitingList();
+
+        // The physician the last stat is about. `?mrp=` chooses; with nothing
+        // chosen, or something chosen that is no longer on the list, it falls
+        // back to the first rather than showing a count belonging to nobody.
+        $mrps        = $this->store->mrps();
+        $mrpIds      = array_column($mrps, 'id');
+        $selectedMrp = (string) $this->request->getGet('mrp');
+
+        if (! in_array($selectedMrp, $mrpIds, true)) {
+            $selectedMrp = $mrpIds[0] ?? '';
+        }
 
         return view('ui/dashboard', [
-            'title'     => ucfirst($organ) . ' Transplant Program',
-            'navPage'   => 'dashboard',
-            'organ'     => $organ,
-            'stats'     => [
+            'title'       => ucfirst($organ) . ' Transplant Program',
+            'navPage'     => 'dashboard',
+            'organ'       => $organ,
+            'stats'       => [
                 'total'     => count($recipients),
                 'unmatched' => count($waiting),
                 'pairs'     => count($pairs),
-                'active'    => count($activePairs),
+                'mrp'       => $this->store->recipientCountForMrp($selectedMrp),
             ],
-            'maxBar'    => max(count($recipients), count($pairs), 1),
-            'topUrgent' => array_slice($waiting, 0, 3),
+            'maxBar'      => max(count($recipients), count($pairs), 1),
+            'topUrgent'   => array_slice($waiting, 0, 3),
+            'mrps'        => $mrps,
+            'selectedMrp' => $selectedMrp,
         ]);
     }
 

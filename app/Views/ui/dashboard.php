@@ -14,16 +14,23 @@ use App\Libraries\UiStore;
  * animated on mount). Switching programme is a link rather than a click
  * handler, so the numbers come back already recomputed.
  *
- * @var string                                                     $organ
- * @var array{total: int, unmatched: int, pairs: int, active: int}  $stats
- * @var int                                                        $maxBar
- * @var list<array<string, mixed>>                                 $topUrgent
+ * The last statistic is about one physician rather than the programme, and
+ * which one is a dropdown in its own label — so the row reads as a sentence
+ * with a blank in it. Choosing reloads the dashboard with `?mrp=`, which is
+ * what makes it work with JavaScript off; `ui.js` only saves the extra click
+ * on the Show button.
+ *
+ * @var string                                                  $organ
+ * @var array{total: int, unmatched: int, pairs: int, mrp: int} $stats
+ * @var int                                                     $maxBar
+ * @var list<array<string, mixed>>                              $topUrgent
+ * @var list<array{id: string, name: string}>                   $mrps
+ * @var string                                                  $selectedMrp
  */
 $rows = [
-    ['key' => 'total',     'label' => 'Total Recipients',      'color' => '#15508A'],
-    ['key' => 'unmatched', 'label' => 'Waitlist (unmatched)',  'color' => '#2563eb'],
-    ['key' => 'pairs',     'label' => 'Linked Pairs',          'color' => '#0f766e'],
-    ['key' => 'active',    'label' => 'Active / Scheduled',    'color' => '#b45309'],
+    ['key' => 'total',     'label' => 'Total Recipients',     'color' => '#15508A'],
+    ['key' => 'unmatched', 'label' => 'Waitlist (unmatched)', 'color' => '#2563eb'],
+    ['key' => 'pairs',     'label' => 'Linked Pairs',         'color' => '#0f766e'],
 ];
 
 $actions = [
@@ -70,6 +77,30 @@ $actions = [
                         </div>
                     </div>
                 <?php endforeach; ?>
+
+                <?php // Number of Recipients for (Doctor's name). ?>
+                <div>
+                    <div class="stat-row-head">
+                        <?php if ($mrps === []): ?>
+                            <span class="stat-label">Number of Recipients for &mdash; <a class="stat-link" href="<?= site_url('mrp') ?>">add a doctor first</a></span>
+                        <?php else: ?>
+                            <form class="stat-label stat-picker" method="get" action="<?= site_url('dashboard') ?>">
+                                <label for="stat-mrp">Number of Recipients for</label>
+                                <select id="stat-mrp" name="mrp" class="stat-select" data-auto-submit>
+                                    <?php foreach ($mrps as $mrp): ?>
+                                        <option value="<?= esc($mrp['id']) ?>"<?= $mrp['id'] === $selectedMrp ? ' selected' : '' ?>><?= esc($mrp['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <?php // Only needed where the select cannot submit itself. ?>
+                                <button type="submit" class="stat-go">Show</button>
+                            </form>
+                        <?php endif; ?>
+                        <span class="stat-value"><?= $stats['mrp'] ?></span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-fill" style="width:<?= (int) round($stats['mrp'] / $maxBar * 100) ?>%;background-color:#b45309"></div>
+                    </div>
+                </div>
             </div>
         </div>
 

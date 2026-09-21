@@ -297,6 +297,23 @@
     });
   }
 
+  /* ---- A select that reloads with its own choice ------------------------ */
+
+  /* The dashboard's per-doctor statistic is a GET form: choosing a name and
+     pressing Show reloads the page with `?mrp=`. Where this runs, changing
+     the name is enough and the button hides, since it has nothing left to do. */
+  function initAutoSubmit() {
+    document.querySelectorAll("[data-auto-submit]").forEach(function (select) {
+      var form = select.form;
+      if (!form) return;
+
+      select.addEventListener("change", function () { form.submit(); });
+
+      var button = form.querySelector('button[type="submit"]');
+      if (button) button.hidden = true;
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initSidebar();
     initRowLinks();
@@ -304,5 +321,6 @@
     initDateFields();
     initDialogs();
     initConfirmDelete();
+    initAutoSubmit();
   });
 })();

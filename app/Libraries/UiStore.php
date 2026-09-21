@@ -7,6 +7,7 @@ use App\Models\DonorModel;
 use App\Models\LabModel;
 use App\Models\LabResultModel;
 use App\Models\MrpModel;
+use App\Models\OrganProgramModel;
 use App\Models\PairModel;
 use App\Models\RecipientModel;
 use CodeIgniter\Model;
@@ -227,6 +228,7 @@ final class UiStore
     private CoordinatorModel $coordinators;
     private LabModel $labs;
     private LabResultModel $labResults;
+    private OrganProgramModel $programs;
 
     public function __construct(?Session $session = null)
     {
@@ -238,6 +240,7 @@ final class UiStore
         $this->coordinators = model(CoordinatorModel::class);
         $this->labs         = model(LabModel::class);
         $this->labResults   = model(LabResultModel::class);
+        $this->programs     = model(OrganProgramModel::class);
     }
 
     /** Signs out: clears the session keys, never the records. */
@@ -253,6 +256,14 @@ final class UiStore
         $organ = $this->session->get('ui_organ');
 
         return in_array($organ, self::ORGANS, true) ? $organ : 'kidney';
+    }
+
+    /** The programme's name as the picker shows it, for a title or a header. */
+    public function organLabel(): string
+    {
+        $row = $this->programs->find($this->organ());
+
+        return (string) ($row['label'] ?? ucfirst($this->organ()));
     }
 
     public function setOrgan(string $organ): void

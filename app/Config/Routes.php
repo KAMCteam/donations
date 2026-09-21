@@ -49,7 +49,7 @@ $routes->match(['get', 'post'], 'donors/(:segment)/link/existing', 'Ui::linkDono
 $routes->match(['get', 'post'], 'donors/(:segment)', 'Ui::donor/$1');
 
 $routes->get('pairs', 'Ui::pairs');
-$routes->get('pairs/export', 'Ui::exportPairs');
+$routes->get('pairs/print', 'Ui::printPairs');
 $routes->match(['get', 'post'], 'pairs/new', 'Ui::addPair');
 $routes->match(['get', 'post'], 'pairs/(:segment)', 'Ui::pair/$1');
 

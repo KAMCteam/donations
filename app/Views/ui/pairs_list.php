@@ -9,10 +9,10 @@ use App\Libraries\UiStore;
  * Pairs register. Was `js/pages/pairs-list.js`.
  *
  * Each pair still occupies two rows sharing a rowspan'd pair number, the
- * alternating row background is still written inline, and "Export CSV" still
- * downloads the filtered set — it is a link to `ui/pairs/export` now, so the
- * file is built from the same rows the table shows rather than re-derived in
- * the browser.
+ * alternating row background is still written inline, and the export still
+ * covers the filtered set — as a printable sheet at `pairs/print` now rather
+ * than a CSV, built from the same rows the table shows rather than re-derived
+ * in the browser.
  *
  * @var list<array{pair: array<string, mixed>, recipient: array<string, mixed>|null, donor: array<string, mixed>|null}> $rows
  * @var string $btFilter
@@ -58,7 +58,7 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
             <p class="page-subtitle"><?= esc(ui_plural(count($rows), 'pair')) ?></p>
         </div>
         <div class="header-actions">
-            <a class="btn-outline" href="<?= site_url('pairs/export') . '?' . http_build_query(['bt' => $btFilter, 'status' => $statusFilter]) ?>"><?= ui_icon('download') ?>Export CSV</a>
+            <a class="btn-outline" href="<?= site_url('pairs/print') . '?' . http_build_query(['bt' => $btFilter, 'status' => $statusFilter]) ?>" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
             <a class="btn-primary" href="<?= site_url('pairs/new') ?>"><?= ui_icon('plus') ?>Add Pair</a>
         </div>
     </div>
@@ -110,7 +110,10 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                             <td class="t-medium t-800"><?= esc($recipient['name'] ?? $dash) ?></td>
                             <td class="t-700"><?= esc($recipient['age'] ?? $dash) ?></td>
                             <td><span class="role-tag tone-blue-soft">recipient</span></td>
-                            <td rowspan="2" class="cell-span cell-rel"><?= esc(($pair['notes'] ?? '') !== '' ? $pair['notes'] : $dash) ?></td>
+                            <?php // Relationship is the pair's own column. It used to print
+                                  // the note here, which put the same text in two columns
+                                  // and left Relationship blank whenever nobody wrote a note. ?>
+                            <td rowspan="2" class="cell-span cell-rel"><?= esc($orDash((string) ($pair['relationship'] ?? ''))) ?></td>
                             <td class="t-mono t-semibold t-700"><?= esc($recipient['bloodType'] ?? $dash) ?></td>
                             <td class="t-600"><?= esc($mrpName($recipient['selectedMrp'] ?? '')) ?></td>
                             <td class="t-600"><?= esc($recipient['gender'] ?? $dash) ?></td>

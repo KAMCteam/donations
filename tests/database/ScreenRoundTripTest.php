@@ -1278,6 +1278,60 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('coordinators', ['name' => 'Coordinator Three']);
     }
 
+    // ---- The printed sheet -----------------------------------------------
+
+    /**
+     * Export is a sheet to print, not a file to open in a spreadsheet.
+     *
+     * It shows the same pairs the table does, narrowed the same way, and it
+     * carries nothing that only means something on screen.
+     */
+    public function testTheExportIsAPrintableSheetOfTheFilteredPairs(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9101', 'dMrn' => '9102',
+            'rName' => 'Recipient One', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Donor One', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+        $this->post('pairs/new', [
+            'rMrn' => '9103', 'dMrn' => '9104',
+            'rName' => 'Recipient Two', 'rAge' => '50', 'rBloodType' => 'O',
+            'dName' => 'Donor Two', 'dAge' => '35', 'dBloodType' => 'O',
+        ]);
+
+        $html = $this->get('pairs/print')->getBody();
+
+        $this->assertStringContainsString('Pairs List &mdash; Kidney Programme', $html);
+        $this->assertStringContainsString('All pairs', $html);
+        $this->assertStringContainsString('Recipient One', $html);
+        $this->assertStringContainsString('Donor Two', $html);
+
+        // Its own document: no sidebar, no chips, and a stylesheet for paper.
+        $this->assertStringContainsString('assets/ui/css/print.css', $html);
+        $this->assertStringNotContainsString('class="sidebar', $html);
+        $this->assertStringNotContainsString('class="chip', $html);
+
+        // A pair is one block, so a page break cannot land between a
+        // recipient and the donor they are matched to.
+        $this->assertSame(2, substr_count($html, '<tbody class="pair">'));
+
+        // The filters narrow the sheet exactly as they narrow the table.
+        $filtered = $this->get('pairs/print?bt=A')->getBody();
+        $this->assertStringContainsString('Blood type A', $filtered);
+        $this->assertStringContainsString('Recipient One', $filtered);
+        $this->assertStringNotContainsString('Recipient Two', $filtered);
+    }
+
+    /** The list links to the sheet, and no longer to a CSV. */
+    public function testThePairsListOffersThePdfExport(): void
+    {
+        $html = $this->get('pairs')->getBody();
+
+        $this->assertStringContainsString('Export PDF', $html);
+        $this->assertStringContainsString(site_url('pairs/print'), $html);
+        $this->assertStringNotContainsString('Export CSV', $html);
+    }
+
     // ---- Lab workup ------------------------------------------------------
 
     public function testALabResultEnteredOnARecordIsStored(): void

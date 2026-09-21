@@ -398,41 +398,56 @@ class Ui extends BaseController
     }
 
     /**
-     * "Export CSV" — the same columns the prototype's `exportCSV()` wrote,
-     * over the same filtered set, built here so the file matches the table.
+     * "Export PDF" — the Pairs List as a printed sheet.
+     *
+     * A page rather than a file: the browser's own print dialog turns it into
+     * the PDF, and Save as PDF is where Chrome's destination already points.
+     * That is the one route that renders an Arabic name correctly — joining
+     * and right-to-left are the print engine's job and it already does them —
+     * and it adds nothing to install on a machine running this off XAMPP.
+     *
+     * Built from the same filtered rows the table shows, so the sheet and the
+     * screen can never disagree.
      */
-    public function exportPairs(): ResponseInterface
+    public function printPairs(): string
     {
-        [$rows] = $this->filteredPairs();
+        [$rows, $btFilter, $statusFilter] = $this->filteredPairs();
 
-        $lines = ['Pair ID,Organ,Status,Recipient,Recipient Blood,Donor,Donor Blood,Scheduled Date,Created'];
+        return view('ui/pairs_print', [
+            'rows'       => $rows,
+            'mrps'       => $this->store->mrps(),
+            'organLabel' => $this->store->organLabel(),
+            'filters'    => $this->filterSummary($btFilter, $statusFilter),
+            'printedOn'  => date('d/m/Y'),
+            'backUrl'    => site_url('pairs') . $this->filterQuery($btFilter, $statusFilter),
+        ]);
+    }
 
-        foreach ($rows as $row) {
-            $pair      = $row['pair'];
-            $recipient = $row['recipient'];
-            $donor     = $row['donor'];
+    /** What the chips were narrowed to, for the line under the title. */
+    private function filterSummary(string $btFilter, string $statusFilter): string
+    {
+        $applied = [];
 
-            $lines[] = implode(',', [
-                $pair['id'],
-                $pair['organ'],
-                // The label, not the key: a spreadsheet reader should not have
-                // to know that `paired_exchange` means Paired Exchange.
-                UiStore::STATUS_OPTIONS[$pair['status']] ?? $pair['status'],
-                $recipient['name'] ?? $pair['recipientId'],
-                $recipient['bloodType'] ?? '',
-                $donor['name'] ?? $pair['donorId'],
-                $donor['bloodType'] ?? '',
-                $pair['scheduledDate'] ?? '',
-                // Created is the ISO the column holds; the screens show dates
-                // as DD/MM/YYYY, and so does this.
-                $pair['createdDate'] === '' ? '' : UiStore::isoToDMY($pair['createdDate']),
-            ]);
+        if ($btFilter !== 'all') {
+            $applied[] = 'Blood type ' . $btFilter;
         }
 
-        return $this->response
-            ->setContentType('text/csv')
-            ->setHeader('Content-Disposition', 'attachment; filename="pairs-list.csv"')
-            ->setBody(implode("\n", $lines));
+        if ($statusFilter !== 'all') {
+            $applied[] = UiStore::STATUS_OPTIONS[$statusFilter] ?? $statusFilter;
+        }
+
+        return $applied === [] ? 'All pairs' : implode(', ', $applied);
+    }
+
+    /** The filters as a query string, so Back returns to the same view. */
+    private function filterQuery(string $btFilter, string $statusFilter): string
+    {
+        $query = array_filter(
+            ['bt' => $btFilter, 'status' => $statusFilter],
+            static fn (string $value): bool => $value !== 'all'
+        );
+
+        return $query === [] ? '' : '?' . http_build_query($query);
     }
 
     /**

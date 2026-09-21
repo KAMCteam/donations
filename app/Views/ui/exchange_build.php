@@ -12,11 +12,11 @@
  * free. Pick one from each, press Pair them, and the pair joins the list at
  * the top.
  *
- * The bar above the columns is the whole rule in one line: pairing somebody
- * who is standing in a pair takes their partner out of it too, and that
- * partner now needs a pair of their own. While anybody is still owed one the
- * Confirm button is disabled and says why. Nothing is written until it is
- * pressed.
+ * Pairing somebody who is standing in a pair takes their partner out of it
+ * too. The bar counts how many pairs it would take to leave nobody over, and
+ * the line under it names whoever currently would be — as a warning, not a
+ * barrier: confirming with somebody left over is allowed, and puts them back
+ * on their list. Nothing is written until Confirm is pressed.
  *
  * Each column is a radio group in one form, so choosing and submitting works
  * with no JavaScript at all; `ui.js` adds nothing here.
@@ -94,8 +94,9 @@ $person = static function (array $row, string $field, string $kind): string {
             </div>
         <?php endif; ?>
 
-        <?php // Who this exchange has left without a partner. Naming them is
-              // the point: the rule is that none of them may stay that way. ?>
+        <?php // Who this exchange would leave without a partner. Said plainly,
+              // and said before confirming rather than after: they keep their
+              // records and their workups, they simply have no pair. ?>
         <?php if ($state['owedRecipients'] !== [] || $state['owedDonors'] !== []): ?>
             <p class="exchange-owed">
                 <strong>Still to pair:</strong>
@@ -113,6 +114,7 @@ $person = static function (array $row, string $field, string $kind): string {
                 }
                 ?>
                 <?= implode(' &middot; ', $owed) ?>
+                <br>They will go back to their list unpaired if you confirm now.
             </p>
         <?php else: ?>
             <p class="exchange-owed exchange-owed--done">Nobody is left without a pair. The exchange can be confirmed.</p>
@@ -166,9 +168,14 @@ $person = static function (array $row, string $field, string $kind): string {
             <form method="post" action="<?= site_url('exchange/build') ?>" class="inline-form">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="confirm">
-                <?php // Disabled is not the guard — ExchangeDraft::confirm() refuses
-                      // the same thing server-side, whatever arrives. ?>
-                <button type="submit" class="btn-save"<?= $state['complete'] ? '' : ' disabled title="Everyone this exchange releases needs a pair first"' ?>>Confirm exchange</button>
+                <?php
+                // Offered either way now. What it does differs, so it says
+                // which: everyone paired, or somebody going back alone.
+                $leftOver = count($state['owedRecipients']) + count($state['owedDonors']);
+                ?>
+                <button type="submit" class="btn-save"<?= $state['formed'] === [] ? ' disabled title="Pair at least two people first"' : '' ?>>
+                    <?= $state['complete'] ? 'Confirm exchange' : esc('Confirm, leaving ' . $leftOver . ($leftOver === 1 ? ' person' : ' people') . ' unpaired') ?>
+                </button>
             </form>
         </div>
     </div>

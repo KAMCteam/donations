@@ -1328,10 +1328,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
      *
      * Pair A is Recipient A with Donor A, pair B likewise. The exchange puts
      * Recipient A with Donor B — which takes Donor B out of pair B and leaves
-     * Recipient B without one. It cannot be confirmed until Recipient B has
-     * Donor A, and then it can.
+     * Recipient B without one. Pairing Recipient B with Donor A closes the
+     * loop, and then both old pairs give way to both new ones.
      */
-    public function testAnExchangeCannotLeaveAnybodyWithoutAPair(): void
+    public function testATwoWaySwapReplacesBothPairs(): void
     {
         [$pairA, $pairB] = $this->twoPairsToExchange();
 
@@ -1342,17 +1342,11 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         $html = $this->get('exchange/build')->getBody();
         $this->assertStringContainsString('1 of 2 pairs complete', $html);
+        // Both leftovers are named, and what would happen to them is said.
         $this->assertStringContainsString('Still to pair:', $html);
-        // Both leftovers are named, and Confirm is not offered yet.
         $this->assertStringContainsString('Recipient B', $html);
         $this->assertStringContainsString('Donor A', $html);
-        $this->assertStringContainsString('disabled', $html);
-
-        // Confirming anyway is refused by the server, not only by the button.
-        $this->post('exchange/build', ['action' => 'confirm'])
-            ->assertRedirectTo(site_url('exchange/build'));
-        $this->seeInDatabase('pairs', ['id' => $pairA, 'status' => 'active']);
-        $this->assertStringContainsString('needs a pair', (string) session()->getFlashdata('ui_error'));
+        $this->assertStringContainsString('go back to their list unpaired', $html);
 
         // Recipient B with Donor A closes the loop.
         $this->post('exchange/build', ['action' => 'link', 'recipientMrn' => '8201', 'donorMrn' => '8102']);
@@ -1378,24 +1372,51 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertSame([], $store->waitingList());
     }
 
-    /** Bringing somebody in from the waiting list strands nobody. */
-    public function testAFreeRecipientCanCompleteAnExchangeOnTheirOwn(): void
+    /**
+     * An exchange may be confirmed with somebody left over.
+     *
+     * A swap that only half works is a real outcome: the person nobody was
+     * found for goes back to their list, records and workup intact, free to
+     * be matched another day. Refusing to record it did not make it less true.
+     */
+    public function testAnExchangeMayLeaveSomebodyUnpaired(): void
     {
-        [$pairA] = $this->twoPairsToExchange();
+        [$pairA, $pairB] = $this->twoPairsToExchange();
 
         // Someone unpaired, who owes nothing to anyone.
         $this->post('recipients/new', ['mrn' => '8301', 'name' => 'Free Recipient', 'age' => '39', 'bloodType' => 'A']);
 
         $this->post('exchange/start/' . $pairA);
-        // Free recipient takes Donor A; Recipient A is the one left owing.
+        // The free recipient takes Donor A, so Recipient A is left over.
         $this->post('exchange/build', ['action' => 'link', 'recipientMrn' => '8301', 'donorMrn' => '8102']);
 
         $html = $this->get('exchange/build')->getBody();
-        $this->assertStringContainsString('Recipient A', $html, 'the partner they displaced is still owed a pair');
+        $this->assertStringContainsString('Recipient A', $html, 'the partner they displaced is named');
+        $this->assertStringContainsString('Confirm, leaving 1 person unpaired', $html);
 
-        // Pair B is untouched, so its donor is not on offer to displace.
-        $this->post('exchange/build', ['action' => 'confirm']);
+        $this->post('exchange/build', ['action' => 'confirm'])->assertRedirectTo(site_url('pairs'));
+
+        $this->seeInDatabase('pairs', ['id' => $pairA, 'status' => 'closed']);
+        $this->seeInDatabase('pairs', ['recipient_mrn' => 8301, 'donor_mrn' => 8102, 'status' => 'paired_exchange']);
+        // Recipient A is back on the waiting list rather than gone.
+        $this->seeInDatabase('recipients', ['mrn' => 8101]);
+        $waiting = array_column((new UiStore())->waitingList(), 'id');
+        $this->assertContains('8101', $waiting);
+        // And pair B, which this never touched, is untouched.
+        $this->seeInDatabase('pairs', ['id' => $pairB, 'status' => 'active']);
+    }
+
+    /** There still has to be an exchange: confirming nothing is refused. */
+    public function testConfirmingWithNoPairsMadeIsRefused(): void
+    {
+        [$pairA] = $this->twoPairsToExchange();
+
+        $this->post('exchange/start/' . $pairA);
+        $this->post('exchange/build', ['action' => 'confirm'])
+            ->assertRedirectTo(site_url('exchange/build'));
+
         $this->seeInDatabase('pairs', ['id' => $pairA, 'status' => 'active']);
+        $this->assertStringContainsString('at least two people', (string) session()->getFlashdata('ui_error'));
     }
 
     /** The list offers only pairs an exchange can move, and can be searched. */

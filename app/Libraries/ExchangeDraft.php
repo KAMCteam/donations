@@ -12,16 +12,16 @@ use CodeIgniter\Session\Session;
  *
  * An exchange starts from one pair whose donor cannot give to their own
  * recipient, and swaps across others. The moment you take somebody out of a
- * pair to use them, their partner is left without one — and that partner is
- * now the problem. So the rule the whole screen is built around is:
+ * pair to use them, their partner is left without one — so picking somebody
+ * already in a pair quietly pulls that pair in too: taking one side is taking
+ * both, and the screen says so rather than letting it be discovered later.
  *
- *     **nobody may be left on their own.**
- *
- * Every person released by a pair this exchange breaks has to end the exchange
- * in a new pair. Until they all do, there is nothing to confirm. That is what
- * `owed()` counts and what `isComplete()` asks, and it is why picking somebody
- * who is already in a pair quietly pulls that pair in too: taking one side is
- * taking both, and the screen says so rather than discovering it later.
+ * Finding all of them a partner in the same exchange is the tidy outcome and
+ * the screen counts towards it, but it is not required. An exchange may be
+ * confirmed with people left over: their old pair closes and they go back to
+ * the waiting list or the donor register, free to be matched another day.
+ * That is what really happens when a swap only half works, and refusing to
+ * record it did not make it any less true.
  *
  * The draft lives in the session, not in a table. It is a page of working out,
  * abandoned as often as it is finished, and it becomes real in one step at the
@@ -258,6 +258,9 @@ final class ExchangeDraft
     /**
      * Closes what the exchange broke and links what it made, in one go.
      *
+     * Anybody released and not re-paired here simply has no pair afterwards:
+     * their old one is closed, which is what puts them back on their list.
+     *
      * Re-checked against the tables first rather than trusted from the
      * session: the draft may have been open a while, and a pair it counted on
      * can have been closed or deleted on another screen since.
@@ -272,8 +275,8 @@ final class ExchangeDraft
             return 'There is no exchange being worked out.';
         }
 
-        if (! $state['complete']) {
-            return 'Every person this exchange releases needs a pair before it can be confirmed.';
+        if ($state['formed'] === []) {
+            return 'Pair at least two people before confirming the exchange.';
         }
 
         $draft = $this->draft();

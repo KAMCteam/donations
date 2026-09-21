@@ -56,5 +56,11 @@ $routes->match(['get', 'post'], 'pairs/new', 'Ui::addPair');
 $routes->match(['get', 'post'], 'pairs/(:segment)/delete', 'Ui::deletePair/$1');
 $routes->match(['get', 'post'], 'pairs/(:segment)', 'Ui::pair/$1');
 
+// Paired exchange. `build` is one address for the screen and its four
+// actions, so every button on it is a plain form post.
+$routes->get('exchange', 'Exchange::index');
+$routes->post('exchange/start/(:segment)', 'Exchange::start/$1');
+$routes->match(['get', 'post'], 'exchange/build', 'Exchange::build');
+
 $routes->get('mrp', 'Ui::mrp');
 $routes->post('mrp', 'Ui::addMrp');

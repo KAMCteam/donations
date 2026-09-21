@@ -17,6 +17,7 @@ $navItems = [
     ['page' => 'recipients', 'label' => 'Recipient Waitlist', 'icon' => 'users',     'url' => site_url('recipients')],
     ['page' => 'donors',     'label' => 'Donors List',        'icon' => 'heart',     'url' => site_url('donors')],
     ['page' => 'pairs',      'label' => 'Pairs List',         'icon' => 'link17',    'url' => site_url('pairs')],
+    ['page' => 'exchange',   'label' => 'Paired Exchange',    'icon' => 'shuffle',   'url' => site_url('exchange')],
     ['page' => 'add-mrp',    'label' => 'Add MRP',            'icon' => 'userPlus',  'url' => site_url('mrp')],
 ];
 ?>

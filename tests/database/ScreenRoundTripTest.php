@@ -61,7 +61,32 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $security = service('security');
         $params   = ($params ?? []) + [$security->getTokenName() => $security->getHash()];
 
-        return $this->call('post', $path, $params);
+        return $this->carrySession($this->call('post', $path, $params));
+    }
+
+    /**
+     * @param array<string, mixed>|null $params
+     */
+    public function get($path, ?array $params = null): \CodeIgniter\Test\TestResponse
+    {
+        return $this->carrySession($this->call('get', $path, $params));
+    }
+
+    /**
+     * Carries the session into the next request, the way a cookie does.
+     *
+     * The feature-test client copies the seeded array over `$_SESSION` before
+     * every call, so anything a request writes there is gone by the next one —
+     * which no browser does, and which a screen that builds something up over
+     * several posts cannot be tested through at all.
+     */
+    private function carrySession(\CodeIgniter\Test\TestResponse $response): \CodeIgniter\Test\TestResponse
+    {
+        if (isset($_SESSION) && is_array($_SESSION)) {
+            $this->withSession($_SESSION);
+        }
+
+        return $response;
     }
 
     // ---- Add Recipient ---------------------------------------------------
@@ -1294,6 +1319,117 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'mrp_id' => $this->mrpId,
         ]);
         $this->seeInDatabase('coordinators', ['name' => 'Coordinator Three']);
+    }
+
+    // ---- Paired exchange ---------------------------------------------------
+
+    /**
+     * The whole swap: two pairs in, two pairs out, nobody left over.
+     *
+     * Pair A is Recipient A with Donor A, pair B likewise. The exchange puts
+     * Recipient A with Donor B — which takes Donor B out of pair B and leaves
+     * Recipient B without one. It cannot be confirmed until Recipient B has
+     * Donor A, and then it can.
+     */
+    public function testAnExchangeCannotLeaveAnybodyWithoutAPair(): void
+    {
+        [$pairA, $pairB] = $this->twoPairsToExchange();
+
+        $this->post('exchange/start/' . $pairA)->assertRedirectTo(site_url('exchange/build'));
+
+        // Recipient A with Donor B. That breaks pair B.
+        $this->post('exchange/build', ['action' => 'link', 'recipientMrn' => '8101', 'donorMrn' => '8202']);
+
+        $html = $this->get('exchange/build')->getBody();
+        $this->assertStringContainsString('1 of 2 pairs complete', $html);
+        $this->assertStringContainsString('Still to pair:', $html);
+        // Both leftovers are named, and Confirm is not offered yet.
+        $this->assertStringContainsString('Recipient B', $html);
+        $this->assertStringContainsString('Donor A', $html);
+        $this->assertStringContainsString('disabled', $html);
+
+        // Confirming anyway is refused by the server, not only by the button.
+        $this->post('exchange/build', ['action' => 'confirm'])
+            ->assertRedirectTo(site_url('exchange/build'));
+        $this->seeInDatabase('pairs', ['id' => $pairA, 'status' => 'active']);
+        $this->assertStringContainsString('needs a pair', (string) session()->getFlashdata('ui_error'));
+
+        // Recipient B with Donor A closes the loop.
+        $this->post('exchange/build', ['action' => 'link', 'recipientMrn' => '8201', 'donorMrn' => '8102']);
+
+        $html = $this->get('exchange/build')->getBody();
+        $this->assertStringContainsString('2 of 2 pairs complete', $html);
+        $this->assertStringContainsString('Nobody is left without a pair', $html);
+
+        $this->post('exchange/build', ['action' => 'confirm'])->assertRedirectTo(site_url('pairs'));
+
+        // The two old pairs are closed — history, not deleted — and the two
+        // new ones stand in their place.
+        $this->seeInDatabase('pairs', ['id' => $pairA, 'status' => 'closed', 'closed_reason' => 'Paired exchange']);
+        $this->seeInDatabase('pairs', ['id' => $pairB, 'status' => 'closed']);
+        $this->seeInDatabase('pairs', ['recipient_mrn' => 8101, 'donor_mrn' => 8202, 'status' => 'paired_exchange']);
+        $this->seeInDatabase('pairs', ['recipient_mrn' => 8201, 'donor_mrn' => 8102, 'status' => 'paired_exchange']);
+        // The recipient's own status follows their pair, as everywhere else.
+        $this->seeInDatabase('recipients', ['mrn' => 8101, 'status' => 'paired_exchange']);
+
+        // And nobody is on a list they should not be: both are paired again.
+        $store = new UiStore();
+        $this->assertSame([], $store->availableDonors());
+        $this->assertSame([], $store->waitingList());
+    }
+
+    /** Bringing somebody in from the waiting list strands nobody. */
+    public function testAFreeRecipientCanCompleteAnExchangeOnTheirOwn(): void
+    {
+        [$pairA] = $this->twoPairsToExchange();
+
+        // Someone unpaired, who owes nothing to anyone.
+        $this->post('recipients/new', ['mrn' => '8301', 'name' => 'Free Recipient', 'age' => '39', 'bloodType' => 'A']);
+
+        $this->post('exchange/start/' . $pairA);
+        // Free recipient takes Donor A; Recipient A is the one left owing.
+        $this->post('exchange/build', ['action' => 'link', 'recipientMrn' => '8301', 'donorMrn' => '8102']);
+
+        $html = $this->get('exchange/build')->getBody();
+        $this->assertStringContainsString('Recipient A', $html, 'the partner they displaced is still owed a pair');
+
+        // Pair B is untouched, so its donor is not on offer to displace.
+        $this->post('exchange/build', ['action' => 'confirm']);
+        $this->seeInDatabase('pairs', ['id' => $pairA, 'status' => 'active']);
+    }
+
+    /** The list offers only pairs an exchange can move, and can be searched. */
+    public function testTheExchangeListIsFilteredAndSearchable(): void
+    {
+        [$pairA, $pairB] = $this->twoPairsToExchange();
+        model(\App\Models\PairModel::class)->update($pairB, ['status' => 'completed']);
+
+        $html = $this->get('exchange')->getBody();
+        $this->assertStringContainsString('Recipient A', $html);
+        $this->assertStringNotContainsString('Recipient B', $html, 'a completed transplant is not exchangeable');
+
+        // Search takes either side's file number.
+        $this->assertStringContainsString('Recipient A', $this->get('exchange?q=8102')->getBody());
+        $this->assertStringNotContainsString('Recipient A', $this->get('exchange?q=9999')->getBody());
+    }
+
+    /** Two pairs on this programme, both open. @return array{int, int} */
+    private function twoPairsToExchange(): array
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '8101', 'dMrn' => '8102',
+            'rName' => 'Recipient A', 'rAge' => '44', 'rBloodType' => 'A',
+            'dName' => 'Donor A', 'dAge' => '33', 'dBloodType' => 'B',
+        ]);
+        $this->post('pairs/new', [
+            'rMrn' => '8201', 'dMrn' => '8202',
+            'rName' => 'Recipient B', 'rAge' => '51', 'rBloodType' => 'B',
+            'dName' => 'Donor B', 'dAge' => '36', 'dBloodType' => 'A',
+        ]);
+
+        $ids = array_column($this->db->table('pairs')->orderBy('id')->get()->getResultArray(), 'id');
+
+        return [(int) $ids[0], (int) $ids[1]];
     }
 
     // ---- The dashboard's per-doctor statistic ------------------------------

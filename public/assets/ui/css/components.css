@@ -89,6 +89,10 @@
 }
 
 .btn-save {
+  /* Inline-flex so a button carrying an icon keeps it on the text's line. */
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.625rem 1.25rem;
   border-radius: var(--radius-xl);
   color: #fff;
@@ -899,4 +903,105 @@ textarea.lab-editor-field { resize: none; }
     color: #b91c1c;
   }
   .btn-danger:hover { opacity: 0.9; }
+}
+
+/* =========================================================
+   Paired exchange
+   ========================================================= */
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.search-input { max-width: 18rem; }
+
+.inline-form { display: inline-flex; margin: 0; }
+
+/* The two columns people are picked from. One above the other on a narrow
+   screen, because a column of names is unreadable at half a phone. */
+.exchange-columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* Long registers scroll inside the card rather than running the page on. */
+.card--scroll-y { max-height: 26rem; overflow-y: auto; }
+
+.pick-list { display: flex; flex-direction: column; gap: 0.25rem; }
+
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+.pick:has(input:checked) {
+  border-color: #bfdbfe;
+  background-color: #eff6ff;
+}
+.pick-body { display: flex; flex-direction: column; min-width: 0; }
+.pick-name {
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  font-weight: 600;
+  color: var(--slate-800);
+}
+.pick-meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  color: var(--slate-500);
+}
+
+.exchange-formed { margin-top: 1.25rem; }
+
+.formed-pair {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #a7f3d0;
+  border-radius: var(--radius-lg);
+  background-color: #ecfdf5;
+}
+.formed-side {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  font-weight: 600;
+  color: var(--slate-800);
+}
+.formed-arrow { color: #059669; display: inline-flex; }
+.formed-pair .inline-form { margin-left: auto; }
+
+.exchange-owed {
+  margin-top: 1.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid #fed7aa;
+  background-color: #fff7ed;
+  color: #9a3412;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+.exchange-owed--done {
+  border-color: #a7f3d0;
+  background-color: #ecfdf5;
+  color: #065f46;
+}
+
+.btn-save[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+@media (min-width: 64rem) {
+  .exchange-columns { grid-template-columns: 1fr 1fr; }
 }

@@ -16,7 +16,7 @@
 ?>
 <div class="login">
     <div class="login-brand">
-        <img class="login-brand-logo" src="<?= base_url('assets/ui/img/kamc-big.png') ?>" alt="King Abdullah Medical City">
+        <img class="login-brand-logo" src="<?= base_url('assets/ui/img/kamc.svg') ?>" alt="King Abdullah Medical City">
         <div>
             <div class="login-tagline">Organ Donation &amp; Transplant Platform</div>
             <h1 class="login-headline">Every transplant<br>begins with a match.</h1>
@@ -28,7 +28,7 @@
     <div class="login-panel">
         <div class="login-box">
             <div class="login-heading-block">
-                <div class="login-mobile-logo"><img src="<?= base_url('assets/ui/img/kamc-big.png') ?>" alt="King Abdullah Medical City"></div>
+                <div class="login-mobile-logo"><img src="<?= base_url('assets/ui/img/kamc.svg') ?>" alt="King Abdullah Medical City"></div>
                 <h2 class="login-title">Staff login</h2>
                 <p class="login-sub">Enter your credentials to access the platform.</p>
             </div>

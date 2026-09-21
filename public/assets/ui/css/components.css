@@ -589,6 +589,17 @@ textarea.lab-editor-field { resize: none; }
   margin-top: 1.25rem;
 }
 
+/* The one Save on an add screen, at the foot of the form. Sits below the
+   last card rather than inside one, because it commits all of them. */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.5rem;
+}
+
 @media (hover: hover) {
   .btn-edit:hover { border-color: var(--slate-300); color: #15508A; }
 }

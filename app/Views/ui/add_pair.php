@@ -42,7 +42,6 @@ foreach ($v as $field => $value) {
                 <p class="page-subtitle">Enter the <?= esc($fixedIs('recipient') ? 'donor' : 'recipient') ?> to pair with this record.</p>
             <?php endif; ?>
         </div>
-        <button type="submit" form="pair-form" class="btn-save">Save</button>
     </div>
 
     <?php if ($error !== ''): ?>
@@ -281,6 +280,12 @@ foreach ($v as $field => $value) {
             <fieldset class="card-fields"<?= $fixedIs('donor') ? ' disabled' : '' ?>>
                 <textarea class="textarea" name="dNotes" rows="4" placeholder="Add clinical notes, observations, or relevant context..."><?= esc($v['dNotes']) ?></textarea>
             </fieldset>
+        </div>
+
+        <?php // At the foot of the form, below everything it saves. ?>
+        <div class="form-actions">
+            <a class="btn-outline" href="<?= site_url('pairs') ?>">Cancel</a>
+            <button type="submit" class="btn-save">Save Pair</button>
         </div>
     </form>
 </div>

@@ -45,8 +45,8 @@ $eyebrow = $mode === 'add' ? 'New' : ($person['id'] ?? '');
 // A saved record opens read-only and is edited one card at a time. Each Edit
 // is a link back to this screen with the card named, so the card returns as a
 // form and the screen still works with JavaScript off. A new record has
-// nothing to read yet, so every card starts editable and the header keeps its
-// single Save.
+// nothing to read yet, so every card starts editable and one Save at the foot
+// of the form commits the lot — below the fields it saves, not above them.
 $viewUrl  = $mode === 'add' ? null : site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id']));
 $editable = static fn (string $section): bool => $mode === 'add' || $editing === $section;
 $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $section;
@@ -65,9 +65,6 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                 <?php // A real link to the choice at its own URL; ui.js opens
                       // the dialog below instead when it can. ?>
                 <a class="btn-outline" href="<?= esc($linkUrl) ?>" data-dialog="link-choice"><?= ui_icon('link14') ?>Link with <?= esc($isRecipient ? 'Donor' : 'Recipient') ?></a>
-            <?php endif; ?>
-            <?php if ($mode === 'add'): ?>
-                <button type="submit" form="person-form" class="btn-save">Save</button>
             <?php endif; ?>
         </div>
     </div>
@@ -310,6 +307,15 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                 </div>
             <?php endif; ?>
         </div>
+
+        <?php // A new record saves once, at the end. A saved one has a Save per
+              // card instead, because it is edited a card at a time. ?>
+        <?php if ($mode === 'add'): ?>
+            <div class="form-actions">
+                <a class="btn-outline" href="<?= $backUrl ?>">Cancel</a>
+                <button type="submit" class="btn-save">Save <?= esc($isRecipient ? 'Recipient' : 'Donor') ?></button>
+            </div>
+        <?php endif; ?>
     </form>
 
     <?php if ($mode === 'view' && $linked === null): ?>

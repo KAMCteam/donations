@@ -898,6 +898,24 @@ class Ui extends BaseController
         $section = (string) $this->request->getPost('section');
         $post    = fn (string $field): string => (string) $this->request->getPost($field);
 
+        // Not a card: the one button in the header, putting this pair forward
+        // for a paired exchange or taking it back.
+        if ($section === 'exchange') {
+            $offered = $post('forExchange') === '1';
+            $error   = $this->store->offerPairForExchange($pair['id'], $offered);
+
+            $this->session->setFlashdata(
+                $error === '' ? 'ui_notice' : 'ui_error',
+                $error === ''
+                    ? ($offered
+                        ? 'This pair is now on the Paired Exchange list.'
+                        : 'This pair has been taken off the Paired Exchange list.')
+                    : $error
+            );
+
+            return $back;
+        }
+
         // One card at a time, so each branch writes only what its own card
         // collects. Relationship sits on the pair and on the donor — the
         // donors list shows it — so the pair card keeps the two in step.

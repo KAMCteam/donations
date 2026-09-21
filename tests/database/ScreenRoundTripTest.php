@@ -1419,11 +1419,66 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('at least two people', (string) session()->getFlashdata('ui_error'));
     }
 
+    /**
+     * A pair is on the exchange list only once its own screen offers it.
+     *
+     * That is the consent: without it a pair could be swapped apart by
+     * somebody who never proposed the swap.
+     */
+    public function testAPairIsOnlyOfferedAfterPairExchangeIsPressed(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '8401', 'dMrn' => '8402',
+            'rName' => 'Recipient C', 'rAge' => '44', 'rBloodType' => 'A',
+            'dName' => 'Donor C', 'dAge' => '33', 'dBloodType' => 'B',
+        ]);
+        $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
+
+        // Not offered yet, so not on the list — and not startable either.
+        $this->assertStringNotContainsString('Recipient C', $this->get('exchange')->getBody());
+        $this->post('exchange/start/' . $pairId)->assertRedirectTo(site_url('exchange'));
+
+        // The pair's own screen offers the button, and pressing it is a post.
+        $this->assertStringContainsString('Pair Exchange', $this->get('pairs/' . $pairId)->getBody());
+        $this->post('pairs/' . $pairId, ['section' => 'exchange', 'forExchange' => '1']);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'for_exchange' => 1]);
+
+        $this->assertStringContainsString('Recipient C', $this->get('exchange')->getBody());
+        $this->post('exchange/start/' . $pairId)->assertRedirectTo(site_url('exchange/build'));
+
+        // And it can be taken back.
+        $this->post('pairs/' . $pairId, ['section' => 'exchange', 'forExchange' => '0']);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'for_exchange' => 0]);
+        $this->assertStringNotContainsString('Recipient C', $this->get('exchange')->getBody());
+    }
+
+    /** Somebody in a pair nobody offered is not on the table to displace. */
+    public function testAPairNotOfferedCannotBeBrokenByAnExchange(): void
+    {
+        [$pairA, $pairB] = $this->twoPairsToExchange();
+        // Pair B is withdrawn after the fact.
+        $this->post('pairs/' . $pairB, ['section' => 'exchange', 'forExchange' => '0']);
+
+        $this->post('exchange/start/' . $pairA);
+
+        $html = $this->get('exchange/build')->getBody();
+        $this->assertStringNotContainsString('Donor B', $html, 'pair B was withdrawn, so its donor is not on offer');
+
+        // Posting the MRN anyway is refused, not only hidden.
+        $this->post('exchange/build', ['action' => 'link', 'recipientMrn' => '8101', 'donorMrn' => '8202']);
+        $this->assertStringContainsString(
+            'not been put forward',
+            (string) session()->getFlashdata('ui_error')
+        );
+        $this->seeInDatabase('pairs', ['id' => $pairB, 'status' => 'active']);
+    }
+
     /** The list offers only pairs an exchange can move, and can be searched. */
     public function testTheExchangeListIsFilteredAndSearchable(): void
     {
         [$pairA, $pairB] = $this->twoPairsToExchange();
         model(\App\Models\PairModel::class)->update($pairB, ['status' => 'completed']);
+        $this->assertNotSame(0, $pairA);
 
         $html = $this->get('exchange')->getBody();
         $this->assertStringContainsString('Recipient A', $html);
@@ -1434,7 +1489,15 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringNotContainsString('Recipient A', $this->get('exchange?q=9999')->getBody());
     }
 
-    /** Two pairs on this programme, both open. @return array{int, int} */
+    /**
+     * Two pairs on this programme, both open and both put forward.
+     *
+     * Put forward through the button, not by writing the column: nothing
+     * reaches the exchange screen any other way, and the tests should not
+     * either.
+     *
+     * @return array{int, int}
+     */
     private function twoPairsToExchange(): array
     {
         $this->post('pairs/new', [
@@ -1449,6 +1512,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         ]);
 
         $ids = array_column($this->db->table('pairs')->orderBy('id')->get()->getResultArray(), 'id');
+
+        foreach ($ids as $id) {
+            $this->post('pairs/' . $id, ['section' => 'exchange', 'forExchange' => '1']);
+        }
 
         return [(int) $ids[0], (int) $ids[1]];
     }

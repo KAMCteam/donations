@@ -24,7 +24,7 @@ class PairModel extends Model
     protected $returnType    = 'array';
     protected $useTimestamps = true;
     protected $allowedFields = [
-        'recipient_mrn', 'donor_mrn', 'status', 'relationship',
+        'recipient_mrn', 'donor_mrn', 'status', 'for_exchange', 'relationship',
         'crossmatch_date', 'surgery_date', 'closed_reason', 'notes',
     ];
 
@@ -99,7 +99,15 @@ class PairModel extends Model
         return (bool) $this->update($pairId, [
             'status'        => self::CLOSED,
             'closed_reason' => $reason,
+            // A closed pair holds nobody, so it has nobody left to offer.
+            'for_exchange'  => 0,
         ]);
+    }
+
+    /** Puts a pair forward for a paired exchange, or takes it back. */
+    public function offerForExchange(int|string $pairId, bool $offered): bool
+    {
+        return (bool) $this->update($pairId, ['for_exchange' => $offered ? 1 : 0]);
     }
 
     /**

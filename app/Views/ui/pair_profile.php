@@ -39,6 +39,26 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             <div class="eyebrow"><?= esc($pair['id']) ?></div>
             <h1 class="page-title">Pair Profile</h1>
         </div>
+        <?php // Nothing reaches the exchange screen without this, so it is the
+              // pair's own team putting it forward — and taking it back. ?>
+        <div class="header-actions">
+            <?php if ($pair['forExchange']): ?>
+                <span class="badge tone-teal-soft">Offered for exchange</span>
+                <form method="post" action="<?= esc($viewUrl) ?>" class="inline-form">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="section" value="exchange">
+                    <input type="hidden" name="forExchange" value="0">
+                    <button type="submit" class="btn-outline">Withdraw from exchange</button>
+                </form>
+            <?php else: ?>
+                <form method="post" action="<?= esc($viewUrl) ?>" class="inline-form">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="section" value="exchange">
+                    <input type="hidden" name="forExchange" value="1">
+                    <button type="submit" class="btn-outline"><?= ui_icon('shuffle14') ?>Pair Exchange</button>
+                </form>
+            <?php endif; ?>
+        </div>
     </div>
 
     <form id="pair-form" class="stack-5" method="post" action="<?= current_url() ?>">

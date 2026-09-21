@@ -55,8 +55,23 @@ final class ExchangeDraft
         $this->pairs      = model(PairModel::class);
     }
 
-    /** Whether a pair is one this screen can start from, or draw on. */
-    public static function isExchangeable(string $status): bool
+    /**
+     * Whether a pair is one this screen may start from, or draw on.
+     *
+     * Two things, and it needs both: a status an exchange can move it out of,
+     * and Pair Exchange pressed on its own screen. The second is the consent —
+     * without it a pair can be swapped apart by someone who never proposed it.
+     *
+     * @param array<string, mixed> $pair
+     */
+    public static function isExchangeable(array $pair): bool
+    {
+        return (int) ($pair['for_exchange'] ?? 0) === 1
+            && self::isExchangeableStatus((string) $pair['status']);
+    }
+
+    /** The status half of it on its own, for the screen's filter chips. */
+    public static function isExchangeableStatus(string $status): bool
     {
         return ! in_array($status, self::NOT_EXCHANGEABLE, true);
     }
@@ -144,8 +159,8 @@ final class ExchangeDraft
                 continue;
             }
 
-            if (! self::isExchangeable((string) $holding['status'])) {
-                return 'Pair #' . $holding['id'] . ' cannot be exchanged out of.';
+            if (! self::isExchangeable($holding)) {
+                return 'Pair #' . $holding['id'] . ' has not been put forward for exchange.';
             }
 
             if (! in_array((int) $holding['id'], $draft['sources'], true)) {
@@ -284,7 +299,7 @@ final class ExchangeDraft
         // The old pairs go first: a person cannot be in two open pairs, so
         // nothing can be linked while the pair that holds them is still open.
         foreach ($state['sources'] as $source) {
-            if (self::isExchangeable((string) $source['status'])) {
+            if (self::isExchangeable($source)) {
                 $this->pairs->close((int) $source['id'], 'Paired exchange');
             }
         }
@@ -311,7 +326,7 @@ final class ExchangeDraft
     {
         $rows = $this->pairs->overview($organ, $status === 'all' ? null : $status, $bloodType === 'all' ? null : $bloodType);
 
-        $rows = array_filter($rows, static fn (array $r): bool => self::isExchangeable((string) $r['status']));
+        $rows = array_filter($rows, static fn (array $r): bool => self::isExchangeable($r));
 
         if ($query !== '') {
             $rows = array_filter($rows, static function (array $r) use ($query): bool {
@@ -376,7 +391,9 @@ final class ExchangeDraft
 
             $holding = $this->openPairFor($personType, (int) $row['mrn']);
 
-            if ($holding !== null && ! self::isExchangeable((string) $holding['status'])) {
+            // Somebody held by a pair nobody has offered is not on the table:
+            // using them would break a pair that never volunteered.
+            if ($holding !== null && ! self::isExchangeable($holding)) {
                 continue;
             }
 
@@ -414,7 +431,7 @@ final class ExchangeDraft
 
         $pair = $this->pairs->find((int) $pairId);
 
-        if ($pair === null || ! self::isExchangeable((string) $pair['status'])) {
+        if ($pair === null || ! self::isExchangeable($pair)) {
             return null;
         }
 

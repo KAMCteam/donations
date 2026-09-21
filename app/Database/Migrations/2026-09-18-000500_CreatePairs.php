@@ -69,6 +69,18 @@ class CreatePairs extends Migration
                 'constraint' => ['pending', 'confirmed', 'closed', 'completed', 'paired_exchange', 'on_hold', 'active', 'declined'],
                 'default'    => 'pending',
             ],
+            // Offered for a paired exchange, by the button on the pair's own
+            // screen. Not a status: a pair looking for a swap is still active,
+            // still on the list, still that recipient's pair — the flag only
+            // says its team have put it forward. Nothing reaches the exchange
+            // screen without it, so no pair is ever swapped out from under the
+            // people responsible for it.
+            'for_exchange' => [
+                'type'       => 'TINYINT',
+                'constraint' => 1,
+                'unsigned'   => true,
+                'default'    => 0,
+            ],
             // How the two are related, as recorded for this pair.
             'relationship' => [
                 'type'       => 'VARCHAR',
@@ -110,6 +122,8 @@ class CreatePairs extends Migration
         $this->forge->addKey(['recipient_mrn', 'status']);
         $this->forge->addKey(['donor_mrn', 'status']);
         $this->forge->addKey('status');
+        // The exchange screen's only question: which pairs are on offer?
+        $this->forge->addKey(['for_exchange', 'status']);
         $this->forge->addForeignKey('recipient_mrn', 'recipients', 'mrn', 'CASCADE', 'RESTRICT');
         $this->forge->addForeignKey('donor_mrn', 'donors', 'mrn', 'CASCADE', 'RESTRICT');
 

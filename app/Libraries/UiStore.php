@@ -2,6 +2,7 @@
 
 namespace App\Libraries;
 
+use App\Libraries\ExchangeDraft;
 use App\Models\CoordinatorModel;
 use App\Models\DonorModel;
 use App\Models\LabModel;
@@ -481,6 +482,32 @@ final class UiStore
         return $row !== null && $row['organ_code'] === $this->organ() ? $row : null;
     }
 
+    /**
+     * Puts a pair forward for a paired exchange, or takes it back.
+     *
+     * The exchange screen shows nothing that has not been through here, so
+     * this is where a pair consents to being swapped apart.
+     *
+     * @return string An empty string when it is done, else why it was not
+     */
+    public function offerPairForExchange(?string $id, bool $offered): string
+    {
+        $pair = $this->findPair($id);
+
+        if ($pair === null || $pair['organ'] !== $this->organ()) {
+            return 'That pair is not on this programme.';
+        }
+
+        if ($offered && ! ExchangeDraft::isExchangeableStatus($pair['status'])) {
+            return 'A pair that is ' . (self::STATUS_OPTIONS[$pair['status']] ?? $pair['status'])
+                . ' cannot be offered for exchange.';
+        }
+
+        $this->pairs->offerForExchange((int) $id, $offered);
+
+        return '';
+    }
+
     /** Any pair naming this person, open or closed — a row is a row. */
     private function anyPairFor(string $column, int $mrn): ?array
     {
@@ -772,6 +799,7 @@ final class UiStore
             'id'            => (string) $row['id'],
             'organ'         => $row['organ_code'],
             'status'        => $row['status'],
+            'forExchange'   => (int) ($row['for_exchange'] ?? 0) === 1,
             'recipientId'   => (string) $row['recipient_mrn'],
             'donorId'       => (string) $row['donor_mrn'],
             'relationship'  => (string) $row['relationship'],

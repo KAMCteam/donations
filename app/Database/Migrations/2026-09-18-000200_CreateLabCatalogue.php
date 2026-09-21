@@ -12,12 +12,14 @@ use CodeIgniter\Database\Migration;
  * touching a single patient record, and lets a test be retired without
  * deleting the history of everyone who took it.
  *
- *   lab_parents  the group a test is listed under (Virology, Imaging, ...)
+ *   lab_parents  the group a test is listed under, per person type
  *   labs         one row per test, per programme and per person type
  *
- * `labs` is keyed by programme and person type because a kidney donor's
- * workup is not a liver recipient's: the screens ask the catalogue "what does
- * a donor on the kidney programme need?" and render a card per answer.
+ * Both are keyed by person type because a donor's workup is not a recipient's
+ * all the way up to the headings: the check list gives each side its own
+ * sheet, and four of its group names read almost the same on both while
+ * listing different tests. The screens ask the catalogue "what does a donor on
+ * the kidney programme need?" and render a card per answer.
  */
 class CreateLabCatalogue extends Migration
 {
@@ -34,6 +36,13 @@ class CreateLabCatalogue extends Migration
                 'type'       => 'VARCHAR',
                 'constraint' => 100,
             ],
+            // Which sheet the heading is from. "Infectious workup" heads both,
+            // and holds eighteen tests on one and seventeen on the other.
+            'person_type' => [
+                'type'       => 'ENUM',
+                'constraint' => ['recipient', 'donor'],
+                'default'    => 'recipient',
+            ],
             'sort_order' => [
                 'type'       => 'SMALLINT',
                 'constraint' => 5,
@@ -42,7 +51,7 @@ class CreateLabCatalogue extends Migration
             ],
         ]);
         $this->forge->addPrimaryKey('id');
-        $this->forge->addUniqueKey('name');
+        $this->forge->addUniqueKey(['name', 'person_type']);
         $this->forge->createTable('lab_parents', true, ['ENGINE' => 'InnoDB']);
 
         $this->forge->addField([
@@ -66,26 +75,31 @@ class CreateLabCatalogue extends Migration
                 'type'       => 'VARCHAR',
                 'constraint' => 30,
             ],
-            // `both` where the same test is on each side's workup.
+            // Which sheet the test is from. A test both sheets ask for is a
+            // row on each, under that side's own heading, because the two
+            // sides answer, order and retire it independently.
             'person_type' => [
                 'type'       => 'ENUM',
-                'constraint' => ['recipient', 'donor', 'both'],
-                'default'    => 'both',
+                'constraint' => ['recipient', 'donor'],
+                'default'    => 'recipient',
             ],
             // How the result is captured, in the check list's own wording.
             // `text` is free entry — a value, a finding, a report line — and
             // `numeric` a figure. The rest are the answers the sheet offers:
-            //   blood_group          A / B / AB / O
-            //   done                 Not done / pending / done
-            //   positive_negative    Not done / pending / Positive / Negative
-            //   acceptable_abnormal  Not done / pending / acceptable / Abnormal
-            //   cleared_not_cleared  Not done / pending / Cleared / not cleared
-            //   given_not_given      Given / not required / not given
-            // "Not applicable" is added to several of them on the sheet; it is
-            // an answer any test can need, so it is not a vocabulary of its own.
+            //   blood_group             A / B / AB / O
+            //   done                    Not done / pending / done
+            //   positive_negative       Not done / pending / Positive / Negative
+            //   acceptable_abnormal     Not done / pending / acceptable / Abnormal
+            //   acceptable_abnormal_na  ... / Not applicable
+            //   cleared_not_cleared     Not done / pending / Cleared / not cleared / Not applicable
+            //   given_not_given         Given / not required / not given / not applicable
+            // "Not applicable" is offered test by test, not everywhere: the
+            // sheet adds it where a patient's sex or history can rule the test
+            // out, and withholds it from the bloods and serologies asked of
+            // everyone. Hence two acceptable/abnormal lists, one with it.
             'result_type' => [
                 'type'       => 'ENUM',
-                'constraint' => ['text', 'numeric', 'blood_group', 'done', 'positive_negative', 'acceptable_abnormal', 'cleared_not_cleared', 'given_not_given'],
+                'constraint' => ['text', 'numeric', 'blood_group', 'done', 'positive_negative', 'acceptable_abnormal', 'acceptable_abnormal_na', 'cleared_not_cleared', 'given_not_given'],
                 'default'    => 'text',
             ],
             'sort_order' => [

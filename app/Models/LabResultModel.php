@@ -37,7 +37,7 @@ class LabResultModel extends Model
                 'left'
             )
             ->where('l.organ_code', $organCode)
-            ->whereIn('l.person_type', [$personType, 'both'])
+            ->where('l.person_type', $personType)
             ->where('l.is_active', 1)
             ->orderBy('lp.sort_order')
             ->orderBy('l.sort_order')

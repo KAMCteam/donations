@@ -10,12 +10,13 @@ use CodeIgniter\Database\Seeder;
  *
  *     php spark db:seed DatabaseSeeder
  *
- * The workup is the transplant check list, group for group and test for test:
- * a recipient's pre-transplant list and the donor's pre-Tx list. Where both
- * ask for the same test it is stored once, marked `both`; where only one side
- * does, it is marked for that side. The spellings that differ between the two
- * sheets for the same test ("Ca/Phos/Mg" and "Calcium/Phosphorus/Mg") are
- * reconciled in ALIASES rather than stored twice.
+ * The workup is the transplant check list, group for group and test for test.
+ * The two sheets are kept apart all the way down, headings included: the
+ * recipient's "Hematology/Biochemistry" and the donor's "Hematology/Biochem"
+ * are two groups, not one spelled two ways, because they hold different tests.
+ * Four headings read almost the same on both sheets and none of them lists the
+ * same tests, so a shared heading would have to be filtered by side on every
+ * read — and the first heading that is genuinely shared would break it.
  *
  * The check list names no organ, so both programmes get both lists.
  *
@@ -31,192 +32,187 @@ class DatabaseSeeder extends Seeder
     ];
 
     /**
-     * How the check list records each kind of test, from its own wording:
+     * How the check list records each kind of test, in its own wording:
      *
-     *   blood_group          A / B / AB / O
-     *   done                 Not done / pending / done
-     *   positive_negative    Not done / pending / Positive / Negative
-     *   acceptable_abnormal  Not done / pending / acceptable / Abnormal
-     *   cleared_not_cleared  Not done / pending / Cleared / not cleared
-     *   given_not_given      Given / not required / not given
+     *   blood_group             A / B / AB / O
+     *   done                    Not done / pending / done
+     *   positive_negative       Not done / pending / Positive / Negative
+     *   acceptable_abnormal     Not done / pending / acceptable / Abnormal
+     *   acceptable_abnormal_na  ... / Not applicable
+     *   cleared_not_cleared     Not done / pending / Cleared / not cleared / Not applicable
+     *   given_not_given         Given / not required / not given / not applicable
      *
-     * The sheet adds "Not applicable" to several of these; it is an answer any
-     * test can need, so it is not a vocabulary of its own.
+     * "Not applicable" is offered test by test rather than everywhere: the
+     * sheet adds it to cancer screening, imaging, the clearances and B-HCG —
+     * the tests a patient's sex or history can rule out — and withholds it
+     * from the bloods and serologies, which are asked of everyone. That is why
+     * `acceptable_abnormal` comes in two, one with the answer and one without.
+     *
+     * Every test starts at Not done, whichever list it answers from.
      */
     private const RECIPIENT = [
         'Immunology tests' => [
             ['Blood group', 'blood_group'],
-            ['HLA Typing', 'done'],
             ['PRA', 'done'],
-            ['DSA', 'positive_negative'],
+            ['HLA Typing', 'done'],
             ['Cross match', 'positive_negative'],
+            ['DSA', 'positive_negative'],
         ],
         'Hematology/Biochemistry' => [
             ['CBC', 'acceptable_abnormal'],
-            ['Creatinine', 'acceptable_abnormal'],
             ['Electrolyte', 'acceptable_abnormal'],
-            ['Calcium/Phosphorus/Mg', 'acceptable_abnormal'],
             ['Lipid profile', 'acceptable_abnormal'],
-            ['Liver profile', 'acceptable_abnormal'],
             ['Albumin', 'acceptable_abnormal'],
-            ['Coagulation profile', 'acceptable_abnormal'],
             ['FBG', 'acceptable_abnormal'],
-            ['HbA1C', 'acceptable_abnormal'],
             ['G6PD', 'acceptable_abnormal'],
-            ['Sickle cell', 'acceptable_abnormal'],
             ['PTH', 'acceptable_abnormal'],
-            ['B-HCG', 'acceptable_abnormal'],
+            ['Creatinine', 'acceptable_abnormal'],
+            ['Calcium/Phosphorus/Mg', 'acceptable_abnormal'],
+            ['Liver profile', 'acceptable_abnormal'],
+            ['Coagulation profile', 'acceptable_abnormal'],
+            ['Sickle cell', 'acceptable_abnormal'],
+            ['HbA1C', 'acceptable_abnormal'],
+            ['B-HCG', 'acceptable_abnormal_na'],
         ],
         'Infectious workup' => [
             ['HbsAg', 'positive_negative'],
-            ['HCV', 'positive_negative'],
             ['HbsAb', 'positive_negative'],
-            ['HIV', 'positive_negative'],
             ['AbcAb', 'positive_negative'],
-            ['Brucella', 'positive_negative'],
             ['TB', 'positive_negative'],
-            ['Syphilis', 'positive_negative'],
             ['Leishmania', 'positive_negative'],
-            ['Strongyloides', 'positive_negative'],
             ['Mumps', 'positive_negative'],
-            ['Measles', 'positive_negative'],
             ['Rubella', 'positive_negative'],
-            ['VZV', 'positive_negative'],
             ['CMV', 'positive_negative'],
-            ['EBV', 'positive_negative'],
             ['Toxoplasma', 'positive_negative'],
+            ['HCV', 'positive_negative'],
+            ['HIV', 'positive_negative'],
+            ['Brucella', 'positive_negative'],
+            ['Syphilis', 'positive_negative'],
+            ['Strongyloides', 'positive_negative'],
+            ['Measles', 'positive_negative'],
+            ['VZV', 'positive_negative'],
+            ['EBV', 'positive_negative'],
             ['Schistosomiasis', 'positive_negative'],
         ],
-        'Urine/stool' => [
+        'Urine/Stool' => [
             ['Urinalysis', 'acceptable_abnormal'],
-            ['Protein/Creatinine ratio', 'acceptable_abnormal'],
             ['Urine Culture', 'acceptable_abnormal'],
+            ['Protein/Creatinine ratio', 'acceptable_abnormal'],
             ['24h-urine for protein', 'acceptable_abnormal'],
             ['Cr clearance', 'acceptable_abnormal'],
             ['Stool exam', 'acceptable_abnormal'],
             ['Stool cultures', 'positive_negative'],
         ],
         'Cancer screening' => [
-            ['PSA', 'acceptable_abnormal'],
-            ['PAP smear', 'acceptable_abnormal'],
-            ['Stool OB', 'acceptable_abnormal'],
-            ['Mammogram', 'acceptable_abnormal'],
-            ['Colonoscopy', 'acceptable_abnormal'],
-            ['U/S gyn', 'acceptable_abnormal'],
+            ['PSA', 'acceptable_abnormal_na'],
+            ['Stool OB', 'acceptable_abnormal_na'],
+            ['Colonoscopy', 'acceptable_abnormal_na'],
+            ['PAP smear', 'acceptable_abnormal_na'],
+            ['Mammogram', 'acceptable_abnormal_na'],
+            ['U/S gyn', 'acceptable_abnormal_na'],
         ],
         'Imaging' => [
-            ['CXR', 'acceptable_abnormal'],
-            ['US KUB', 'acceptable_abnormal'],
-            ['ECG', 'acceptable_abnormal'],
-            ['Echo', 'acceptable_abnormal'],
-            ['CT angio pelvis', 'acceptable_abnormal'],
-            ['Coronary Angio', 'acceptable_abnormal'],
+            ['CXR', 'acceptable_abnormal_na'],
+            ['ECG', 'acceptable_abnormal_na'],
+            ['Echo', 'acceptable_abnormal_na'],
+            ['CT angio pelvis', 'acceptable_abnormal_na'],
+            ['Coronary Angio', 'acceptable_abnormal_na'],
+            ['US KUB', 'acceptable_abnormal_na'],
         ],
         'Referrals and Clearances' => [
             ['Dental', 'cleared_not_cleared'],
-            ['Cardiology', 'cleared_not_cleared'],
             ['Anaesthesia', 'cleared_not_cleared'],
+            ['Cardiology', 'cleared_not_cleared'],
             ['Transplant Surgeons', 'cleared_not_cleared'],
             ['Gynaecology', 'cleared_not_cleared'],
-            ['Social worker', 'cleared_not_cleared'],
             ['I.D', 'cleared_not_cleared'],
+            ['Social worker', 'cleared_not_cleared'],
             ['Gastroenterology', 'cleared_not_cleared'],
         ],
         'Vaccinations' => [
             ['MMR', 'given_not_given'],
-            ['Hepatitis B vaccine', 'given_not_given'],
             ['VZV', 'given_not_given'],
-            ['Influenza vaccine', 'given_not_given'],
             ['Pneumococcal 13', 'given_not_given'],
-            ['Pneumococcal 23', 'given_not_given'],
             ['Meningococcal', 'given_not_given'],
+            ['Hepatitis B vaccine', 'given_not_given'],
+            ['Influenza vaccine', 'given_not_given'],
+            ['Pneumococcal 23', 'given_not_given'],
         ],
     ];
 
     /**
-     * The donor sheet. Its group headings are the recipient's abbreviated
-     * ("Immunology", "Hematology/Biochem", "Clearances"); they are written out
-     * here so one set of headings serves both.
+     * The donor's pre-Tx sheet, under its own headings.
      *
-     * Cross match is laid out as a heading row on the donor sheet rather than
-     * a test row — it is a test, and it is here.
+     * Shorter than the recipient's at every turn: no cancer screening, no
+     * vaccinations, no Schistosomiasis, no PRA or DSA, and its own spellings
+     * for tests the recipient sheet writes out in full ("Ca/Phos/Mg",
+     * "Creatinine Clearance"). Renal panel/Cr stands where the recipient sheet
+     * asks for Creatinine, and microalbuminuria is asked of donors alone.
      */
     private const DONOR = [
-        'Immunology tests' => [
+        'Immunology' => [
             ['Blood group', 'blood_group'],
             ['HLA Typing', 'done'],
             ['Cross match', 'positive_negative'],
         ],
-        'Hematology/Biochemistry' => [
+        'Hematology/Biochem' => [
             ['CBC', 'acceptable_abnormal'],
-            ['Renal panel/Cr', 'acceptable_abnormal'],
             ['Electrolyte', 'acceptable_abnormal'],
-            ['Calcium/Phosphorus/Mg', 'acceptable_abnormal'],
             ['Lipid profile', 'acceptable_abnormal'],
-            ['Liver profile', 'acceptable_abnormal'],
             ['Albumin', 'acceptable_abnormal'],
-            ['Coagulation profile', 'acceptable_abnormal'],
             ['FBG', 'acceptable_abnormal'],
+            ['Renal panel/Cr', 'acceptable_abnormal'],
+            ['Ca/Phos/Mg', 'acceptable_abnormal'],
+            ['Liver profile', 'acceptable_abnormal'],
+            ['Coagulation profile', 'acceptable_abnormal'],
             ['HbA1C', 'acceptable_abnormal'],
-            ['B-HCG', 'acceptable_abnormal'],
             ['Sickle cell', 'acceptable_abnormal'],
+            ['B-HCG', 'acceptable_abnormal_na'],
         ],
         'Infectious workup' => [
             ['HbsAg', 'positive_negative'],
-            ['HCV', 'positive_negative'],
             ['HbsAb', 'positive_negative'],
-            ['HIV', 'positive_negative'],
             ['AbcAb', 'positive_negative'],
-            ['Brucella', 'positive_negative'],
             ['TB', 'positive_negative'],
-            ['Syphilis', 'positive_negative'],
             ['Leishmania', 'positive_negative'],
+            ['HCV', 'positive_negative'],
+            ['HIV', 'positive_negative'],
+            ['Brucella', 'positive_negative'],
+            ['Syphilis', 'positive_negative'],
             ['Strongyloides', 'positive_negative'],
             ['Mumps', 'positive_negative'],
-            ['VZV', 'positive_negative'],
             ['Measles', 'positive_negative'],
-            ['Rubella', 'positive_negative'],
             ['CMV', 'positive_negative'],
-            ['EBV', 'positive_negative'],
             ['Toxoplasma', 'positive_negative'],
+            ['VZV', 'positive_negative'],
+            ['Rubella', 'positive_negative'],
+            ['EBV', 'positive_negative'],
         ],
-        'Urine/stool' => [
+        'Urine/Stool' => [
             ['Urinalysis', 'acceptable_abnormal'],
-            ['Protein/Creatinine ratio', 'acceptable_abnormal'],
             ['Urine Culture', 'acceptable_abnormal'],
             ['24h-urine for protein', 'acceptable_abnormal'],
-            ['Cr clearance', 'acceptable_abnormal'],
             ['Microalbuminuria', 'acceptable_abnormal'],
-            ['Stool exam', 'acceptable_abnormal'],
+            ['Protein/Creatinine ratio', 'acceptable_abnormal'],
+            ['Creatinine Clearance', 'acceptable_abnormal'],
+            ['Stool Exam', 'acceptable_abnormal'],
         ],
         'Imaging' => [
-            ['CXR', 'acceptable_abnormal'],
-            ['US KUB', 'acceptable_abnormal'],
-            ['ECG', 'acceptable_abnormal'],
-            ['Echo', 'acceptable_abnormal'],
-            ['CT angio pelvis', 'acceptable_abnormal'],
-            ['Mammogram', 'acceptable_abnormal'],
-            ['US Gynae', 'acceptable_abnormal'],
+            ['CXR', 'acceptable_abnormal_na'],
+            ['ECG', 'acceptable_abnormal_na'],
+            ['Echo', 'acceptable_abnormal_na'],
+            ['CT angio pelvis', 'acceptable_abnormal_na'],
+            ['US Gynae', 'acceptable_abnormal_na'],
+            ['US KUB', 'acceptable_abnormal_na'],
+            ['Mammogram', 'acceptable_abnormal_na'],
         ],
-        'Referrals and Clearances' => [
+        'Clearances' => [
             ['Anaesthesia', 'cleared_not_cleared'],
-            ['Cardio', 'cleared_not_cleared'],
             ['Advocate', 'cleared_not_cleared'],
-            ['Transplant Surgery', 'cleared_not_cleared'],
             ['Social worker', 'cleared_not_cleared'],
+            ['Cardio', 'cleared_not_cleared'],
+            ['Transplant Surgery', 'cleared_not_cleared'],
         ],
-    ];
-
-    /** The order the groups appear on the sheet, which is the order they show. */
-    private const GROUP_ORDER = [
-        'Immunology tests',
-        'Hematology/Biochemistry',
-        'Infectious workup',
-        'Urine/stool',
-        'Cancer screening',
-        'Imaging',
-        'Referrals and Clearances',
-        'Vaccinations',
     ];
 
     public function run(): void
@@ -247,89 +243,85 @@ class DatabaseSeeder extends Seeder
 
     private function seedWorkup(): void
     {
-        $wanted = $this->checklist();
+        $seeded = [];
 
         foreach (array_column(self::PROGRAMS, 0) as $organ) {
-            $this->seedProgramme($organ, $wanted);
+            foreach (['recipient' => self::RECIPIENT, 'donor' => self::DONOR] as $personType => $sheet) {
+                foreach ($this->seedSheet($organ, $personType, $sheet) as $id) {
+                    $seeded[$id] = true;
+                }
+            }
         }
 
-        $this->retireAnythingNotOnTheChecklist($wanted);
+        $this->retireAnythingNotOnTheChecklist(array_keys($seeded));
     }
 
     /**
-     * The two sheets merged: group => [name => [personType, resultType, order]].
+     * One side of one programme: its groups in order, and its tests in each.
      *
-     * A test on both sheets is one row marked `both`. Order runs across the
-     * whole checklist so a group's tests keep the order they are listed in.
+     * @param array<string, list<array{string, string}>> $sheet
      *
-     * @return array<string, array<string, array{string, string, int}>>
+     * @return list<int> The lab rows this sheet accounts for
      */
-    private function checklist(): array
+    private function seedSheet(string $organ, string $personType, array $sheet): array
     {
-        $merged = [];
-        $order  = 0;
-
-        foreach (self::GROUP_ORDER as $group) {
-            foreach (self::RECIPIENT[$group] ?? [] as [$name, $resultType]) {
-                $merged[$group][$name] = ['recipient', $resultType, ++$order];
-            }
-
-            foreach (self::DONOR[$group] ?? [] as [$name, $resultType]) {
-                if (isset($merged[$group][$name])) {
-                    $merged[$group][$name][0] = 'both';
-
-                    continue;
-                }
-
-                $merged[$group][$name] = ['donor', $resultType, ++$order];
-            }
-        }
-
-        return $merged;
-    }
-
-    /** @param array<string, array<string, array{string, string, int}>> $wanted */
-    private function seedProgramme(string $organ, array $wanted): void
-    {
-        $parents    = $this->db->table('lab_parents');
         $labs       = $this->db->table('labs');
+        $ids        = [];
         $groupOrder = 0;
+        $order      = 0;
 
-        foreach ($wanted as $group => $tests) {
-            $groupOrder++;
-            $row = $parents->getWhere(['name' => $group])->getRowArray();
+        foreach ($sheet as $group => $tests) {
+            $parentId = $this->parentId($group, $personType, ++$groupOrder);
 
-            if ($row === null) {
-                $parents->insert(['name' => $group, 'sort_order' => $groupOrder]);
-                $parentId = (int) $this->db->insertID();
-            } else {
-                $parentId = (int) $row['id'];
-                $parents->where('id', $parentId)->update(['sort_order' => $groupOrder]);
-            }
-
-            foreach ($tests as $name => [$personType, $resultType, $order]) {
+            foreach ($tests as [$name, $resultType]) {
+                // Keyed on the group as well as the name: the recipient sheet
+                // lists VZV twice, once as a serology and once as a jab.
                 $key = [
                     'name'          => $name,
                     'lab_parent_id' => $parentId,
                     'organ_code'    => $organ,
+                    'person_type'   => $personType,
                 ];
 
                 $values = [
-                    'person_type' => $personType,
                     'result_type' => $resultType,
-                    'sort_order'  => $order,
+                    'sort_order'  => ++$order,
                     'is_active'   => 1,
                 ];
 
-                // Keyed on the group as well as the name: the sheet lists VZV
-                // twice, once as a serology and once as a vaccination.
-                if ($labs->getWhere($key)->getRowArray() === null) {
+                $row = $labs->getWhere($key)->getRowArray();
+
+                if ($row === null) {
                     $labs->insert($key + $values);
-                } else {
-                    $this->db->table('labs')->where($key)->update($values);
+                    $ids[] = (int) $this->db->insertID();
+
+                    continue;
                 }
+
+                $this->db->table('labs')->where('id', $row['id'])->update($values);
+                $ids[] = (int) $row['id'];
             }
         }
+
+        return $ids;
+    }
+
+    /** The group heading, made if this side does not have it yet. */
+    private function parentId(string $name, string $personType, int $order): int
+    {
+        $parents = $this->db->table('lab_parents');
+        $key     = ['name' => $name, 'person_type' => $personType];
+        $row     = $parents->getWhere($key)->getRowArray();
+
+        if ($row === null) {
+            $parents->insert($key + ['sort_order' => $order]);
+
+            return (int) $this->db->insertID();
+        }
+
+        $parents->where('id', $row['id'])->update(['sort_order' => $order]);
+
+        return (int) $row['id'];
     }
 
     /**
@@ -339,20 +331,12 @@ class DatabaseSeeder extends Seeder
      * where something has: a result already entered stays attached to the test
      * it was entered for, and only disappears from the screens.
      *
-     * @param array<string, array<string, array{string, string, int}>> $wanted
+     * @param list<int> $keep Every lab row the two sheets account for
      */
-    private function retireAnythingNotOnTheChecklist(array $wanted): void
+    private function retireAnythingNotOnTheChecklist(array $keep): void
     {
-        $names = [];
-
-        foreach ($wanted as $tests) {
-            foreach (array_keys($tests) as $name) {
-                $names[$name] = true;
-            }
-        }
-
         $stale = $this->db->table('labs')
-            ->whereNotIn('name', array_keys($names))
+            ->whereNotIn('id', $keep === [] ? [0] : $keep)
             ->get()
             ->getResultArray();
 
@@ -370,7 +354,8 @@ class DatabaseSeeder extends Seeder
         $this->db->query(
             'DELETE FROM ' . $this->db->protectIdentifiers($this->db->prefixTable('lab_parents'))
             . ' WHERE id NOT IN (SELECT lab_parent_id FROM '
-            . $this->db->protectIdentifiers($this->db->prefixTable('labs')) . ')'
+            . $this->db->protectIdentifiers($this->db->prefixTable('labs'))
+            . ' WHERE lab_parent_id IS NOT NULL)'
         );
     }
 }

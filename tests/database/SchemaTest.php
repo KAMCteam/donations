@@ -58,7 +58,9 @@ final class SchemaTest extends CIUnitTestCase
         // Only the reference rows the system cannot start without: the two
         // programmes, and the check list's workup for each.
         $this->assertCount(2, model(OrganProgramModel::class)->active());
-        $this->assertCount(8, $this->db->table('lab_parents')->get()->getResultArray());
+        // Eight group headings on the recipient's sheet, six on the donor's.
+        $this->assertCount(8, $this->db->table('lab_parents')->where('person_type', 'recipient')->get()->getResultArray());
+        $this->assertCount(6, $this->db->table('lab_parents')->where('person_type', 'donor')->get()->getResultArray());
         $this->assertSame(
             $this->db->table('labs')->where('organ_code', 'kidney')->countAllResults(),
             $this->db->table('labs')->where('organ_code', 'liver')->countAllResults(),
@@ -282,8 +284,8 @@ final class SchemaTest extends CIUnitTestCase
     {
         $labs = model(LabModel::class);
 
-        // Each side of each programme gets the tests marked for it plus
-        // `both`: 71 on the recipient's sheet, 51 on the donor's.
+        // Each side of each programme gets its own sheet's tests, and only
+        // those: 71 on the recipient's, 51 on the donor's.
         $this->assertCount(71, $labs->workupFor('kidney', 'recipient'));
         $this->assertCount(51, $labs->workupFor('kidney', 'donor'));
         $this->assertCount(71, $labs->workupFor('liver', 'recipient'));
@@ -292,9 +294,16 @@ final class SchemaTest extends CIUnitTestCase
         $recipientNames = array_column($labs->workupFor('kidney', 'recipient'), 'name');
         $donorNames     = array_column($labs->workupFor('kidney', 'donor'), 'name');
 
-        // On both sheets, so stored once and marked `both`.
+        // On both sheets, so a row on each — and neither side sees the
+        // other's, which is what makes the two orders and spellings possible.
         $this->assertContains('Cross match', $recipientNames);
         $this->assertContains('Cross match', $donorNames);
+
+        // The same test, spelled the way each sheet spells it.
+        $this->assertContains('Calcium/Phosphorus/Mg', $recipientNames);
+        $this->assertContains('Ca/Phos/Mg', $donorNames);
+        $this->assertNotContains('Ca/Phos/Mg', $recipientNames);
+        $this->assertNotContains('Calcium/Phosphorus/Mg', $donorNames);
 
         // On the recipient's sheet alone.
         $this->assertContains('PRA', $recipientNames);
@@ -310,12 +319,45 @@ final class SchemaTest extends CIUnitTestCase
             'Immunology tests',
             'Hematology/Biochemistry',
             'Infectious workup',
-            'Urine/stool',
+            'Urine/Stool',
             'Cancer screening',
             'Imaging',
             'Referrals and Clearances',
             'Vaccinations',
         ], $groups);
+
+        // The donor's sheet has its own headings, shorter and fewer.
+        $donorGroups = array_values(array_unique(array_column($labs->workupFor('kidney', 'donor'), 'parent_name')));
+        $this->assertSame([
+            'Immunology',
+            'Hematology/Biochem',
+            'Infectious workup',
+            'Urine/Stool',
+            'Imaging',
+            'Clearances',
+        ], $donorGroups);
+    }
+
+    public function testATestOffersOnlyTheAnswersItsSheetPrints(): void
+    {
+        $types = array_column(
+            model(LabModel::class)->workupFor('kidney', 'recipient'),
+            'result_type',
+            'name'
+        );
+
+        // Not applicable is where the sheet puts it — on a test a patient's
+        // sex or history can rule out — and nowhere else.
+        $this->assertSame('acceptable_abnormal_na', $types['B-HCG']);
+        $this->assertSame('acceptable_abnormal_na', $types['Mammogram']);
+        $this->assertSame('acceptable_abnormal', $types['CBC'], 'asked of everyone, so it cannot not apply');
+        $this->assertNotContains('not_applicable', UiStore::RESULT_OPTIONS['acceptable_abnormal']);
+        $this->assertContains('not_applicable', UiStore::RESULT_OPTIONS['acceptable_abnormal_na']);
+
+        // And every test starts where nobody has looked yet.
+        foreach (UiStore::RESULT_OPTIONS as $vocabulary => $answers) {
+            $this->assertSame('not_done', $answers[0], "{$vocabulary} should start at Not done");
+        }
     }
 
     public function testAnUnrecordedTestStillComesBackAsNotDone(): void

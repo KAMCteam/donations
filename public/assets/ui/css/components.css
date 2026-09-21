@@ -431,6 +431,29 @@
   transition-duration: var(--dur);
 }
 
+/* The check list's comment line: on every card, not behind the pencil. */
+.lab-comment {
+  padding: 0.5rem 0.75rem 0.625rem;
+  background-color: #fff;
+  border-top: 1px solid var(--slate-100);
+}
+
+.lab-comment-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 500;
+  color: var(--slate-400);
+}
+
+/* Grows with what is typed rather than scrolling inside one line. */
+.lab-comment-field {
+  field-sizing: content;
+  min-height: 2rem;
+  resize: none;
+}
+
 .lab-editor {
   padding: 0.25rem 0.75rem 0.75rem;
   background-color: #fff;

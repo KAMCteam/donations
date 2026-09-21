@@ -84,23 +84,28 @@ final class UiStore
      * Every card shows its own test's answers rather than one generic
      * Pending / Done / Flagged: a serology is Positive or Negative, a referral
      * is Cleared or not, a vaccination is Given or not. `not_done` starts them
-     * all — nobody has looked yet — and `not_applicable` ends most of them,
-     * since a test that cannot apply to this patient is a real answer and the
-     * sheet adds it to several vocabularies by hand.
+     * all — nobody has looked yet.
+     *
+     * `not_applicable` is only where the sheet puts it: on the cancer
+     * screening, the imaging, the clearances and B-HCG, the tests a patient's
+     * sex or history can rule out. The bloods and serologies are asked of
+     * everyone, so they do not offer it — which is why acceptable/abnormal
+     * comes in two lists that differ by that one answer.
      *
      * Blood group is the one that answers with a value rather than a verdict,
      * so its answers are prefixed: in the column, `blood_ab` is unmistakably a
      * blood group and not an abbreviation of something else.
      */
     public const RESULT_OPTIONS = [
-        'blood_group'         => ['not_done', 'blood_a', 'blood_b', 'blood_ab', 'blood_o'],
-        'done'                => ['not_done', 'pending', 'done', 'not_applicable'],
-        'positive_negative'   => ['not_done', 'pending', 'positive', 'negative', 'not_applicable'],
-        'acceptable_abnormal' => ['not_done', 'pending', 'acceptable', 'abnormal', 'not_applicable'],
-        'cleared_not_cleared' => ['not_done', 'pending', 'cleared', 'not_cleared', 'not_applicable'],
-        'given_not_given'     => ['not_done', 'given', 'not_required', 'not_given', 'not_applicable'],
-        'text'                => ['not_done', 'pending', 'done', 'not_applicable'],
-        'numeric'             => ['not_done', 'pending', 'done', 'not_applicable'],
+        'blood_group'            => ['not_done', 'blood_a', 'blood_b', 'blood_ab', 'blood_o'],
+        'done'                   => ['not_done', 'pending', 'done'],
+        'positive_negative'      => ['not_done', 'pending', 'positive', 'negative'],
+        'acceptable_abnormal'    => ['not_done', 'pending', 'acceptable', 'abnormal'],
+        'acceptable_abnormal_na' => ['not_done', 'pending', 'acceptable', 'abnormal', 'not_applicable'],
+        'cleared_not_cleared'    => ['not_done', 'pending', 'cleared', 'not_cleared', 'not_applicable'],
+        'given_not_given'        => ['not_done', 'given', 'not_required', 'not_given', 'not_applicable'],
+        'text'                   => ['not_done', 'pending', 'done', 'not_applicable'],
+        'numeric'                => ['not_done', 'pending', 'done', 'not_applicable'],
     ];
 
     public const RESULT_LABEL = [
@@ -146,6 +151,23 @@ final class UiStore
 
     /** Where a test starts: nobody has looked at it yet. */
     public const RESULT_UNANSWERED = ['not_done', 'pending'];
+
+    /**
+     * Tests whose comment box the sheet gives a shape to.
+     *
+     * HLA typing is the only one: under its comment line the sheet prints the
+     * loci to fill in — A / B / Cw on one row, DRB1 / DRB2 / DQ / DP on the
+     * next — so the box is asking for a typing, not for a remark, and it is
+     * sized and prompted for one.
+     *
+     * @var array<string, array{rows: int, placeholder: string}>
+     */
+    public const COMMENT_HINT = [
+        'HLA Typing' => [
+            'rows'        => 3,
+            'placeholder' => "A  /  B  /  Cw\nDRB1  /  DRB2  /  DQ  /  DP",
+        ],
+    ];
 
     /** The answers a test can hold, whichever kind it is. */
     public const LAB_STATUSES = [
@@ -789,10 +811,19 @@ final class UiStore
             $date  = (string) ($test['date'] ?? '');
             $notes = (string) ($test['notes'] ?? '');
 
+            $lab = $this->labs->find($labId);
+
+            // The test has to be one this side's sheet asks for. Each sheet
+            // has its own row for a test both ask for, so a donor's CBC and a
+            // recipient's are different ids and a result filed against the
+            // wrong one would be invisible on the screen that entered it.
+            if ($lab === null || $lab['person_type'] !== $personType) {
+                continue;
+            }
+
             // The answer has to be one this test actually offers. The form
             // renders only those, so anything else was not typed on a screen.
-            $lab     = $this->labs->find($labId);
-            $offered = self::RESULT_OPTIONS[$lab['result_type'] ?? 'text'] ?? self::RESULT_OPTIONS['text'];
+            $offered = self::RESULT_OPTIONS[$lab['result_type']] ?? self::RESULT_OPTIONS['text'];
             $status  = (string) ($test['status'] ?? 'not_done');
             $status  = in_array($status, $offered, true) ? $status : 'not_done';
 

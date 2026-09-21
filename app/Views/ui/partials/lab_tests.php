@@ -5,11 +5,15 @@ use App\Libraries\UiStore;
 /**
  * "Required Lab Tests" card. Was `js/lab-section.js`.
  *
- * Every test is a real form control now: the three status buttons write into a
- * hidden `status` input and the result / date / notes fields live inside the
- * card from the start, marked `hidden` until the pencil is clicked. So the card
- * arrives as finished HTML and posts with the form it sits in, where the
- * prototype had to build the card and its editor from strings on each click.
+ * Every test is a real form control now: the status buttons write into a
+ * hidden `status` input and the value / date fields live inside the card from
+ * the start, marked `hidden` until the pencil is clicked. So the card arrives
+ * as finished HTML and posts with the form it sits in, where the prototype had
+ * to build the card and its editor from strings on each click.
+ *
+ * Comment is the exception: the check list prints a comment line under every
+ * single test, so it is on the face of the card rather than behind the pencil.
+ * Reading a workup, it is where a Positive or an Abnormal says what it was.
  *
  * @var list<array<string, mixed>> $tests      Each carries the group it is listed under.
  * @var string                     $field      Form field prefix, e.g. "labs" or "rLabs".
@@ -96,10 +100,23 @@ foreach ($tests as $i => $test) {
                     <button type="button" class="lab-edit-btn" data-lab-edit<?= $editTitle !== null ? ' title="' . esc($editTitle) . '"' : '' ?>><?= ui_icon('edit') ?></button>
                 </div>
 
+                <?php // The sheet's comment line. Free text on every test, and
+                      // on HLA typing the loci it asks to be filled in with. ?>
+                <?php if ($editing || ($test['notes'] ?? '') !== ''): ?>
+                    <?php
+                    $hint      = UiStore::COMMENT_HINT[$test['name']] ?? null;
+                    $commentId = $field . '-' . $i . '-comment';
+                    ?>
+                    <div class="lab-comment">
+                        <label class="lab-comment-label" for="<?= $commentId ?>">Comment</label>
+                        <textarea id="<?= $commentId ?>" class="lab-editor-field lab-comment-field" name="<?= $base ?>[notes]"
+                                  rows="<?= $hint['rows'] ?? 1 ?>"<?= $hint === null ? '' : ' placeholder="' . esc($hint['placeholder']) . '"' ?>><?= esc($test['notes'] ?? '') ?></textarea>
+                    </div>
+                <?php endif; ?>
+
                 <div class="lab-editor stack-2" data-lab-editor hidden>
-                    <input type="text" class="lab-editor-field" name="<?= $base ?>[result]" value="<?= esc($test['result'] ?? '') ?>" placeholder="Result / finding">
+                    <input type="text" class="lab-editor-field" name="<?= $base ?>[result]" value="<?= esc($test['result'] ?? '') ?>" placeholder="Value / finding">
                     <input type="text" class="lab-editor-field lab-editor-field--mono" name="<?= $base ?>[date]" value="<?= esc($test['date'] ?? '') ?>" placeholder="Date (DD/MM/YYYY)" inputmode="numeric" maxlength="10" autocomplete="off" data-date-text>
-                    <textarea class="lab-editor-field" name="<?= $base ?>[notes]" placeholder="Notes (optional)" rows="2"><?= esc($test['notes'] ?? '') ?></textarea>
                     <button type="button" class="lab-editor-save" data-lab-save>Save</button>
                 </div>
             </div>

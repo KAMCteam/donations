@@ -1287,7 +1287,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $mrn = (int) $this->db->table('recipients')->get()->getRowArray()['mrn'];
         // A serology, which answers Positive or Negative.
         $lab = $this->db->table('labs')
-            ->where(['organ_code' => 'kidney', 'name' => 'HIV'])
+            ->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'HIV'])
             ->get()->getRowArray();
 
         $this->post('recipients/' . $mrn, [
@@ -1352,7 +1352,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->post('recipients/new', ['mrn' => '4022', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
 
         $lab = $this->db->table('labs')
-            ->where(['organ_code' => 'kidney', 'name' => 'Dental'])
+            ->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'Dental'])
             ->get()->getRowArray();
 
         $this->post('recipients/4022', [
@@ -1369,13 +1369,61 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('lab_results', ['lab_id' => $lab['id'], 'status' => 'not_done']);
     }
 
+    /**
+     * The comment is on the face of every card, not behind the pencil.
+     *
+     * The check list prints a comment line under each test, so a workup that
+     * only carries comments — no answers, no dates — is a real one and has to
+     * survive the round trip.
+     */
+    public function testACommentIsOfferedOnEveryTestAndKeptOnItsOwn(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4024', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $html = $this->get('recipients/4024?edit=labs')->getBody();
+        $this->assertSame(71, substr_count($html, 'class="lab-comment"'), 'one per test');
+
+        // HLA typing asks for the loci the sheet prints under its comment.
+        $this->assertStringContainsString('DRB1', $this->cardFor($html, 'HLA Typing'));
+        $this->assertStringNotContainsString('DRB1', $this->cardFor($html, 'CBC'));
+
+        $cbc = $this->db->table('labs')
+            ->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'CBC'])
+            ->get()->getRowArray();
+
+        $this->post('recipients/4024', [
+            'section' => 'labs',
+            'labs'    => [['id' => $cbc['id'], 'name' => 'CBC', 'status' => 'not_done', 'notes' => 'Hb 13.4']],
+        ]);
+
+        $this->seeInDatabase('lab_results', ['lab_id' => $cbc['id'], 'status' => 'not_done', 'notes' => 'Hb 13.4']);
+        $this->assertStringContainsString('Hb 13.4', $this->get('recipients/4024')->getBody());
+    }
+
+    /** A result belongs to the side that entered it, not to a test's name. */
+    public function testATestFromTheOtherSidesSheetIsNotStored(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4025', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $donorCbc = $this->db->table('labs')
+            ->where(['organ_code' => 'kidney', 'person_type' => 'donor', 'name' => 'CBC'])
+            ->get()->getRowArray();
+
+        $this->post('recipients/4025', [
+            'section' => 'labs',
+            'labs'    => [['id' => $donorCbc['id'], 'name' => 'CBC', 'status' => 'acceptable']],
+        ]);
+
+        $this->dontSeeInDatabase('lab_results', ['lab_id' => $donorCbc['id']]);
+    }
+
     /** The bar counts answered tests, whatever the answer was. */
     public function testTheProgressBarCountsAnsweredTests(): void
     {
         $this->post('recipients/new', ['mrn' => '4023', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
 
-        $hiv    = $this->db->table('labs')->where(['organ_code' => 'kidney', 'name' => 'HIV'])->get()->getRowArray();
-        $dental = $this->db->table('labs')->where(['organ_code' => 'kidney', 'name' => 'Dental'])->get()->getRowArray();
+        $hiv    = $this->db->table('labs')->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'HIV'])->get()->getRowArray();
+        $dental = $this->db->table('labs')->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'Dental'])->get()->getRowArray();
 
         $this->post('recipients/4023', [
             'section' => 'labs',

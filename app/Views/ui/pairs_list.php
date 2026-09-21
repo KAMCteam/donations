@@ -22,7 +22,7 @@ use App\Libraries\UiStore;
 $headers = [
     'Pair #', 'MRN', 'Name', 'Age', 'Type', 'Relationship',
     'Blood Group', 'MRP', 'Gender', 'Phone Number',
-    'Dialysis', 'Entry Date', 'Match Status', 'Date of Crossmatch', 'Note', '',
+    'Dialysis', 'Entry Date', 'Status', 'Date of Crossmatch', 'Note', '',
 ];
 
 $dash = '—';
@@ -117,7 +117,7 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                             <td class="t-mono t-semibold t-700"><?= esc($recipient['bloodType'] ?? $dash) ?></td>
                             <td class="t-600"><?= esc($mrpName($recipient['selectedMrp'] ?? '')) ?></td>
                             <td class="t-600"><?= esc($recipient['gender'] ?? $dash) ?></td>
-                            <td class="t-mono t-600"><?= esc($recipient['phone'] ?? $dash) ?></td>
+                            <td class="t-mono t-600 cell-phone"><?= esc($recipient['phone'] ?? $dash) ?></td>
                             <td class="t-mono t-500"><?= esc($orDash($recipient['firstDialysis'] ?? '')) ?></td>
                             <td class="t-mono t-500"><?= esc($entry($recipient['dateRegistered'] ?? '')) ?></td>
                             <td rowspan="2" class="cell-span">
@@ -144,7 +144,7 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                             <td class="t-mono t-semibold t-700"><?= esc($donor['bloodType'] ?? $dash) ?></td>
                             <td class="t-600"><?= esc($mrpName($donor['donorMrp'] ?? '')) ?></td>
                             <td class="t-600"><?= esc($donor['donorGender'] ?? $dash) ?></td>
-                            <td class="t-mono t-600"><?= esc($donor['phone'] ?? $dash) ?></td>
+                            <td class="t-mono t-600 cell-phone"><?= esc($donor['phone'] ?? $dash) ?></td>
                             <td class="t-500">N/A</td>
                             <td class="t-500">N/A</td>
                             <td class="t-mono t-500"><?= esc(($pair['scheduledDate'] ?? '') !== '' ? $pair['scheduledDate'] : $dash) ?></td>

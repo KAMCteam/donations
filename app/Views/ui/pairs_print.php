@@ -27,7 +27,7 @@ use App\Libraries\UiStore;
 $headers = [
     'Pair #', 'MRN', 'Name', 'Age', 'Type', 'Relationship',
     'Blood Group', 'MRP', 'Gender', 'Phone Number',
-    'Dialysis', 'Entry Date', 'Match Status', 'Date of Crossmatch', 'Note',
+    'Dialysis', 'Entry Date', 'Status', 'Date of Crossmatch', 'Note',
 ];
 
 $dash = '—';

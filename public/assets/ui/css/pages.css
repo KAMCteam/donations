@@ -490,26 +490,37 @@
   margin-bottom: 1.5rem;
 }
 
+/* Sixteen columns across the page rather than off the side of it.
+
+   The table used to be laid out at its natural width and scrolled inside the
+   card, which meant half a pair was always out of sight. What made it so wide
+   was not the data but the chrome: headings that refused to wrap, so "Date of
+   Crossmatch" reserved its whole length on one line, and three-quarters of a
+   rem of padding on either side of all sixteen. Both are the first things to
+   give. The card keeps `overflow-x: auto` as a floor for a narrow laptop. */
 .pairs-table {
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
-  min-width: 900px;
+  width: 100%;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .pairs-table thead tr { background-color: #15508A; }
 
 .pairs-table th {
-  padding: 0.75rem;
+  padding: 0.5rem 0.375rem;
   text-align: left;
   font-weight: 600;
   color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.025em;
-  white-space: nowrap;
-  font-size: 11px;
+  letter-spacing: 0.01em;
+  /* Two short lines cost a few pixels of height once; one long line costs
+     its whole width on every row underneath. */
+  white-space: normal;
+  font-size: 10px;
+  vertical-align: bottom;
 }
-.pairs-table th:first-child { padding-left: 1.25rem; }
-.pairs-table th:last-child  { padding-right: 1.25rem; }
+.pairs-table th:first-child { padding-left: 0.75rem; }
+.pairs-table th:last-child  { padding-right: 0.75rem; }
 
 .pairs-table tbody tr {
   cursor: pointer;
@@ -521,13 +532,32 @@
 .pairs-table tr.row-donor     { border-bottom: 2px solid var(--slate-200); }
 
 .pairs-table td {
-  padding: 0.625rem 0.75rem;
+  padding: 0.5rem 0.375rem;
   vertical-align: middle;
 }
-.pairs-table td.cell-last { padding-right: 1.25rem; }
+.pairs-table td:first-child { padding-left: 0.75rem; }
+.pairs-table td.cell-last { padding-right: 0.375rem; }
+
+/* The columns that hold prose are the ones allowed to wrap; a date or a
+   phone number wrapping mid-value is harder to read, not easier. */
+.pairs-table td.cell-name,
+.pairs-table td.cell-rel { overflow-wrap: anywhere; }
+.pairs-table .t-mono { white-space: nowrap; }
+
+/* On a laptop the sixteen columns need the last of the slack: the gutters
+   come in again, the type drops a point, and the phone number — the one
+   value with spaces already in it — is allowed to take two lines. A date or
+   an MRN still never breaks mid-value. */
+@media (max-width: 1500px) {
+  .pairs-table { font-size: 10px; }
+  .pairs-table th,
+  .pairs-table td { padding-left: 0.25rem; padding-right: 0.25rem; }
+  .pairs-table td.cell-phone { white-space: normal; }
+  .pairs-table .status-tag { padding-left: 0.375rem; padding-right: 0.375rem; }
+}
 
 .pairs-table td.cell-pairno {
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.25rem;
   text-align: center;
   border-right: 1px solid var(--slate-100);
 }
@@ -565,14 +595,18 @@
 .pairs-table .t-800      { color: var(--slate-800); }
 
 .role-tag {
-  padding: 0.125rem 0.5rem;
+  display: inline-block;
+  padding: 0.125rem 0.375rem;
   border-radius: var(--radius);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .status-tag {
-  padding: 0.25rem 0.625rem;
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
   border-radius: var(--radius-md);
+  white-space: nowrap;
   font-weight: 600;
   text-transform: capitalize;
   white-space: nowrap;

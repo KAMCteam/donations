@@ -65,7 +65,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                     <?= view('ui/partials/date_field', ['id' => 'f-crossmatch', 'name' => 'crossmatchDate', 'value' => $v['crossmatchDate']], ['saveData' => false]) ?>
                 </div>
                 <div>
-                    <label class="field-label" for="f-status">Match Status</label>
+                    <label class="field-label" for="f-status">Status</label>
                     <select id="f-status" name="pairStatus" class="input">
                         <?php foreach (UiStore::STATUS_OPTIONS as $value => $label): ?>
                             <option value="<?= esc($value) ?>"<?= $v['pairStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>

@@ -20,8 +20,9 @@
 }
 
 .login-brand-logo {
+  align-self: flex-start;
   object-fit: contain;
-  max-height: 180px;
+  max-height: min(280px, 30vh);
   filter: brightness(0) invert(1);
 }
 

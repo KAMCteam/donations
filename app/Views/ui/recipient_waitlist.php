@@ -15,7 +15,7 @@ use App\Libraries\UiStore;
  * @var list<array<string, mixed>> $recipients  Unpaired, urgent-first then score-sorted.
  * @var string                     $btFilter
  */
-$headers = ['#', 'Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Score', 'Urgent'];
+$headers = ['#', 'Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Score', 'Urgent', ''];
 // The score is a real number now: a tenth of a point per month waiting plus a
 // tenth per month on dialysis, computed by the query. It is NULL for a
 // recipient with no dialysis date, which shows as a dash rather than as zero.
@@ -62,6 +62,12 @@ $score = static fn (?float $value): string => $value === null ? '—' : number_f
                             <td class="mono"><?= esc($recipient['bloodType']) ?></td>
                             <td class="mono"><?= esc($score($recipient['score'] ?? null)) ?></td>
                             <td><?= $recipient['urgent'] ? 'Urgent' : 'Not Urgent' ?></td>
+                            <td class="cell-action"><?= view('ui/partials/delete_cell', [
+                                'url'    => site_url('recipients/' . rawurlencode($recipient['id']) . '/delete'),
+                                'name'   => $recipient['name'],
+                                'kind'   => 'recipient',
+                                'detail' => 'MRN ' . $recipient['id'] . '. The record and its whole lab workup will be removed. This cannot be undone.',
+                            ], ['saveData' => false]) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -69,4 +75,5 @@ $score = static fn (?float $value): string => $value === null ? '—' : number_f
         <?php endif; ?>
     </div>
 </div>
+<?= view('ui/partials/delete_dialog', [], ['saveData' => false]) ?>
 <?= $this->endSection() ?>

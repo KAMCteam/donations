@@ -22,7 +22,7 @@ use App\Libraries\UiStore;
 $headers = [
     'Pair #', 'MRN', 'Name', 'Age', 'Type', 'Relationship',
     'Blood Group', 'MRP', 'Gender', 'Phone Number',
-    'Dialysis', 'Entry Date', 'Match Status', 'Date of Crossmatch', 'Note',
+    'Dialysis', 'Entry Date', 'Match Status', 'Date of Crossmatch', 'Note', '',
 ];
 
 $dash = '—';
@@ -125,6 +125,16 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                             </td>
                             <td class="t-mono t-500"><?= esc(($pair['scheduledDate'] ?? '') !== '' ? $pair['scheduledDate'] : $dash) ?></td>
                             <td class="t-500 cell-last"><?= ($pair['notes'] ?? '') !== '' ? '<span class="note-link">Show Note</span>' : $dash ?></td>
+                            <?php // One control for the pair, not one per row: the two rows
+                                  // are one record, and deleting it unmakes the link only. ?>
+                            <td rowspan="2" class="cell-action" style="background-color:<?= $rowBg ?>"><?= view('ui/partials/delete_cell', [
+                                'url'    => site_url('pairs/' . rawurlencode($pair['id']) . '/delete'),
+                                'name'   => 'Pair #' . ($index + 1),
+                                'kind'   => 'pair',
+                                'detail' => 'The link between ' . ($recipient['name'] ?? 'MRN ' . $pair['recipientId'])
+                                    . ' and ' . ($donor['name'] ?? 'MRN ' . $pair['donorId'])
+                                    . ' will be removed. Both records stay on the register, with their workups, and each can be matched again.',
+                            ], ['saveData' => false]) ?></td>
                         </tr>
                         <tr class="row-donor" data-href="<?= $url ?>" style="background-color:<?= $rowBg ?>">
                             <td class="t-mono t-500"><?= esc($donor['id'] ?? $dash) ?></td>
@@ -146,4 +156,5 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
         <?php endif; ?>
     </div>
 </div>
+<?= view('ui/partials/delete_dialog', [], ['saveData' => false]) ?>
 <?= $this->endSection() ?>

@@ -397,6 +397,114 @@ class Ui extends BaseController
         ]);
     }
 
+    // ---- Removing a record -------------------------------------------------
+
+    /**
+     * The three lists' delete button, for all three of them.
+     *
+     * GET asks, POST does. Never the other way round: a GET that deletes goes
+     * off on its own the moment a browser prefetches the link or something
+     * crawls the page, and on a patient register that is not recoverable.
+     *
+     * The question is a page of its own so it is still asked with JavaScript
+     * off; the lists open the same question as a dialog when it is on.
+     */
+    public function deleteRecipient(?string $mrn = null): string|RedirectResponse
+    {
+        return $this->confirmThenDelete(
+            $this->store->findRecipient($mrn),
+            'recipients/' . rawurlencode((string) $mrn) . '/delete',
+            site_url('recipients'),
+            'recipient',
+            fn (): string => $this->store->deleteRecipient($mrn)
+        );
+    }
+
+    public function deleteDonor(?string $mrn = null): string|RedirectResponse
+    {
+        return $this->confirmThenDelete(
+            $this->store->findDonor($mrn),
+            'donors/' . rawurlencode((string) $mrn) . '/delete',
+            site_url('donors'),
+            'donor',
+            fn (): string => $this->store->deleteDonor($mrn)
+        );
+    }
+
+    public function deletePair(?string $id = null): string|RedirectResponse
+    {
+        $pair = $this->store->findPair($id);
+
+        return $this->confirmThenDelete(
+            $pair,
+            'pairs/' . rawurlencode((string) $id) . '/delete',
+            site_url('pairs'),
+            'pair',
+            fn (): string => $this->store->deletePair($id)
+        );
+    }
+
+    /**
+     * Ask on GET, act on POST, and say what happened either way.
+     *
+     * @param array<string, mixed>|null $record  Null when there is nothing to delete
+     * @param callable(): string        $delete  Returns '' or why it was refused
+     */
+    private function confirmThenDelete(
+        ?array $record,
+        string $action,
+        string $listUrl,
+        string $kind,
+        callable $delete
+    ): string|RedirectResponse {
+        if ($record === null) {
+            return redirect()->to($listUrl);
+        }
+
+        $name = $kind === 'pair'
+            ? 'Pair #' . $record['id']
+            : (string) $record['name'];
+
+        if (strtolower($this->request->getMethod()) !== 'post') {
+            return view('ui/confirm_delete', [
+                'title'   => 'Delete ' . $name,
+                'navPage' => '',
+                'organ'   => $this->store->organ(),
+                'name'    => $name,
+                'kind'    => $kind,
+                'detail'  => $this->deleteDetail($kind, $record),
+                'action'  => site_url($action),
+                'backUrl' => $listUrl,
+            ]);
+        }
+
+        $error = $delete();
+
+        $this->session->setFlashdata(
+            $error === '' ? 'ui_notice' : 'ui_error',
+            $error === '' ? $name . ' has been deleted.' : $error
+        );
+
+        return redirect()->to($listUrl);
+    }
+
+    /** What exactly goes, spelled out before anyone presses the button. */
+    private function deleteDetail(string $kind, array $record): string
+    {
+        if ($kind === 'pair') {
+            $recipient = $this->store->findRecipient($record['recipientId']);
+            $donor     = $this->store->findDonor($record['donorId']);
+
+            return 'The link between ' . ($recipient['name'] ?? 'MRN ' . $record['recipientId'])
+                . ' and ' . ($donor['name'] ?? 'MRN ' . $record['donorId'])
+                . ' will be removed. Both records stay on the register, with their '
+                . 'workups, and each can be matched again.';
+        }
+
+        return 'MRN ' . $record['id'] . '. The record and its whole lab workup '
+            . 'will be removed. This cannot be undone.';
+    }
+
     /**
      * "Export PDF" — the Pairs List as a printed sheet.
      *

@@ -75,6 +75,12 @@ class Filters extends BaseFilters
             // The `organ` guard was removed with the screens it protected: the
             // transplant UI carries its own login and programme picker and
             // keeps the choice in the `ui_organ` session key.
+            //
+            // Every form on every screen already emits csrf_field(); until the
+            // delete buttons went in, nothing checked the token. A page on
+            // another site could not read this one, but it could post to it,
+            // and one of the things it can post to now removes a patient.
+            'csrf' => ['except' => ['login']],
         ],
         'after' => [
         ],

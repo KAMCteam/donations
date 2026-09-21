@@ -67,6 +67,14 @@ $navItems = [
                 </div>
 
                 <div id="page" class="page-host">
+                    <?php // What just happened, once. Set by the actions that
+                          // redirect rather than render — a delete has no screen
+                          // of its own to say it worked on. ?>
+                    <?php foreach (['ui_notice' => 'notice', 'ui_error' => 'notice notice--error'] as $key => $class): ?>
+                        <?php if ((string) session()->getFlashdata($key) !== ''): ?>
+                            <div class="<?= $class ?>" role="status"><?= esc(session()->getFlashdata($key)) ?></div>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
                     <?= $this->renderSection('content') ?>
                 </div>
             </main>

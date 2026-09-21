@@ -46,6 +46,24 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->withSession(['ui_signed_in' => true, 'ui_organ' => 'kidney']);
     }
 
+    /**
+     * Posts the way a screen does, token and all.
+     *
+     * Every form emits `csrf_field()` and the filter checks it, so a post
+     * without one is refused — as it should be. The browser sends the token
+     * back from the cookie the last page set; there is no page here, so this
+     * mints one and posts it the way the field would.
+     *
+     * @param array<string, mixed>|null $params
+     */
+    public function post($path, ?array $params = null): \CodeIgniter\Test\TestResponse
+    {
+        $security = service('security');
+        $params   = ($params ?? []) + [$security->getTokenName() => $security->getHash()];
+
+        return $this->call('post', $path, $params);
+    }
+
     // ---- Add Recipient ---------------------------------------------------
 
     public function testAddRecipientStoresEveryFieldTheFormCollects(): void
@@ -1276,6 +1294,130 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'mrp_id' => $this->mrpId,
         ]);
         $this->seeInDatabase('coordinators', ['name' => 'Coordinator Three']);
+    }
+
+    // ---- Deleting from a list --------------------------------------------
+
+    /** Every list offers it, at the end of the row. */
+    public function testEachListOffersADeleteButton(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9201', 'name' => 'Recipient One', 'age' => '40', 'bloodType' => 'A']);
+        $this->post('donors/new', ['mrn' => '9202', 'name' => 'Donor One', 'age' => '30', 'bloodType' => 'A']);
+        $this->post('pairs/new', [
+            'rMrn' => '9203', 'dMrn' => '9204',
+            'rName' => 'Recipient Two', 'rAge' => '50', 'rBloodType' => 'O',
+            'dName' => 'Donor Two', 'dAge' => '35', 'dBloodType' => 'O',
+        ]);
+        $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
+
+        foreach ([
+            'recipients' => 'recipients/9201/delete',
+            'donors'     => 'donors/9202/delete',
+            'pairs'      => 'pairs/' . $pairId . '/delete',
+        ] as $list => $deleteUrl) {
+            $html = $this->get($list)->getBody();
+
+            $this->assertStringContainsString(site_url($deleteUrl), $html, "{$list} should offer delete");
+            // One dialog for the whole list, filled in by whichever row asked.
+            $this->assertSame(1, substr_count($html, 'id="confirm-delete"'));
+        }
+    }
+
+    /**
+     * The button asks first, and asks on a page of its own.
+     *
+     * A GET that deletes goes off when a browser prefetches the link, which on
+     * a patient register is not recoverable — so GET only ever renders the
+     * question.
+     */
+    public function testTheDeleteLinkAsksRatherThanDeletes(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9205', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
+
+        $html = $this->get('recipients/9205/delete')->getBody();
+
+        $this->assertStringContainsString('Delete Layla Test?', $html);
+        $this->assertStringContainsString('cannot be undone', $html);
+        $this->seeInDatabase('recipients', ['mrn' => 9205]);
+    }
+
+    /** Posting it removes the record, and the workup with it. */
+    public function testDeletingARecipientTakesTheirWorkupWithThem(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9206', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
+
+        $lab = $this->db->table('labs')
+            ->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'HIV'])
+            ->get()->getRowArray();
+
+        $this->post('recipients/9206', [
+            'section' => 'labs',
+            'labs'    => [['id' => $lab['id'], 'name' => 'HIV', 'status' => 'negative']],
+        ]);
+        $this->seeInDatabase('lab_results', ['person_mrn' => 9206]);
+
+        $this->post('recipients/9206/delete')->assertRedirectTo(site_url('recipients'));
+
+        $this->dontSeeInDatabase('recipients', ['mrn' => 9206]);
+        $this->dontSeeInDatabase('lab_results', ['person_mrn' => 9206, 'person_type' => 'recipient']);
+    }
+
+    /**
+     * Deleting a pair unmakes the link. It does not delete the two it joined.
+     *
+     * They go back to their lists with their records and workups intact, free
+     * to be matched again.
+     */
+    public function testDeletingAPairKeepsBothPeople(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9207', 'dMrn' => '9208',
+            'rName' => 'Recipient Three', 'rAge' => '44', 'rBloodType' => 'A',
+            'dName' => 'Donor Three', 'dAge' => '33', 'dBloodType' => 'A',
+        ]);
+        $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
+
+        $this->post('pairs/' . $pairId . '/delete')->assertRedirectTo(site_url('pairs'));
+
+        $this->dontSeeInDatabase('pairs', ['id' => $pairId]);
+        $this->seeInDatabase('recipients', ['mrn' => 9207]);
+        $this->seeInDatabase('donors', ['mrn' => 9208]);
+
+        // And both are free again, which is what the lists are for.
+        $store = new UiStore();
+        $this->assertCount(1, $store->waitingList());
+        $this->assertCount(1, $store->availableDonors());
+    }
+
+    /** Somebody a pair names cannot just vanish from under it. */
+    public function testAPairedPersonIsNotDeletedButExplained(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9209', 'dMrn' => '9210',
+            'rName' => 'Recipient Four', 'rAge' => '44', 'rBloodType' => 'A',
+            'dName' => 'Donor Four', 'dAge' => '33', 'dBloodType' => 'A',
+        ]);
+
+        $this->post('recipients/9209/delete')->assertRedirectTo(site_url('recipients'));
+
+        $this->seeInDatabase('recipients', ['mrn' => 9209]);
+        $this->assertStringContainsString(
+            'is in pair #',
+            (string) session()->getFlashdata('ui_error')
+        );
+    }
+
+    /** A record on the other programme is not this programme's to delete. */
+    public function testARecordFromAnotherProgrammeIsNotDeleted(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9211', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
+
+        // Switched to the liver programme; the kidney register is not its
+        // to delete from, even though an MRN finds a record either way.
+        $this->withSession(['ui_signed_in' => true, 'ui_organ' => 'liver']);
+        $this->post('recipients/9211/delete');
+
+        $this->seeInDatabase('recipients', ['mrn' => 9211]);
     }
 
     // ---- The printed sheet -----------------------------------------------

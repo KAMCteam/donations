@@ -369,6 +369,112 @@ final class UiStore
         return $row === null ? null : $this->donorToUi($row);
     }
 
+    // ---- Removing a record -------------------------------------------------
+
+    /**
+     * Takes a recipient off the register, with their whole workup.
+     *
+     * The lab results go with them: a trigger on `recipients` deletes them,
+     * standing in for the ON DELETE CASCADE that `lab_results.person_mrn`
+     * cannot have, since it points at either register depending on the row.
+     *
+     * A recipient held by a pair is refused rather than deleted. Removing them
+     * would leave the pair naming a patient who is not there — the foreign key
+     * would block it anyway, and a message says so better than an SQL error.
+     *
+     * @return string An empty string when it is done, else why it was not
+     */
+    public function deleteRecipient(?string $id): string
+    {
+        $row = $this->onThisProgramme($this->rowFor($this->recipients, $id));
+
+        if ($row === null) {
+            return 'That recipient is not on this programme.';
+        }
+
+        $pair = $this->anyPairFor('recipient_mrn', (int) $row['mrn']);
+
+        if ($pair !== null) {
+            return $this->heldByAPair($row['name'], $pair);
+        }
+
+        $this->recipients->delete($row['mrn']);
+
+        return '';
+    }
+
+    /** The same for a donor, and for the same reasons. */
+    public function deleteDonor(?string $id): string
+    {
+        $row = $this->onThisProgramme($this->rowFor($this->donors, $id));
+
+        if ($row === null) {
+            return 'That donor is not on this programme.';
+        }
+
+        $pair = $this->anyPairFor('donor_mrn', (int) $row['mrn']);
+
+        if ($pair !== null) {
+            return $this->heldByAPair($row['name'], $pair);
+        }
+
+        $this->donors->delete($row['mrn']);
+
+        return '';
+    }
+
+    /**
+     * Unmakes a pair. Both people stay.
+     *
+     * Deleting the pairing is not deleting the two it joined: they go back to
+     * their lists, records and workups intact, free to be matched again. This
+     * is the difference between a pair entered by mistake and one that ended —
+     * a pair that ended is closed, and the row stays as history.
+     *
+     * @return string An empty string when it is done, else why it was not
+     */
+    public function deletePair(?string $id): string
+    {
+        $pair = $this->findPair($id);
+
+        if ($pair === null || $pair['organ'] !== $this->organ()) {
+            return 'That pair is not on this programme.';
+        }
+
+        $this->pairs->delete((int) $id);
+
+        return '';
+    }
+
+    /**
+     * The row, but only if the current programme is the one holding it.
+     *
+     * An MRN is unique across both registers, so finding one by number reaches
+     * a record on the other programme too. Reading one that way is harmless
+     * and the record screens rely on it; deleting one is not, so the deletes
+     * check the programme even though nothing else does.
+     *
+     * @param array<string, mixed>|null $row
+     *
+     * @return array<string, mixed>|null
+     */
+    private function onThisProgramme(?array $row): ?array
+    {
+        return $row !== null && $row['organ_code'] === $this->organ() ? $row : null;
+    }
+
+    /** Any pair naming this person, open or closed — a row is a row. */
+    private function anyPairFor(string $column, int $mrn): ?array
+    {
+        return $this->pairs->where($column, $mrn)->orderBy('id')->first();
+    }
+
+    private function heldByAPair(string $name, array $pair): string
+    {
+        return $name . ' is in pair #' . $pair['id']
+            . '. Delete that pair first — the two records are kept, only the link goes.';
+    }
+
     public function findPair(?string $id): ?array
     {
         if (! $this->isMrn($id)) {

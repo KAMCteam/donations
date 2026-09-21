@@ -265,11 +265,44 @@
     });
   }
 
+  /* ---- Delete, asked before it happens ---------------------------------- */
+
+  /* Every delete button in a list is a link to a page that asks the question.
+     Where this runs, the same question opens as a dialog instead, so the list
+     is not lost — but the answer posts to the same address either way, and the
+     link still works on its own if this never runs. */
+  function initConfirmDelete() {
+    var dialog = document.getElementById("confirm-delete");
+    if (!dialog || typeof dialog.showModal !== "function") return;
+
+    var form = dialog.querySelector("[data-delete-form]");
+    var title = dialog.querySelector("[data-delete-title]");
+    var detail = dialog.querySelector("[data-delete-detail]");
+    var cancel = dialog.querySelector("[data-delete-cancel]");
+
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-delete]");
+      if (!button) return;
+
+      event.preventDefault();
+      form.action = button.getAttribute("data-delete-action");
+      title.textContent = button.getAttribute("data-delete-title");
+      detail.textContent = button.getAttribute("data-delete-detail");
+      dialog.showModal();
+    });
+
+    if (cancel) cancel.addEventListener("click", function () { dialog.close(); });
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog) dialog.close();
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initSidebar();
     initRowLinks();
     initLabSections();
     initDateFields();
     initDialogs();
+    initConfirmDelete();
   });
 })();

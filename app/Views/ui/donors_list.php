@@ -15,7 +15,7 @@ use App\Libraries\UiStore;
  *
  * @var list<array<string, mixed>> $donors  Unmatched donors for the current programme.
  */
-$headers = ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs'];
+$headers = ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs', ''];
 ?>
 <div class="page">
     <div class="page-header page-header--center">
@@ -53,6 +53,12 @@ $headers = ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs'];
                             <td class="mono"><?= esc($donor['bloodType']) ?></td>
                             <td><span class="badge <?= str_starts_with($donor['donationType'], 'living') ? 'tone-teal-soft' : 'tone-slate' ?>"><?= esc(UiStore::DONATION_TYPES[$donor['donationType']] ?? $donor['donationType']) ?></span></td>
                             <td class="mono"><?= $progress['done'] ?>/<?= $progress['total'] ?></td>
+                            <td class="cell-action"><?= view('ui/partials/delete_cell', [
+                                'url'    => site_url('donors/' . rawurlencode($donor['id']) . '/delete'),
+                                'name'   => $donor['name'],
+                                'kind'   => 'donor',
+                                'detail' => 'MRN ' . $donor['id'] . '. The record and its whole lab workup will be removed. This cannot be undone.',
+                            ], ['saveData' => false]) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -60,4 +66,5 @@ $headers = ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs'];
         <?php endif; ?>
     </div>
 </div>
+<?= view('ui/partials/delete_dialog', [], ['saveData' => false]) ?>
 <?= $this->endSection() ?>

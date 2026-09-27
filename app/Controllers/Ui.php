@@ -540,6 +540,246 @@ class Ui extends BaseController
         ]);
     }
 
+    // ---- One record on paper -----------------------------------------------
+
+    /**
+     * A recipient's, a donor's or a pair's record as a printed sheet.
+     *
+     * Three routes into one document, because the three sheets differ only in
+     * which blocks go on them. The blocks themselves are built here rather
+     * than in the view so the sheet stays a renderer: a pair is the pair's own
+     * details followed by each person's, in the order the pair screen shows
+     * them.
+     *
+     * A PDF by printing, as the Pairs List sheet is, and for the same reasons.
+     */
+    public function printRecipient(string $id): string|RedirectResponse
+    {
+        $recipient = $this->store->findRecipient($id);
+
+        if ($recipient === null) {
+            return redirect()->to(site_url('recipients'));
+        }
+
+        $donor = $this->store->findDonor($recipient['pairedDonorId'] ?? null);
+
+        return $this->recordSheet(
+            'Recipient Record',
+            $recipient,
+            'Back to record',
+            site_url('recipients/' . rawurlencode($recipient['id'])),
+            array_merge(
+                [$this->recipientBlock($recipient, $donor)],
+                $this->workupBlocks($recipient, 'Required Lab Tests', 'Clinical Notes')
+            )
+        );
+    }
+
+    public function printDonor(string $id): string|RedirectResponse
+    {
+        $donor = $this->store->findDonor($id);
+
+        if ($donor === null) {
+            return redirect()->to(site_url('donors'));
+        }
+
+        $recipient = $this->store->findRecipient($donor['pairedRecipientId'] ?? null);
+
+        return $this->recordSheet(
+            'Donor Record',
+            $donor,
+            'Back to record',
+            site_url('donors/' . rawurlencode($donor['id'])),
+            array_merge(
+                [$this->donorBlock($donor, $recipient)],
+                $this->workupBlocks($donor, 'Required Lab Tests', 'Clinical Notes')
+            )
+        );
+    }
+
+    public function printPair(string $id): string|RedirectResponse
+    {
+        $pair = $this->store->findPair($id);
+
+        if ($pair === null || $pair['organ'] !== $this->store->organ()) {
+            return redirect()->to(site_url('pairs'));
+        }
+
+        $recipient = $this->store->findRecipient($pair['recipientId']);
+        $donor     = $this->store->findDonor($pair['donorId']);
+
+        $blocks = [$this->pairBlock($pair, $recipient, $donor)];
+
+        if ($recipient !== null) {
+            $blocks[] = $this->recipientBlock($recipient, $donor);
+            $blocks   = array_merge($blocks, $this->workupBlocks(
+                $recipient,
+                'Recipient — Required Lab Tests',
+                'Recipient — Clinical Notes'
+            ));
+        }
+
+        if ($donor !== null) {
+            $blocks[] = $this->donorBlock($donor, $recipient);
+            $blocks   = array_merge($blocks, $this->workupBlocks(
+                $donor,
+                'Donor — Required Lab Tests',
+                'Donor — Clinical Notes'
+            ));
+        }
+
+        $subject = trim(($recipient['name'] ?? '?') . ' & ' . ($donor['name'] ?? '?'));
+
+        return view('ui/record_print', [
+            'sheetTitle' => 'Pair Record',
+            'subject'    => $subject,
+            'meta'       => [
+                'Pair ' . $pair['id'],
+                $this->store->organLabel() . ' Programme',
+                'Printed ' . date('d/m/Y'),
+            ],
+            'blocks'     => $blocks,
+            'backUrl'    => site_url('pairs/' . rawurlencode($pair['id'])),
+            'backLabel'  => 'Back to pair',
+        ]);
+    }
+
+    /**
+     * The sheet around one person's blocks.
+     *
+     * @param array<string, mixed>         $person
+     * @param list<array<string, mixed>>   $blocks
+     */
+    private function recordSheet(string $sheetTitle, array $person, string $backLabel, string $backUrl, array $blocks): string
+    {
+        return view('ui/record_print', [
+            'sheetTitle' => $sheetTitle,
+            'subject'    => (string) ($person['name'] ?? ''),
+            'meta'       => [
+                'MRN ' . $person['id'],
+                $this->store->organLabel() . ' Programme',
+                'Printed ' . date('d/m/Y'),
+            ],
+            'blocks'     => $blocks,
+            'backUrl'    => $backUrl,
+            'backLabel'  => $backLabel,
+        ]);
+    }
+
+    /**
+     * The workup and the notes, which every sheet carries in that order.
+     *
+     * @param array<string, mixed> $person
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function workupBlocks(array $person, string $labsTitle, string $notesTitle): array
+    {
+        return [
+            ['kind' => 'labs', 'title' => $labsTitle, 'tests' => $person['labTests'] ?? []],
+            ['kind' => 'text', 'title' => $notesTitle, 'text' => (string) ($person['notes'] ?? '')],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed>      $recipient
+     * @param array<string, mixed>|null $donor
+     *
+     * @return array<string, mixed>
+     */
+    private function recipientBlock(array $recipient, ?array $donor): array
+    {
+        return [
+            'kind'   => 'fields',
+            'title'  => 'Recipient Details',
+            'fields' => [
+                ['label' => 'Recipient MRN', 'value' => (string) $recipient['id'], 'mono' => true],
+                ['label' => 'Recipient Name', 'value' => (string) ($recipient['name'] ?? ''), 'wide' => true, 'strong' => true],
+                ['label' => 'Age', 'value' => isset($recipient['age']) ? (string) $recipient['age'] : ''],
+                ['label' => 'Gender', 'value' => (string) ($recipient['gender'] ?? '')],
+                ['label' => 'Blood Group', 'value' => (string) ($recipient['bloodType'] ?? ''), 'mono' => true, 'strong' => true],
+                ['label' => 'Phone Number', 'value' => (string) ($recipient['phone'] ?? ''), 'mono' => true],
+                ['label' => 'City', 'value' => (string) ($recipient['address'] ?? '')],
+                ['label' => 'Recipient MRP', 'value' => $this->mrpName((string) ($recipient['selectedMrp'] ?? ''))],
+                ['label' => 'Coordinator', 'value' => (string) ($recipient['coordinator'] ?? '')],
+                ['label' => 'First Dialysis', 'value' => (string) ($recipient['firstDialysis'] ?? ''), 'mono' => true],
+                ['label' => 'Entry Date', 'value' => UiStore::isoToDMY((string) ($recipient['dateRegistered'] ?? '')), 'mono' => true],
+                ['label' => 'Urgent', 'value' => ($recipient['urgent'] ?? false) ? 'Yes' : 'No'],
+                ['label' => 'Recipient Status', 'value' => UiStore::STATUS_OPTIONS[$recipient['status'] ?? ''] ?? (string) ($recipient['status'] ?? '')],
+                ['label' => 'Linked Donor', 'value' => $donor === null ? 'Not linked' : $donor['name'] . ' (' . $donor['id'] . ')', 'wide' => true],
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed>      $donor
+     * @param array<string, mixed>|null $recipient
+     *
+     * @return array<string, mixed>
+     */
+    private function donorBlock(array $donor, ?array $recipient): array
+    {
+        return [
+            'kind'   => 'fields',
+            'title'  => 'Donor Details',
+            'fields' => [
+                ['label' => 'Donor MRN', 'value' => (string) $donor['id'], 'mono' => true],
+                ['label' => 'Donor Name', 'value' => (string) ($donor['name'] ?? ''), 'wide' => true, 'strong' => true],
+                ['label' => 'Age', 'value' => isset($donor['age']) ? (string) $donor['age'] : ''],
+                ['label' => 'Gender', 'value' => (string) ($donor['donorGender'] ?? '')],
+                ['label' => 'Blood Group', 'value' => (string) ($donor['bloodType'] ?? ''), 'mono' => true, 'strong' => true],
+                ['label' => 'Phone Number', 'value' => (string) ($donor['phone'] ?? ''), 'mono' => true],
+                ['label' => 'City', 'value' => (string) ($donor['address'] ?? '')],
+                ['label' => 'Donor MRP', 'value' => $this->mrpName((string) ($donor['donorMrp'] ?? ''))],
+                ['label' => 'Coordinator', 'value' => (string) ($donor['donorCoordinator'] ?? '')],
+                ['label' => 'Donor Type', 'value' => UiStore::DONATION_TYPES[$donor['donationType'] ?? ''] ?? ''],
+                ['label' => 'Relationship', 'value' => (string) ($donor['relationship'] ?? '')],
+                ['label' => 'Donor Status', 'value' => (string) ($donor['donorStatus'] ?? '')],
+                ['label' => 'Linked Recipient', 'value' => $recipient === null ? 'Not linked' : $recipient['name'] . ' (' . $recipient['id'] . ')', 'wide' => true],
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed>      $pair
+     * @param array<string, mixed>|null $recipient
+     * @param array<string, mixed>|null $donor
+     *
+     * @return array<string, mixed>
+     */
+    private function pairBlock(array $pair, ?array $recipient, ?array $donor): array
+    {
+        $fields = [
+            ['label' => 'Pair #', 'value' => (string) $pair['id'], 'mono' => true],
+            ['label' => 'Recipient', 'value' => (string) ($recipient['name'] ?? '—')],
+            ['label' => 'Donor', 'value' => (string) ($donor['name'] ?? '—')],
+            ['label' => 'Relationship', 'value' => (string) ($donor['relationship'] ?? $pair['notes'] ?? '')],
+            ['label' => 'Date of Crossmatch', 'value' => (string) ($pair['scheduledDate'] ?? ''), 'mono' => true],
+            ['label' => 'Status', 'value' => UiStore::STATUS_OPTIONS[$pair['status']] ?? (string) $pair['status'], 'strong' => true],
+            ['label' => 'Offered for Exchange', 'value' => ($pair['forExchange'] ?? false) ? 'Yes' : 'No'],
+        ];
+
+        // Only a closed pair has a reason, and when it has one it is the whole
+        // point of the block.
+        if (($pair['closedReason'] ?? '') !== '') {
+            $fields[] = ['label' => 'Reason for Closing', 'value' => (string) $pair['closedReason'], 'wide' => true];
+        }
+
+        return ['kind' => 'fields', 'title' => 'Pair Details', 'fields' => $fields];
+    }
+
+    /** An MRP's name from the id the record stores. */
+    private function mrpName(string $id): string
+    {
+        foreach ($this->store->mrps() as $mrp) {
+            if ($mrp['id'] === $id) {
+                return $mrp['name'];
+            }
+        }
+
+        return '';
+    }
+
     /** What the chips were narrowed to, for the line under the title. */
     private function filterSummary(string $btFilter, string $statusFilter): string
     {

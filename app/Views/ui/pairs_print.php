@@ -54,6 +54,7 @@ $mrpName = static function (string $id) use ($mrps): string {
     <title>Pairs List — <?= esc($organLabel) ?></title>
 
     <link rel="icon" type="image/x-icon" href="<?= base_url('assets/img/KAMC.png') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/ui/css/sheet.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/ui/css/print.css') ?>">
 </head>
 

@@ -41,11 +41,21 @@ $mrpName = static function (string $id) use ($mrps): string {
     return '—';
 };
 
-/** Rebuilds the current query string with one filter swapped out. */
+/**
+ * Rebuilds the current query string with one filter swapped out.
+ *
+ * A filter sitting on its own default is left out of the URL — `all` for
+ * blood type, Active for status, which is what the screen opens on. That is
+ * why `status=all` has to be written out: leaving it off would mean Active.
+ */
 $filterUrl = static function (string $key, string $value) use ($btFilter, $statusFilter): string {
     $query = ['bt' => $btFilter, 'status' => $statusFilter];
     $query[$key] = $value;
-    $query = array_filter($query, static fn (string $v): bool => $v !== 'all');
+
+    $query = array_filter([
+        'bt'     => $query['bt'] === 'all' ? null : $query['bt'],
+        'status' => $query['status'] === UiStore::PAIRS_DEFAULT_STATUS ? null : $query['status'],
+    ], static fn (?string $v): bool => $v !== null);
 
     return site_url('pairs') . ($query === [] ? '' : '?' . http_build_query($query));
 };
@@ -82,7 +92,18 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
 
     <div class="card card--scroll">
         <?php if ($rows === []): ?>
-            <div class="empty-state">No pairs found.</div>
+            <?php // The screen hides more than it used to, so an empty table
+                  // has to say whether the register is empty or the chips are
+                  // simply holding pairs back — and offer the way out. ?>
+            <div class="empty-state">
+                <?php if ($btFilter === 'all' && $statusFilter === 'all'): ?>
+                    No pairs found.
+                <?php else: ?>
+                    No pairs match these filters.<br>
+                    <?php // Clears both chip rows, not just the status one. ?>
+                    <a class="stat-link" href="<?= site_url('pairs') ?>?status=all">Show all pairs</a>
+                <?php endif; ?>
+            </div>
         <?php else: ?>
             <table class="table pairs-table">
                 <thead>

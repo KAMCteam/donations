@@ -559,10 +559,13 @@ class Ui extends BaseController
     /** The filters as a query string, so Back returns to the same view. */
     private function filterQuery(string $btFilter, string $statusFilter): string
     {
-        $query = array_filter(
-            ['bt' => $btFilter, 'status' => $statusFilter],
-            static fn (string $value): bool => $value !== 'all'
-        );
+        // Each filter drops out of the URL when it is on its own default —
+        // `all` for blood type, Active for status — so the address stays short
+        // and says only what was actually narrowed.
+        $query = array_filter([
+            'bt'     => $btFilter === 'all' ? null : $btFilter,
+            'status' => $statusFilter === UiStore::PAIRS_DEFAULT_STATUS ? null : $statusFilter,
+        ], static fn (?string $value): bool => $value !== null);
 
         return $query === [] ? '' : '?' . http_build_query($query);
     }
@@ -575,11 +578,14 @@ class Ui extends BaseController
      */
     private function filteredPairs(): array
     {
-        $btFilter     = $this->bloodTypeFilter();
-        $statusFilter = (string) ($this->request->getGet('status') ?? 'all');
+        $btFilter = $this->bloodTypeFilter();
 
-        if (! isset(UiStore::STATUS_OPTIONS[$statusFilter])) {
-            $statusFilter = 'all';
+        // No `status` in the query means the screen's own default rather than
+        // everything; `all` is a filter the chips ask for by name.
+        $statusFilter = (string) ($this->request->getGet('status') ?? UiStore::PAIRS_DEFAULT_STATUS);
+
+        if ($statusFilter !== 'all' && ! isset(UiStore::STATUS_OPTIONS[$statusFilter])) {
+            $statusFilter = UiStore::PAIRS_DEFAULT_STATUS;
         }
 
         $rows = [];

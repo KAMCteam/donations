@@ -85,6 +85,20 @@ final class UiStore
     ];
 
     /**
+     * What the Pairs List opens on when no filter is asked for.
+     *
+     * The register accumulates: every pair that was ever transplanted,
+     * declined or closed stays in it, and the day-to-day question is about
+     * the ones still being worked. So the screen opens on those, and All is
+     * one click away.
+     *
+     * Because this is the default, it is the value the links leave out of the
+     * query string — `?status=all` is the one that has to be spelled out, or
+     * the All chip would lead straight back here.
+     */
+    public const PAIRS_DEFAULT_STATUS = 'active';
+
+    /**
      * What a person's own record offers — a recipient's and a donor's alike.
      *
      * Three of the pair's six, and deliberately not the other three: a person

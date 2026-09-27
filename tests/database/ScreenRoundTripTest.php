@@ -1901,7 +1901,9 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $html = $this->get('pairs/print')->getBody();
 
         $this->assertStringContainsString('Pairs List &mdash; Kidney Programme', $html);
-        $this->assertStringContainsString('All pairs', $html);
+        // The sheet follows the screen, and the screen opens on Active.
+        $this->assertStringContainsString('Active', $html);
+        $this->assertStringContainsString('All pairs', $this->get('pairs/print?status=all')->getBody());
         $this->assertStringContainsString('Recipient One', $html);
         $this->assertStringContainsString('Donor Two', $html);
 
@@ -1929,6 +1931,52 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('Export PDF', $html);
         $this->assertStringContainsString(site_url('pairs/print'), $html);
         $this->assertStringNotContainsString('Export CSV', $html);
+    }
+
+    /**
+     * The register keeps every pair it has ever held, so the screen opens on
+     * the ones still being worked rather than on all of them.
+     */
+    public function testThePairsListOpensOnActive(): void
+    {
+        // Nothing narrowed and nothing to show: the register really is empty.
+        $this->assertStringContainsString('No pairs found.', $this->get('pairs?status=all')->getBody());
+
+        $this->post('pairs/new', [
+            'rMrn' => '9301', 'dMrn' => '9302',
+            'rName' => 'Still Going', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Donor Going', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+        $this->post('pairs/new', [
+            'rMrn' => '9303', 'dMrn' => '9304',
+            'rName' => 'Long Finished', 'rAge' => '50', 'rBloodType' => 'O',
+            'dName' => 'Donor Finished', 'dAge' => '35', 'dBloodType' => 'O',
+        ]);
+
+        $finished = $this->db->table('pairs')->where('recipient_mrn', 9303)->get()->getRowArray();
+        $this->db->table('pairs')->where('id', $finished['id'])->update(['status' => 'transplanted']);
+
+        // No query string at all: the transplanted pair is not in the table.
+        $html = $this->get('pairs')->getBody();
+        $this->assertStringContainsString('Still Going', $html);
+        $this->assertStringNotContainsString('Long Finished', $html);
+
+        // The Active chip is the one lit, and All is reachable — its link has
+        // to spell the filter out, since an empty query string means Active.
+        $this->assertStringContainsString('href="' . site_url('pairs') . '?status=all"', $html);
+
+        $all = $this->get('pairs?status=all')->getBody();
+        $this->assertStringContainsString('Still Going', $all);
+        $this->assertStringContainsString('Long Finished', $all);
+
+        // And the default drops back out of the URL rather than piling up.
+        $this->assertStringContainsString('href="' . site_url('pairs') . '"', $all);
+
+        // An empty table now has to say which of the two it is, because the
+        // screen hides pairs by default.
+        $none = $this->get('pairs?status=closed')->getBody();
+        $this->assertStringContainsString('No pairs match these filters.', $none);
+        $this->assertStringContainsString('Show all pairs', $none);
     }
 
     // ---- Lab workup ------------------------------------------------------

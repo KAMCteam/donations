@@ -59,7 +59,8 @@ class CreateLabResults extends Migration
                 'constraint' => [
                     'not_done', 'pending', 'done', 'positive', 'negative', 'acceptable',
                     'abnormal', 'cleared', 'not_cleared', 'given', 'not_required',
-                    'not_given', 'not_applicable', 'blood_a', 'blood_b', 'blood_ab', 'blood_o',
+                    'not_given', 'not_applicable', 'seen', 'not_seen',
+                    'blood_a', 'blood_b', 'blood_ab', 'blood_o',
                 ],
                 'default'    => 'not_done',
             ],

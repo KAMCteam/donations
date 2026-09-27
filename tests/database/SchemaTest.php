@@ -59,8 +59,10 @@ final class SchemaTest extends CIUnitTestCase
         // programmes, and the check list's workup for each.
         $this->assertCount(2, model(OrganProgramModel::class)->active());
         // Eight group headings on the recipient's sheet, six on the donor's.
-        $this->assertCount(8, $this->db->table('lab_parents')->where('person_type', 'recipient')->get()->getResultArray());
-        $this->assertCount(6, $this->db->table('lab_parents')->where('person_type', 'donor')->get()->getResultArray());
+        // The sheet's own groups, plus Transplant Clinic and Other, which
+        // close both of them.
+        $this->assertCount(10, $this->db->table('lab_parents')->where('person_type', 'recipient')->get()->getResultArray());
+        $this->assertCount(8, $this->db->table('lab_parents')->where('person_type', 'donor')->get()->getResultArray());
         $this->assertSame(
             $this->db->table('labs')->where('organ_code', 'kidney')->countAllResults(),
             $this->db->table('labs')->where('organ_code', 'liver')->countAllResults(),
@@ -285,11 +287,12 @@ final class SchemaTest extends CIUnitTestCase
         $labs = model(LabModel::class);
 
         // Each side of each programme gets its own sheet's tests, and only
-        // those: 71 on the recipient's, 51 on the donor's.
-        $this->assertCount(71, $labs->workupFor('kidney', 'recipient'));
-        $this->assertCount(51, $labs->workupFor('kidney', 'donor'));
-        $this->assertCount(71, $labs->workupFor('liver', 'recipient'));
-        $this->assertCount(51, $labs->workupFor('liver', 'donor'));
+        // those: 71 on the recipient's sheet and 51 on the donor's, plus the
+        // clinic's two appointments and the one Other box on each.
+        $this->assertCount(74, $labs->workupFor('kidney', 'recipient'));
+        $this->assertCount(54, $labs->workupFor('kidney', 'donor'));
+        $this->assertCount(74, $labs->workupFor('liver', 'recipient'));
+        $this->assertCount(54, $labs->workupFor('liver', 'donor'));
 
         $recipientNames = array_column($labs->workupFor('kidney', 'recipient'), 'name');
         $donorNames     = array_column($labs->workupFor('kidney', 'donor'), 'name');
@@ -324,6 +327,8 @@ final class SchemaTest extends CIUnitTestCase
             'Imaging',
             'Referrals and Clearances',
             'Vaccinations',
+            'Transplant Clinic',
+            'Other',
         ], $groups);
 
         // The donor's sheet has its own headings, shorter and fewer.
@@ -335,6 +340,8 @@ final class SchemaTest extends CIUnitTestCase
             'Urine/Stool',
             'Imaging',
             'Clearances',
+            'Transplant Clinic',
+            'Other',
         ], $donorGroups);
     }
 
@@ -354,10 +361,42 @@ final class SchemaTest extends CIUnitTestCase
         $this->assertNotContains('not_applicable', UiStore::RESULT_OPTIONS['acceptable_abnormal']);
         $this->assertContains('not_applicable', UiStore::RESULT_OPTIONS['acceptable_abnormal_na']);
 
-        // And every test starts where nobody has looked yet.
+        // The clinic's two appointments are answered Seen or Not seen.
+        $this->assertSame('seen_not_seen', $types['Transplant Nephrology Clinic']);
+        $this->assertSame('seen_not_seen', $types['Transplant Surgery Clinic']);
+
+        // Other offers nothing at all: it is a box, not a question.
+        $this->assertSame('free_text', $types['Other']);
+        $this->assertSame([], UiStore::RESULT_OPTIONS['free_text']);
+
+        // Every test that does ask something starts where nobody has looked.
         foreach (UiStore::RESULT_OPTIONS as $vocabulary => $answers) {
+            if ($answers === []) {
+                continue;
+            }
+
             $this->assertSame('not_done', $answers[0], "{$vocabulary} should start at Not done");
         }
+    }
+
+    /**
+     * A card with nothing to answer is not something to complete.
+     *
+     * Counting Other would hold the bar under 100% for ever, on a card
+     * nobody can ever tick.
+     */
+    public function testTheProgressBarLeavesTheFreeTextCardOut(): void
+    {
+        $workup = array_map(
+            static fn (array $row): array => [
+                'resultType' => $row['result_type'],
+                'status'     => 'not_done',
+            ],
+            model(LabModel::class)->workupFor('kidney', 'recipient')
+        );
+
+        $this->assertCount(74, $workup);
+        $this->assertSame(73, UiStore::labProgress($workup)['total']);
     }
 
     public function testAnUnrecordedTestStillComesBackAsNotDone(): void
@@ -366,7 +405,7 @@ final class SchemaTest extends CIUnitTestCase
         $results = model(LabResultModel::class);
 
         $workup = $results->workupFor(1001, 'recipient', 'kidney');
-        $this->assertCount(71, $workup);
+        $this->assertCount(74, $workup);
         $this->assertSame('not_done', $workup[0]['status'], 'no row yet, so nobody has looked');
         $this->assertNull($workup[0]['result_id']);
     }

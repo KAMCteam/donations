@@ -18,6 +18,10 @@ use CodeIgniter\Database\Seeder;
  * same tests, so a shared heading would have to be filtered by side on every
  * read — and the first heading that is genuinely shared would break it.
  *
+ * Two groups close both sheets and are not on the printed check list: the
+ * Transplant Clinic, whose two appointments are answered Seen or Not seen,
+ * and Other, which is a single box for whatever the sheet has no line for.
+ *
  * The check list names no organ, so both programmes get both lists.
  *
  * Seeds no people — no patients, no donors, no pairs, no staff accounts, no
@@ -41,6 +45,8 @@ class DatabaseSeeder extends Seeder
      *   acceptable_abnormal_na  ... / Not applicable
      *   cleared_not_cleared     Not done / pending / Cleared / not cleared / Not applicable
      *   given_not_given         Given / not required / not given / not applicable
+     *   seen_not_seen           Not done / Seen / Not seen
+     *   free_text               no answer at all, only the comment box
      *
      * "Not applicable" is offered test by test rather than everywhere: the
      * sheet adds it to cancer screening, imaging, the clearances and B-HCG —
@@ -138,6 +144,13 @@ class DatabaseSeeder extends Seeder
             ['Influenza vaccine', 'given_not_given'],
             ['Pneumococcal 23', 'given_not_given'],
         ],
+        'Transplant Clinic' => [
+            ['Transplant Nephrology Clinic', 'seen_not_seen'],
+            ['Transplant Surgery Clinic', 'seen_not_seen'],
+        ],
+        'Other' => [
+            ['Other', 'free_text'],
+        ],
     ];
 
     /**
@@ -212,6 +225,13 @@ class DatabaseSeeder extends Seeder
             ['Social worker', 'cleared_not_cleared'],
             ['Cardio', 'cleared_not_cleared'],
             ['Transplant Surgery', 'cleared_not_cleared'],
+        ],
+        'Transplant Clinic' => [
+            ['Transplant Nephrology Clinic', 'seen_not_seen'],
+            ['Transplant Surgery Clinic', 'seen_not_seen'],
+        ],
+        'Other' => [
+            ['Other', 'free_text'],
         ],
     ];
 

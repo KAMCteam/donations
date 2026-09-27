@@ -75,7 +75,10 @@ foreach ($tests as $i => $test) {
         <?php foreach ($groupTests as $i => $test): ?>
             <?php // $field and $i are ours, not user input, so the name needs no escaping. ?>
             <?php $base = $field . '[' . $i . ']'; ?>
-            <div class="lab-card<?= $animated ? ' lab-card--animated' : '' ?> status-<?= esc($test['status']) ?>" data-idx="<?= $i ?>">
+            <?php // "Other" is the sheet's blank line: no answer to give, so no
+                  // buttons and no pill — the card is its box and nothing else. ?>
+            <?php $freeText = in_array($test['resultType'], UiStore::FREE_TEXT_TYPES, true); ?>
+            <div class="lab-card<?= $animated ? ' lab-card--animated' : '' ?><?= $freeText ? ' lab-card--free' : '' ?> status-<?= esc($test['status']) ?>" data-idx="<?= $i ?>">
                 <input type="hidden" name="<?= $base ?>[id]" value="<?= esc($test['id']) ?>">
                 <input type="hidden" name="<?= $base ?>[name]" value="<?= esc($test['name']) ?>">
                 <input type="hidden" name="<?= $base ?>[status]" value="<?= esc($test['status']) ?>" data-lab-status-value>
@@ -86,9 +89,12 @@ foreach ($tests as $i => $test) {
                         <div class="lab-result" data-lab-result<?= ($test['result'] ?? '') === '' ? ' hidden' : '' ?>><?= esc($test['result'] ?? '') ?></div>
                         <div class="lab-date" data-lab-date-text<?= ($test['date'] ?? '') === '' ? ' hidden' : '' ?>><?= esc($test['date'] ?? '') ?></div>
                     </div>
-                    <span class="lab-pill <?= ui_tone('labStatus', $test['status']) ?>" data-lab-pill><?= esc(UiStore::RESULT_LABEL[$test['status']] ?? $test['status']) ?></span>
+                    <?php if (! $freeText): ?>
+                        <span class="lab-pill <?= ui_tone('labStatus', $test['status']) ?>" data-lab-pill><?= esc(UiStore::RESULT_LABEL[$test['status']] ?? $test['status']) ?></span>
+                    <?php endif; ?>
                 </div>
 
+                <?php if (! $freeText): ?>
                 <div class="lab-actions">
                     <?php // This test's own answers, from the check list: a serology
                           // offers Positive / Negative, a referral Cleared / not.
@@ -99,26 +105,29 @@ foreach ($tests as $i => $test) {
                     <?php endforeach; ?>
                     <button type="button" class="lab-edit-btn" data-lab-edit<?= $editTitle !== null ? ' title="' . esc($editTitle) . '"' : '' ?>><?= ui_icon('edit') ?></button>
                 </div>
+                <?php endif; ?>
 
                 <?php // The sheet's comment line. Free text on every test, and
                       // on HLA typing the loci it asks to be filled in with. ?>
-                <?php if ($editing || ($test['notes'] ?? '') !== ''): ?>
+                <?php if ($editing || $freeText || ($test['notes'] ?? '') !== ''): ?>
                     <?php
                     $hint      = UiStore::COMMENT_HINT[$test['name']] ?? null;
                     $commentId = $field . '-' . $i . '-comment';
                     ?>
                     <div class="lab-comment">
-                        <label class="lab-comment-label" for="<?= $commentId ?>">Comment</label>
+                        <label class="lab-comment-label" for="<?= $commentId ?>"><?= $freeText ? 'Notes' : 'Comment' ?></label>
                         <textarea id="<?= $commentId ?>" class="lab-editor-field lab-comment-field" name="<?= $base ?>[notes]"
-                                  rows="<?= $hint['rows'] ?? 1 ?>"<?= $hint === null ? '' : ' placeholder="' . esc($hint['placeholder']) . '"' ?>><?= esc($test['notes'] ?? '') ?></textarea>
+                                  rows="<?= $freeText ? 3 : ($hint['rows'] ?? 1) ?>"<?= $hint === null ? ($freeText ? ' placeholder="Anything the workup has no line for"' : '') : ' placeholder="' . esc($hint['placeholder']) . '"' ?>><?= esc($test['notes'] ?? '') ?></textarea>
                     </div>
                 <?php endif; ?>
 
+                <?php if (! $freeText): ?>
                 <div class="lab-editor stack-2" data-lab-editor hidden>
                     <input type="text" class="lab-editor-field" name="<?= $base ?>[result]" value="<?= esc($test['result'] ?? '') ?>" placeholder="Value / finding">
                     <input type="text" class="lab-editor-field lab-editor-field--mono" name="<?= $base ?>[date]" value="<?= esc($test['date'] ?? '') ?>" placeholder="Date (DD/MM/YYYY)" inputmode="numeric" maxlength="10" autocomplete="off" data-date-text>
                     <button type="button" class="lab-editor-save" data-lab-save>Save</button>
                 </div>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
         </div>

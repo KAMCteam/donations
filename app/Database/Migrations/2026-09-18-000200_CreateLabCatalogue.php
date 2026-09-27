@@ -93,13 +93,15 @@ class CreateLabCatalogue extends Migration
             //   acceptable_abnormal_na  ... / Not applicable
             //   cleared_not_cleared     Not done / pending / Cleared / not cleared / Not applicable
             //   given_not_given         Given / not required / not given / not applicable
+            //   seen_not_seen           Not done / Seen / Not seen
+            //   free_text               no answer at all, only the comment box
             // "Not applicable" is offered test by test, not everywhere: the
             // sheet adds it where a patient's sex or history can rule the test
             // out, and withholds it from the bloods and serologies asked of
             // everyone. Hence two acceptable/abnormal lists, one with it.
             'result_type' => [
                 'type'       => 'ENUM',
-                'constraint' => ['text', 'numeric', 'blood_group', 'done', 'positive_negative', 'acceptable_abnormal', 'acceptable_abnormal_na', 'cleared_not_cleared', 'given_not_given'],
+                'constraint' => ['text', 'numeric', 'free_text', 'blood_group', 'done', 'positive_negative', 'acceptable_abnormal', 'acceptable_abnormal_na', 'cleared_not_cleared', 'given_not_given', 'seen_not_seen'],
                 'default'    => 'text',
             ],
             'sort_order' => [

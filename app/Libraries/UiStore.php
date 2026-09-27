@@ -137,6 +137,9 @@ final class UiStore
         'acceptable_abnormal_na' => ['not_done', 'pending', 'acceptable', 'abnormal', 'not_applicable'],
         'cleared_not_cleared'    => ['not_done', 'pending', 'cleared', 'not_cleared', 'not_applicable'],
         'given_not_given'        => ['not_done', 'given', 'not_required', 'not_given', 'not_applicable'],
+        'seen_not_seen'          => ['not_done', 'seen', 'not_seen'],
+        // No answer at all: the card is its comment box and nothing else.
+        'free_text'              => [],
         'text'                   => ['not_done', 'pending', 'done', 'not_applicable'],
         'numeric'                => ['not_done', 'pending', 'done', 'not_applicable'],
     ];
@@ -155,6 +158,8 @@ final class UiStore
         'not_required'   => 'Not required',
         'not_given'      => 'Not given',
         'not_applicable' => 'N/A',
+        'seen'           => 'Seen',
+        'not_seen'       => 'Not seen',
         'blood_a'        => 'A',
         'blood_b'        => 'B',
         'blood_ab'       => 'AB',
@@ -176,6 +181,8 @@ final class UiStore
         'not_required'   => 'tone-slate',
         'not_given'      => 'tone-amber',
         'not_applicable' => 'tone-slate',
+        'seen'           => 'tone-emerald',
+        'not_seen'       => 'tone-amber',
         'blood_a'        => 'tone-blue',
         'blood_b'        => 'tone-blue',
         'blood_ab'       => 'tone-blue',
@@ -206,8 +213,19 @@ final class UiStore
     public const LAB_STATUSES = [
         'not_done', 'pending', 'done', 'positive', 'negative', 'acceptable',
         'abnormal', 'cleared', 'not_cleared', 'given', 'not_required',
-        'not_given', 'not_applicable', 'blood_a', 'blood_b', 'blood_ab', 'blood_o',
+        'not_given', 'not_applicable', 'seen', 'not_seen',
+        'blood_a', 'blood_b', 'blood_ab', 'blood_o',
     ];
+
+    /**
+     * Tests with no answer to give, only something to write.
+     *
+     * "Other" is the sheet's blank line: one box for whatever the workup has
+     * no row for. It has no status to set, so it is not something that can be
+     * completed — which is why the progress count leaves it out entirely
+     * rather than counting a card nobody can ever tick.
+     */
+    public const FREE_TEXT_TYPES = ['free_text'];
 
     public const GENDER_OPTIONS = ['Male' => 'Male', 'Female' => 'Female'];
 
@@ -1190,9 +1208,16 @@ final class UiStore
      */
     public static function labProgress(array $labTests): array
     {
-        $total = count($labTests);
-        $done  = count(array_filter(
+        // A free-text card has no answer to give, so it is neither done nor
+        // outstanding — counting it would hold the bar below 100% for ever.
+        $countable = array_filter(
             $labTests,
+            static fn (array $t): bool => ! in_array($t['resultType'] ?? '', self::FREE_TEXT_TYPES, true)
+        );
+
+        $total = count($countable);
+        $done  = count(array_filter(
+            $countable,
             static fn (array $t): bool => ! in_array($t['status'], self::RESULT_UNANSWERED, true)
         ));
 

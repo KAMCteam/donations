@@ -314,6 +314,33 @@
     });
   }
 
+  /* ---- Dialogs that close themselves, and buttons that ask --------------- */
+
+  /* A Cancel inside a dialog that posts elsewhere cannot be method="dialog",
+     so it says data-dialog-close instead. */
+  function initDialogClosers() {
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-dialog-close]");
+      if (!button) return;
+
+      var dialog = button.closest("dialog");
+      if (dialog) { event.preventDefault(); dialog.close(); }
+    });
+  }
+
+  /* An irreversible choice made in the middle of a screen, where a whole page
+     of confirmation would lose the working out. Without this the post still
+     goes through — the server asks again in the summary before anything is
+     written, so this is the earlier of two warnings, not the only one. */
+  function initConfirmButtons() {
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-confirm]");
+      if (!button) return;
+
+      if (!window.confirm(button.getAttribute("data-confirm"))) event.preventDefault();
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initSidebar();
     initRowLinks();
@@ -322,5 +349,7 @@
     initDialogs();
     initConfirmDelete();
     initAutoSubmit();
+    initDialogClosers();
+    initConfirmButtons();
   });
 })();

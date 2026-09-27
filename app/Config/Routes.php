@@ -61,6 +61,7 @@ $routes->match(['get', 'post'], 'pairs/(:segment)', 'Ui::pair/$1');
 $routes->get('exchange', 'Exchange::index');
 $routes->post('exchange/start/(:segment)', 'Exchange::start/$1');
 $routes->match(['get', 'post'], 'exchange/build', 'Exchange::build');
+$routes->get('exchange/review', 'Exchange::review');
 
 $routes->get('mrp', 'Ui::mrp');
 $routes->post('mrp', 'Ui::addMrp');

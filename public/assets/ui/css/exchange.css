@@ -1,0 +1,337 @@
+/* ==========================================================================
+   exchange.css — the paired-exchange builder
+
+   Loaded only by that screen, through the layout's `head` section. Everything
+   here is the chain: the pair at the top, the run of links under it, and the
+   three states a node can be in. The cards, buttons, chips, dialogs and
+   colours all come from components.css and pages.css — this adds the shapes
+   those do not have, and nothing they already do.
+
+   No build step, no utility framework: plain rules, using the same custom
+   properties as the rest of the platform.
+   ========================================================================== */
+
+/* ---- What stands between here and saving ------------------------------- */
+
+.exchange-alert {
+  margin-bottom: 1.25rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+/* Red stops the save; orange only asks for a decision; green is clear. */
+.exchange-alert--stop { border-color: #fecaca; background-color: #fef2f2; color: #991b1b; }
+.exchange-alert--warn { border-color: #fed7aa; background-color: #fff7ed; color: #9a3412; }
+.exchange-alert--go   { border-color: #a7f3d0; background-color: #ecfdf5; color: #065f46; }
+
+/* ---- A person, wherever they appear ------------------------------------- */
+
+.person-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--slate-200);
+  border-left-width: 3px;
+  border-radius: var(--radius-lg);
+  background-color: #fff;
+}
+
+.person-card--recipient { border-left-color: #2563eb; }
+.person-card--donor     { border-left-color: #0f766e; }
+
+.person-role {
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--slate-400);
+}
+
+.person-name {
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  font-weight: 600;
+  color: var(--slate-800);
+  overflow-wrap: anywhere;
+}
+
+.person-meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  color: var(--slate-500);
+}
+
+/* The blood group is the one fact every list and every node repeats, so it
+   gets a shape of its own rather than more grey text. */
+.chip-blood {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  padding: 0.0625rem 0.5rem;
+  border-radius: var(--radius-full);
+  background-color: #e8eef5;
+  color: #15508A;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 700;
+}
+
+/* ---- The pair being exchanged, side by side ----------------------------- */
+
+.swap-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.swap-side { display: flex; flex-direction: column; gap: 0.625rem; }
+
+.swap-picker { display: flex; flex-direction: column; gap: 0.375rem; }
+
+/* The state of the link between the two, in one glance. */
+.swap-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.swap-link-icon { display: inline-flex; }
+
+.swap-link-label {
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.swap-link-note {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: #9a3412;
+}
+
+.swap-link.is-linked  { background-color: #ecfdf5; color: #059669; }
+.swap-link.is-swapped { background-color: #eff6ff; color: #2563eb; }
+.swap-link.is-broken  { background-color: #fef2f2; color: #b91c1c; }
+
+/* ---- A dropdown that posts its own choice -------------------------------- */
+
+.node-chooser {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.node-select {
+  flex: 1;
+  min-width: 12rem;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+}
+
+.node-empty {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--slate-500);
+  font-style: italic;
+}
+
+/* ---- The chain ----------------------------------------------------------- */
+
+.chain {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+}
+
+.chain-node {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-xl);
+  background-color: var(--slate-50);
+}
+
+/* A link that is still missing its donor, and one that has a donor spare:
+   the two colours the rules attach meaning to. */
+.chain-node--open  { border-color: #fecaca; background-color: #fef2f2; }
+.chain-node--spare { border-color: #fed7aa; background-color: #fff7ed; }
+
+.chain-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-full);
+  background-color: #15508A;
+  color: #fff;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* The arrow points from the donor to the recipient — the way the organ goes. */
+.chain-arrow {
+  font-size: 1.25rem;
+  color: var(--slate-400);
+  text-align: center;
+}
+
+.node-open {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px dashed;
+  border-radius: var(--radius-lg);
+  background-color: #fff;
+}
+
+.node-open--stop { border-color: #fca5a5; }
+.node-open--warn { border-color: #fdba74; }
+
+.node-open-label {
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.node-open--stop .node-open-label { color: #b91c1c; }
+.node-open--warn .node-open-label { color: #c2410c; }
+
+.node-fates { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.btn-outline--danger { border-color: #fecaca; color: #b91c1c; }
+.btn-outline.is-chosen { border-color: #15508A; color: #15508A; font-weight: 600; }
+
+.node-decided {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  font-weight: 600;
+  color: #065f46;
+}
+
+/* ---- The review --------------------------------------------------------- */
+
+.dialog--wide { max-width: min(44rem, calc(100vw - 2rem)); }
+
+.summary-title {
+  font-size: var(--text-lg);
+  line-height: var(--lh-lg);
+  font-weight: 600;
+}
+
+.summary-sub {
+  margin-top: 0.25rem;
+  margin-bottom: 1.25rem;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--slate-600);
+}
+
+.summary-block + .summary-block { margin-top: 1.25rem; }
+
+.summary-block--danger {
+  padding: 0.875rem 1rem;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-lg);
+  background-color: #fef2f2;
+}
+
+.summary-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  font-weight: 700;
+  color: var(--slate-700);
+}
+
+.summary-count {
+  padding: 0.0625rem 0.5rem;
+  border-radius: var(--radius-full);
+  background-color: var(--slate-100);
+  color: var(--slate-600);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.summary-list { list-style: none; display: flex; flex-direction: column; gap: 0.375rem; margin: 0; padding: 0; }
+
+.summary-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+}
+
+.summary-list .chip-blood { align-self: center; margin-top: 0; }
+.summary-name  { font-weight: 600; color: var(--slate-800); }
+.summary-arrow { color: var(--slate-400); }
+.summary-meta  { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--slate-500); }
+
+.summary-empty {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--slate-500);
+}
+
+.summary-warning {
+  margin-top: 0.625rem;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  font-weight: 600;
+  color: #991b1b;
+}
+
+/* Review and save before the chain allows it: visibly not yet available,
+   and not clickable either. */
+.btn-save.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ---- Wide enough for the two columns to be two columns ------------------ */
+
+@media (min-width: 64rem) {
+  .swap-row { grid-template-columns: 1fr auto 1fr; }
+}
+
+@media (max-width: 47.99rem) {
+  /* A four-column node does not fit a phone; stack it and let the arrow
+     turn with it. */
+  .chain-node { grid-template-columns: auto 1fr; }
+  .chain-arrow { grid-column: 1 / -1; transform: rotate(90deg); }
+}

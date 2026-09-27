@@ -108,47 +108,76 @@ class Exchange extends BaseController
         ]);
     }
 
-    /** Link, undo, discard or confirm — whichever button was pressed. */
+    /**
+     * The review before saving: every link, every donor's fate, spelled out.
+     *
+     * Its own address so the summary is reachable with JavaScript off; the
+     * builder opens the same content as a dialog when it can.
+     */
+    public function review(): string|RedirectResponse
+    {
+        $organ = $this->store->organ();
+        $state = $this->draft->state($organ);
+
+        if ($state === null) {
+            return redirect()->to(site_url('exchange'));
+        }
+
+        return view('ui/exchange_review', [
+            'title'   => 'Review the exchange',
+            'navPage' => 'exchange',
+            'organ'   => $organ,
+            'state'   => $state,
+        ]);
+    }
+
+    /** Whichever button was pressed, in the order they can be pressed. */
     private function act(string $organ): RedirectResponse
     {
-        $action = (string) $this->request->getPost('action');
+        $post   = fn (string $field): string => (string) $this->request->getPost($field);
+        $action = $post('action');
+        $back   = redirect()->to(site_url('exchange/build'));
 
         if ($action === 'discard') {
             $this->draft->discard();
+            $this->session->setFlashdata('ui_notice', 'The exchange was cancelled. Nothing was changed.');
 
             return redirect()->to(site_url('exchange'));
         }
 
-        if ($action === 'unlink') {
-            $this->draft->unlink($organ, (int) $this->request->getPost('index'));
+        if ($action === 'undo') {
+            $this->draft->undo($organ);
 
-            return redirect()->to(site_url('exchange/build'));
+            return $back;
         }
 
         if ($action === 'confirm') {
             $error = $this->draft->confirm($organ);
 
             if ($error === '') {
-                $this->session->setFlashdata('ui_notice', 'The exchange is done. Its new pairs are below.');
+                $this->session->setFlashdata('ui_notice', 'The exchange is saved. Its new pairs are below.');
 
                 return redirect()->to(site_url('pairs'));
             }
 
             $this->session->setFlashdata('ui_error', $error);
 
-            return redirect()->to(site_url('exchange/build'));
+            return $back;
         }
 
-        $error = $this->draft->link(
-            $organ,
-            (string) $this->request->getPost('recipientMrn'),
-            (string) $this->request->getPost('donorMrn')
-        );
+        $error = match ($action) {
+            // A recipient choosing a donor, and a donor choosing a recipient:
+            // the same link made from either end.
+            'chooseDonor'     => $this->draft->assign($organ, $post('recipientMrn'), $post('donorMrn')),
+            'chooseRecipient' => $this->draft->assignRecipient($organ, $post('donorMrn'), $post('recipientMrn')),
+            'fate'            => $this->draft->setFate($organ, $post('donorMrn'), $post('fate')),
+            default           => 'That is not something this screen does.',
+        };
 
         if ($error !== '') {
             $this->session->setFlashdata('ui_error', $error);
         }
 
-        return redirect()->to(site_url('exchange/build'));
+        return $back;
     }
 }

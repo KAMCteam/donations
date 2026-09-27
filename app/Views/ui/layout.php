@@ -37,6 +37,9 @@ $navItems = [
     <link rel="stylesheet" href="<?= base_url('assets/ui/css/layout.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/ui/css/components.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/ui/css/pages.css') ?>">
+    <?php // A screen with enough of its own to say adds a stylesheet here,
+          // after the shared ones so it can build on them. ?>
+    <?= $this->renderSection('head') ?>
 </head>
 
 <body>

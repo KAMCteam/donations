@@ -1424,6 +1424,47 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertContains('8102', array_column((new UiStore())->availableDonors(), 'id'));
     }
 
+    /**
+     * The two fates only appear once the spare donor is the one left.
+     *
+     * While a recipient is still without a donor the chain has somewhere to
+     * go, so ending it here is not yet a choice anybody has to make — and
+     * offering it then invites a decision nobody needs.
+     */
+    public function testTheSpareDonorsFatesWaitUntilNobodyElseIs(): void
+    {
+        [$pairA] = $this->twoPairsToExchange();
+        $this->post('donors/new', ['mrn' => '8803', 'name' => 'Spare Donor', 'age' => '44', 'bloodType' => 'O']);
+
+        // Straight after starting, both sides of pair A are open: a recipient
+        // without a donor, and a donor without a recipient.
+        $this->post('exchange/start/' . $pairA);
+        $html = $this->get('exchange/build')->getBody();
+        $this->assertStringContainsString('Donor without a recipient', $html);
+        $this->assertStringNotContainsString('btn-fate', $html, 'a recipient is still waiting');
+
+        // Match the recipient, and now the donor really is the only one left.
+        $this->post('exchange/build', ['action' => 'chooseDonor', 'recipientMrn' => '8101', 'donorMrn' => '8803']);
+        $html = $this->get('exchange/build')->getBody();
+        $this->assertStringContainsString('btn-fate', $html);
+        $this->assertStringContainsString('Everyone else is matched', $html);
+        $this->assertStringContainsString('Move to the available donors list', $html);
+        $this->assertStringContainsString('Delete from the system', $html);
+    }
+
+    /** The screen is the chain: the duplicate card above it is gone. */
+    public function testTheBuilderShowsTheChainAndNothingElse(): void
+    {
+        [$pairA] = $this->twoPairsToExchange();
+        $this->post('exchange/start/' . $pairA);
+
+        $html = $this->get('exchange/build')->getBody();
+
+        $this->assertStringContainsString('>The chain</h2>', $html);
+        $this->assertStringNotContainsString('The pair being exchanged', $html);
+        $this->assertSame(1, substr_count($html, 'class="card-title card-title--mb4"'));
+    }
+
     /** The other fate: the spare donor is removed from the system. */
     public function testASpareDonorCanBeDeletedInstead(): void
     {

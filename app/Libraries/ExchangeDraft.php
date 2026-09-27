@@ -350,24 +350,8 @@ final class ExchangeDraft
         }
 
         $undecided = array_values(array_filter($spareDonors, static fn (array $d): bool => $d['fate'] === ''));
-        $startPair = $this->pairs->find($draft['start']);
-
-        // The donor shown at the top of the screen — the one this exchange was
-        // opened over — offers a list of its own, so the swap can be made from
-        // either side. Keyed by MRN because the card may show their
-        // replacement instead, once there is one.
-        $donorChoices = [];
-        $startDonor   = $startPair === null ? null : $this->donors->find($startPair['donor_mrn']);
-
-        foreach ([$startDonor, $chain[0]['donor'] ?? null] as $donor) {
-            if ($donor !== null && ! isset($donorChoices[(int) $donor['mrn']])) {
-                $donorChoices[(int) $donor['mrn']] = $this->compatibleRecipients($organ, $draft, $donor);
-            }
-        }
 
         return [
-            'donorChoices'   => $donorChoices,
-            'startPair'      => $startPair,
             'chain'          => $chain,
             'openRecipients' => $openRecipients,
             'spareDonors'    => $spareDonors,

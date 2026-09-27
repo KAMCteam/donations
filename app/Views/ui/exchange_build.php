@@ -12,13 +12,16 @@ use App\Libraries\ExchangeDraft;
 /**
  * Building a paired exchange.
  *
- * The screen is the chain, drawn as it is: the pair it started from at the
- * top, then each link the choices have added, recipient ← donor, in the order
+ * The screen is the chain and nothing else: the pair it started from is its
+ * first link, and each choice adds another — recipient ← donor, in the order
  * one follows from another. A recipient without a donor is an open node with
  * its own list of compatible donors under it; a donor without a recipient is
- * an open node the other way, with a list of compatible recipients and — since
- * a spare donor is allowed at the end of a chain — the two things that can
- * become of them instead.
+ * an open node the other way, with a list of compatible recipients.
+ *
+ * A spare donor is only offered the two things that can become of them —
+ * back to the register, or deleted — once they are the only one left over.
+ * While a recipient is still without a donor the chain has somewhere to go,
+ * and ending it here is not yet a choice anybody has to make.
  *
  * Every list only ever offers a blood-group match, donor to recipient, and a
  * donor already spoken for is gone from the rest. So a recipient cannot be
@@ -33,6 +36,10 @@ use App\Libraries\ExchangeDraft;
  * @var array<string, mixed> $state
  * @var string               $error
  */
+// A spare donor is only asked about once nobody else is waiting: while a
+// recipient is still without one, the chain has somewhere to go.
+$onlyDonorsLeft = $state['openRecipients'] === [];
+
 $blood = static fn (?array $person): string => $person === null
     ? ''
     : '<span class="chip-blood">' . esc($person['blood_group']) . '</span>';
@@ -106,89 +113,11 @@ $chooser = static function (string $action, string $ownField, string $ownMrn, st
         </div>
     <?php endif; ?>
 
-    <?php // ---- The pair this started from, side by side -------------------- ?>
-    <?php $first = $state['chain'][0] ?? null; ?>
-    <?php if ($first !== null): ?>
-        <?php
-        $originalDonor = $first['wasTheirDonor'];
-        $currentDonor  = $first['donor'];
-        $stillTheirs   = $currentDonor !== null && $originalDonor !== null
-            && (int) $currentDonor['mrn'] === (int) $originalDonor['mrn'];
-        $compatible = $originalDonor !== null && ExchangeDraft::canGive(
-            (string) $originalDonor['blood_group'],
-            (string) $first['recipient']['blood_group']
-        );
-        ?>
-        <div class="card card--pad">
-            <h2 class="card-title card-title--mb4">
-                The pair being exchanged<?= $first['fromPair'] === null ? '' : ' — pair #' . (int) $first['fromPair'] ?>
-            </h2>
-
-            <div class="swap-row">
-                <div class="swap-side">
-                    <div class="person-card person-card--recipient">
-                        <span class="person-role">Recipient</span>
-                        <span class="person-name"><?= esc($first['recipient']['name']) ?></span>
-                        <span class="person-meta"><?= esc($first['recipient']['mrn']) ?></span>
-                        <?= $blood($first['recipient']) ?>
-                    </div>
-                    <div class="swap-picker">
-                        <label class="field-label">Compatible donors</label>
-                        <?= $chooser('chooseDonor', 'recipientMrn', (string) $first['recipient']['mrn'],
-                            'donorMrn',
-                            $first['donor'] === null ? $first['choosableDonors'] : [],
-                            $first['donor'] === null ? 'No compatible donors at the moment.' : 'Matched with ' . $first['donor']['name'] . '.') ?>
-                    </div>
-                </div>
-
-                <?php // The state of the link between the two, in one glance. ?>
-                <div class="swap-link <?= $stillTheirs ? 'is-linked' : ($currentDonor === null ? 'is-broken' : 'is-swapped') ?>">
-                    <span class="swap-link-icon"><?= ui_icon($currentDonor === null ? 'unlink' : 'link14') ?></span>
-                    <span class="swap-link-label">
-                        <?php if ($currentDonor === null): ?>
-                            Unlinked
-                        <?php elseif ($stillTheirs): ?>
-                            Linked
-                        <?php else: ?>
-                            Swapped
-                        <?php endif; ?>
-                    </span>
-                    <?php if ($originalDonor !== null && ! $compatible): ?>
-                        <span class="swap-link-note">Own donor incompatible</span>
-                    <?php endif; ?>
-                </div>
-
-                <div class="swap-side">
-                    <?php $shownDonor = $currentDonor ?? $originalDonor; ?>
-                    <?php if ($shownDonor !== null): ?>
-                        <div class="person-card person-card--donor">
-                            <span class="person-role">Donor</span>
-                            <span class="person-name"><?= esc($shownDonor['name']) ?></span>
-                            <span class="person-meta"><?= esc($shownDonor['mrn']) ?></span>
-                            <?= $blood($shownDonor) ?>
-                        </div>
-                        <div class="swap-picker">
-                            <label class="field-label">Compatible recipients</label>
-                            <?php
-                            $draftRaw = $state['raw'] ?? null;
-                            $forDonor = $state['donorChoices'][(int) $shownDonor['mrn']] ?? [];
-                            ?>
-                            <?= $chooser('chooseRecipient', 'donorMrn', (string) $shownDonor['mrn'],
-                                'recipientMrn', $forDonor,
-                                $forDonor === [] ? 'No compatible recipients at the moment.' : '') ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
-
     <?php // ---- The chain --------------------------------------------------- ?>
-    <?php if ($state['assigned'] > 0 || count($state['chain']) > 1 || $state['spareDonors'] !== []): ?>
-        <div class="card card--pad">
-            <h2 class="card-title card-title--mb4">The chain</h2>
+    <div class="card card--pad">
+        <h2 class="card-title card-title--mb4">The chain</h2>
 
-            <ol class="chain">
+        <ol class="chain">
                 <?php foreach ($state['chain'] as $i => $node): ?>
                     <li class="chain-node <?= $node['donor'] === null ? 'chain-node--open' : '' ?>">
                         <div class="chain-index"><?= $i + 1 ?></div>
@@ -226,30 +155,45 @@ $chooser = static function (string $action, string $ownField, string $ownMrn, st
 
                         <div class="node-open node-open--warn">
                             <span class="node-open-label">Donor without a recipient</span>
-                            <?= $chooser('chooseRecipient', 'donorMrn', (string) $donor['mrn'],
-                                'recipientMrn', $donor['choosableRecipients'],
-                                'No compatible recipients — choose one of the two below.') ?>
 
-                            <div class="node-fates">
-                                <?php foreach (ExchangeDraft::FATES as $value => $label): ?>
+                            <?php // The dropdown is always there while somebody compatible
+                                  // is free — extending the chain is the tidier answer.
+                                  // What the fates wait for is the donor being the *only*
+                                  // one left: while a recipient is still without a donor,
+                                  // ending the chain here is not yet a choice to make, and
+                                  // offering it invites a decision nobody needs. ?>
+                            <?php if ($donor['choosableRecipients'] !== []): ?>
+                                <?= $chooser('chooseRecipient', 'donorMrn', (string) $donor['mrn'],
+                                    'recipientMrn', $donor['choosableRecipients'], '') ?>
+                            <?php else: ?>
+                                <p class="node-empty">No compatible recipients are free.</p>
+                            <?php endif; ?>
+
+                            <?php if ($onlyDonorsLeft): ?>
+                                <p class="node-open-hint">Everyone else is matched. This donor ends the chain &mdash; say what becomes of them.</p>
+
+                                <div class="node-fates">
                                     <form method="post" action="<?= site_url('exchange/build') ?>" class="inline-form">
                                         <?= csrf_field() ?>
                                         <input type="hidden" name="action" value="fate">
                                         <input type="hidden" name="donorMrn" value="<?= esc($donor['mrn']) ?>">
-                                        <input type="hidden" name="fate" value="<?= esc($value) ?>">
-                                        <?php if ($value === 'delete'): ?>
-                                            <?php // Asked before it is set, not only before it is saved. ?>
-                                            <button type="submit" class="btn-outline btn-outline--danger"
-                                                    data-confirm="Delete <?= esc($donor['name']) ?> (MRN <?= esc($donor['mrn']) ?>) from the system? The record and its whole lab workup go with it. This cannot be undone."><?= esc($label) ?></button>
-                                        <?php else: ?>
-                                            <button type="submit" class="btn-outline<?= $donor['fate'] === $value ? ' is-chosen' : '' ?>"><?= esc($label) ?></button>
-                                        <?php endif; ?>
+                                        <input type="hidden" name="fate" value="available">
+                                        <button type="submit" class="btn-fate<?= $donor['fate'] === 'available' ? ' is-chosen' : '' ?>"><?= ui_icon('back') ?><?= esc(ExchangeDraft::FATES['available']) ?></button>
                                     </form>
-                                <?php endforeach; ?>
-                            </div>
+
+                                    <form method="post" action="<?= site_url('exchange/build') ?>" class="inline-form">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="action" value="fate">
+                                        <input type="hidden" name="donorMrn" value="<?= esc($donor['mrn']) ?>">
+                                        <input type="hidden" name="fate" value="delete">
+                                        <?php // Asked before it is set, not only before it is saved. ?>
+                                        <button type="submit" class="btn-fate btn-fate--danger<?= $donor['fate'] === 'delete' ? ' is-chosen' : '' ?>" data-confirm="Delete <?= esc($donor['name']) ?> (MRN <?= esc($donor['mrn']) ?>) from the system? The record, its whole lab workup and the pair records naming them all go with it. This cannot be undone."><?= ui_icon('trash') ?><?= esc(ExchangeDraft::FATES['delete']) ?></button>
+                                    </form>
+                                </div>
+                            <?php endif; ?>
 
                             <?php if ($donor['fate'] !== ''): ?>
-                                <p class="node-decided"><?= esc(ExchangeDraft::FATES[$donor['fate']]) ?> &mdash; decided.</p>
+                                <p class="node-decided"><?= ui_icon('check') ?><?= esc(ExchangeDraft::FATES[$donor['fate']]) ?> &mdash; decided.</p>
                             <?php endif; ?>
                         </div>
 
@@ -263,9 +207,8 @@ $chooser = static function (string $action, string $ownField, string $ownMrn, st
                         </div>
                     </li>
                 <?php endforeach; ?>
-            </ol>
-        </div>
-    <?php endif; ?>
+        </ol>
+    </div>
 
     <div class="card card--pad">
         <div class="card-actions">

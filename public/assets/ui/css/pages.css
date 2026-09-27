@@ -645,12 +645,6 @@
   white-space: nowrap;
 }
 
-.note-link {
-  text-decoration-line: underline;
-  color: #15508A;
-  cursor: pointer;
-}
-
 .not-found {
   padding: 2rem;
   color: var(--slate-500);

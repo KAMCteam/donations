@@ -22,7 +22,7 @@ use App\Libraries\UiStore;
 $headers = [
     'Pair #', 'MRN', 'Name', 'Age', 'Type', 'Relationship',
     'Blood Group', 'MRP', 'Gender', 'Phone Number',
-    'Dialysis', 'Entry Date', 'Status', 'Date of Crossmatch', 'Note', '',
+    'Dialysis', 'Entry Date', 'Status', 'Date of Crossmatch', '',
 ];
 
 $dash = '—';
@@ -144,8 +144,10 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                             <td rowspan="2" class="cell-span">
                                 <span class="status-tag <?= ui_tone('status', $pair['status']) ?>"><?= esc($statusLabel) ?></span>
                             </td>
-                            <td class="t-mono t-500"><?= esc(($pair['scheduledDate'] ?? '') !== '' ? $pair['scheduledDate'] : $dash) ?></td>
-                            <td class="t-500 cell-last"><?= ($pair['notes'] ?? '') !== '' ? '<span class="note-link">Show Note</span>' : $dash ?></td>
+                            <?php // No Note column: it held a "Show Note" that opened
+                                  // nothing, and the note itself is on the pair's own
+                                  // screen and on its printed sheet. ?>
+                            <td class="t-mono t-500 cell-last"><?= esc(($pair['scheduledDate'] ?? '') !== '' ? $pair['scheduledDate'] : $dash) ?></td>
                             <?php // One control for the pair, not one per row: the two rows
                                   // are one record, and deleting it unmakes the link only. ?>
                             <td rowspan="2" class="cell-action" style="background-color:<?= $rowBg ?>"><?= view('ui/partials/delete_cell', [
@@ -171,8 +173,7 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                                   // which is not the same as having none yet. ?>
                             <td class="t-500 cell-na">Not applicable</td>
                             <td class="t-500 cell-na">Not applicable</td>
-                            <td class="t-mono t-500"><?= esc(($pair['scheduledDate'] ?? '') !== '' ? $pair['scheduledDate'] : $dash) ?></td>
-                            <td class="t-500 cell-last"><?= $dash ?></td>
+                            <td class="t-mono t-500 cell-last"><?= esc(($pair['scheduledDate'] ?? '') !== '' ? $pair['scheduledDate'] : $dash) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>

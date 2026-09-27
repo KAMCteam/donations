@@ -358,6 +358,7 @@
 .lab-card.status-flagged   { border-color: #fca5a5; }
 
 .lab-card-head {
+  /* name and result on the left, then the pill and the pencil. */
   padding: 0.75rem 1rem;
   display: flex;
   align-items: flex-start;
@@ -409,26 +410,51 @@
   background-color: #fff;
   border-top: 1px solid var(--slate-100);
   display: flex;
+  align-items: center;
   gap: 0.375rem;
 }
 
+/* The answers a test offers, as one row of chips.
+
+   Every one carries its own border, including the unchosen: the tone classes
+   that colour the chosen one bring a 1px border with them, so without a
+   border on the rest the chosen chip stood 2px taller than its neighbours and
+   looked like it was bulging out of the row. They are also sized to their own
+   words now rather than stretched to equal widths, which had "Not done" as
+   wide as "Not applicable" and left the short ones looking hollow. */
 .lab-status-btn {
-  flex: 1;
   font-size: var(--text-xs);
   line-height: var(--lh-xs);
-  padding: 0.375rem 0;
-  border-radius: var(--radius-lg);
+  padding: 0.3125rem 0.625rem;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-full);
   font-weight: 500;
-  transition-property: all;
+  white-space: nowrap;
+  cursor: pointer;
+  transition-property: var(--transition-colors-props);
   transition-timing-function: var(--ease);
   transition-duration: var(--dur);
 }
-.lab-status-btn:not(.is-active) { color: var(--slate-400); background-color: var(--slate-50); }
-.lab-status-btn.is-active { box-shadow: var(--shadow-sm); }
+
+/* The fill and the text colour are only for the unchosen. A chosen chip also
+   carries its tone class, and the two rules have the same specificity — so
+   whichever is written later wins, and these are written later. Scoping them
+   this way leaves the tone's own fill, colour and border alone instead of
+   quietly painting over them. */
+.lab-status-btn:not(.is-active) {
+  background-color: #fff;
+  color: var(--slate-500);
+}
+
+/* Chosen: the tone brings the fill, the text colour and the border, so the
+   only thing left to add is the weight. No shadow — it made the chip float
+   above a row that is meant to read as one control. */
+.lab-status-btn.is-active { font-weight: 600; }
 
 .lab-edit-btn {
-  padding: 0.375rem 0.5rem;
-  border-radius: var(--radius-lg);
+  padding: 0.3125rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
   color: var(--slate-400);
   transition-property: var(--transition-colors-props);
   transition-timing-function: var(--ease);
@@ -497,7 +523,11 @@ textarea.lab-editor-field { resize: none; }
   .input:hover,
   .textarea:hover    { border-color: var(--slate-300); }
   .chip:not(.is-active):hover { border-color: var(--slate-300); }
-  .lab-status-btn:not(.is-active):hover { background-color: var(--slate-100); }
+  .lab-status-btn:not(.is-active):hover {
+    border-color: var(--slate-300);
+    background-color: var(--slate-50);
+    color: var(--slate-700);
+  }
   .lab-edit-btn:hover { color: var(--slate-600); background-color: var(--slate-100); }
 }
 
@@ -818,9 +848,9 @@ textarea.lab-editor-field { resize: none; }
   border-bottom: 1px solid var(--slate-100);
 }
 
-/* Five answers rather than three, so they wrap instead of squeezing. */
+/* Five answers rather than three, so they wrap instead of squeezing. The
+   chips size themselves now, so there is nothing left to undo here. */
 .lab-actions { flex-wrap: wrap; }
-.lab-status-btn { flex: 0 1 auto; }
 
 /* =========================================================
    Deleting a record

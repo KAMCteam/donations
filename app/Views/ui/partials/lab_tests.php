@@ -91,6 +91,10 @@ foreach ($tests as $i => $test) {
                     </div>
                     <?php if (! $freeText): ?>
                         <span class="lab-pill <?= ui_tone('labStatus', $test['status']) ?>" data-lab-pill><?= esc(UiStore::RESULT_LABEL[$test['status']] ?? $test['status']) ?></span>
+                        <?php // Beside the pill rather than at the end of the answers:
+                              // five answers already wrap on a narrow column, and the
+                              // pencil was being carried onto a line of its own. ?>
+                        <button type="button" class="lab-edit-btn" data-lab-edit<?= $editTitle !== null ? ' title="' . esc($editTitle) . '"' : '' ?>><?= ui_icon('edit') ?></button>
                     <?php endif; ?>
                 </div>
 
@@ -103,7 +107,6 @@ foreach ($tests as $i => $test) {
                     <?php foreach (UiStore::RESULT_OPTIONS[$test['resultType']] ?? UiStore::RESULT_OPTIONS['text'] as $status): ?>
                         <button type="button" class="lab-status-btn<?= $test['status'] === $status ? ' is-active ' . ui_tone('labStatus', $status) : '' ?>" data-lab-status="<?= esc($status) ?>" data-lab-tone="<?= esc(ui_tone('labStatus', $status)) ?>" data-lab-label="<?= esc(UiStore::RESULT_LABEL[$status]) ?>"<?= in_array($status, UiStore::RESULT_UNANSWERED, true) ? ' data-lab-unanswered' : '' ?>><?= esc(UiStore::RESULT_LABEL[$status]) ?></button>
                     <?php endforeach; ?>
-                    <button type="button" class="lab-edit-btn" data-lab-edit<?= $editTitle !== null ? ' title="' . esc($editTitle) . '"' : '' ?>><?= ui_icon('edit') ?></button>
                 </div>
                 <?php endif; ?>
 

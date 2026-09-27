@@ -1933,6 +1933,93 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringNotContainsString('Export CSV', $html);
     }
 
+    /** Every record screen offers its own sheet, and the sheet has the record on it. */
+    public function testARecordPrintsAsItsOwnSheet(): void
+    {
+        $this->post('recipients/new', [
+            'mrn' => '9401', 'name' => 'Noura Printed', 'age' => '39', 'bloodType' => 'B',
+            'phone' => '+966 50 111 2222', 'address' => 'Makkah', 'gender' => 'Female',
+            'notes' => 'Seen in clinic on Tuesday.',
+        ]);
+
+        // The screen carries the link, and it opens the sheet.
+        $screen = $this->get('recipients/9401')->getBody();
+        $this->assertStringContainsString(site_url('recipients/9401') . '/print', $screen);
+
+        $sheet = $this->get('recipients/9401/print')->getBody();
+
+        $this->assertStringContainsString('Recipient Record &mdash; Noura Printed', $sheet);
+        $this->assertStringContainsString('MRN 9401', $sheet);
+        $this->assertStringContainsString('Makkah', $sheet);
+        $this->assertStringContainsString('+966 50 111 2222', $sheet);
+        $this->assertStringContainsString('Seen in clinic on Tuesday.', $sheet);
+
+        // The whole workup, group headings and all — it is most of what a
+        // record is.
+        $this->assertStringContainsString('Immunology tests', $sheet);
+        $this->assertStringContainsString('Cross match', $sheet);
+        $this->assertStringContainsString('Transplant Nephrology Clinic', $sheet);
+
+        // A document of its own: no shell, and the two stylesheets for paper.
+        $this->assertStringContainsString('assets/ui/css/sheet.css', $sheet);
+        $this->assertStringContainsString('assets/ui/css/record-print.css', $sheet);
+        $this->assertStringNotContainsString('class="sidebar', $sheet);
+    }
+
+    /** A donor's sheet is the donor's, down to the fields only they have. */
+    public function testADonorSheetCarriesTheDonorsOwnFields(): void
+    {
+        $this->post('donors/new', [
+            'mrn' => '9402', 'name' => 'Khalid Printed', 'age' => '44', 'bloodType' => 'A',
+            'donorGender' => 'Male', 'donationType' => 'living',
+        ]);
+
+        $sheet = $this->get('donors/9402/print')->getBody();
+
+        $this->assertStringContainsString('Donor Record &mdash; Khalid Printed', $sheet);
+        $this->assertStringContainsString('Donor Type', $sheet);
+        $this->assertStringContainsString('Living', $sheet);
+        $this->assertStringContainsString('Not linked', $sheet);
+        // The donor's own check list, which is not the recipient's.
+        $this->assertStringContainsString('Renal panel/Cr', $sheet);
+    }
+
+    /** A pair's sheet is the pair, then both people in full. */
+    public function testAPairSheetCarriesBothRecords(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9403', 'dMrn' => '9404',
+            'rName' => 'Recipient Sheet', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Donor Sheet', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+
+        $pairId = (int) $this->db->table('pairs')->where('recipient_mrn', 9403)->get()->getRowArray()['id'];
+
+        $screen = $this->get('pairs/' . $pairId)->getBody();
+        $this->assertStringContainsString(site_url('pairs/' . $pairId) . '/print', $screen);
+
+        $sheet = $this->get('pairs/' . $pairId . '/print')->getBody();
+
+        $this->assertStringContainsString('Pair Record', $sheet);
+        $this->assertStringContainsString('Recipient Sheet', $sheet);
+        $this->assertStringContainsString('Donor Sheet', $sheet);
+        $this->assertStringContainsString('Pair Details', $sheet);
+
+        // Two workups and two sets of notes, told apart by whose they are.
+        $this->assertStringContainsString('Recipient &mdash; Required Lab Tests', $sheet);
+        $this->assertStringContainsString('Donor &mdash; Required Lab Tests', $sheet);
+        $this->assertStringContainsString('Recipient &mdash; Clinical Notes', $sheet);
+        $this->assertStringContainsString('Donor &mdash; Clinical Notes', $sheet);
+    }
+
+    /** A sheet for a record that is not there is not a blank sheet. */
+    public function testPrintingAMissingRecordGoesBackToTheList(): void
+    {
+        $this->get('recipients/9999/print')->assertRedirectTo(site_url('recipients'));
+        $this->get('donors/9999/print')->assertRedirectTo(site_url('donors'));
+        $this->get('pairs/9999/print')->assertRedirectTo(site_url('pairs'));
+    }
+
     /**
      * The register keeps every pair it has ever held, so the screen opens on
      * the ones still being worked rather than on all of them.

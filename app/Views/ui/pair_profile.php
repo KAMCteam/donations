@@ -42,6 +42,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
         <?php // Nothing reaches the exchange screen without this, so it is the
               // pair's own team putting it forward — and taking it back. ?>
         <div class="header-actions">
+            <a class="btn-outline" href="<?= site_url('pairs/' . rawurlencode($pair['id'])) ?>/print" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
             <?php if ($pair['forExchange']): ?>
                 <span class="badge tone-teal-soft">Offered for exchange</span>
                 <form method="post" action="<?= esc($viewUrl) ?>" class="inline-form">

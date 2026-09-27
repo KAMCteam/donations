@@ -1,0 +1,124 @@
+/* =========================================================
+   The chrome every printed sheet shares.
+
+   A sheet is a standalone document rather than a screen in the shell: no
+   sidebar, no cards, no chips — nothing that would come out on paper
+   without meaning anything there. What every sheet does have is the
+   screen-only bar at the top, the letterhead, and the footer.
+
+   This file holds those, and nothing about what goes between them. Each
+   sheet then adds its own stylesheet for its own body, and sets the two
+   things that differ:
+
+     --sheet-width   how wide the document runs on screen
+     @page           the paper it is laid out for
+
+   `@page` cannot be scoped to a class, so it has to be declared by the
+   sheet's own stylesheet rather than here.
+   ========================================================= */
+
+:root { --sheet-width: 1400px; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  color: #0f172a;
+  background-color: #f1f5f9;
+  padding: 1.5rem;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ---- The screen-only bar ---------------------------------------------- */
+
+.print-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: var(--sheet-width);
+  margin: 0 auto 1rem;
+}
+
+.print-bar-back {
+  color: #15508A;
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+.print-bar-back:hover { text-decoration: underline; }
+
+.print-bar-print {
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background-color: #15508A;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---- The letterhead ---------------------------------------------------- */
+
+.sheet-head,
+.sheet-foot,
+.sheet-empty {
+  max-width: var(--sheet-width);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 2px solid #15508A;
+}
+
+.sheet-logo {
+  height: 52px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.sheet-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #15508A;
+}
+
+.sheet-meta {
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.sheet-empty {
+  padding: 2rem 0;
+  text-align: center;
+  color: #64748b;
+}
+
+.sheet-foot {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #cbd5e1;
+  font-size: 0.625rem;
+  color: #94a3b8;
+}
+
+/* ---- Paper ------------------------------------------------------------- */
+
+@media print {
+  body { background-color: #fff; padding: 0; }
+
+  .print-bar { display: none; }
+
+  .sheet-head,
+  .sheet-foot { max-width: none; }
+
+  .sheet-foot { position: fixed; bottom: 0; }
+}

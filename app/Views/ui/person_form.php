@@ -59,6 +59,10 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             <h1 class="page-title"><?= esc($title) ?></h1>
         </div>
         <div class="header-actions">
+            <?php // A record has nothing to print until it has been saved. ?>
+            <?php if ($mode === 'view'): ?>
+                <a class="btn-outline" href="<?= site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id'])) ?>/print" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
+            <?php endif; ?>
             <?php if ($mode === 'view' && $linked !== null): ?>
                 <a class="btn-outline" href="<?= site_url(($isRecipient ? 'donors/' : 'recipients/') . rawurlencode($linked['id'])) ?>">Linked: <?= esc($linked['name']) ?></a>
             <?php elseif ($mode === 'view'): ?>

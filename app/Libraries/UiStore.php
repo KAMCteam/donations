@@ -176,7 +176,7 @@ final class UiStore
         'given'          => 'Given',
         'not_required'   => 'Not required',
         'not_given'      => 'Not given',
-        'not_applicable' => 'N/A',
+        'not_applicable' => 'Not applicable',
         'seen'           => 'Seen',
         'not_seen'       => 'Not seen',
         'blood_a'        => 'A',

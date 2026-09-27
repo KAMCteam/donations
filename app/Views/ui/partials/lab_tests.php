@@ -78,6 +78,11 @@ foreach ($tests as $i => $test) {
             <?php // "Other" is the sheet's blank line: no answer to give, so no
                   // buttons and no pill — the card is its box and nothing else. ?>
             <?php $freeText = in_array($test['resultType'], UiStore::FREE_TEXT_TYPES, true); ?>
+            <?php // A test whose answer list has no "Not done" — a vaccination —
+                  // starts with nothing on it rather than with a word it cannot
+                  // offer. The pill is in the markup all the same, so pressing
+                  // an answer has something to fill. ?>
+            <?php $answered = UiStore::offersAnswer($test['resultType'], $test['status']); ?>
             <div class="lab-card<?= $animated ? ' lab-card--animated' : '' ?><?= $freeText ? ' lab-card--free' : '' ?> status-<?= esc($test['status']) ?>" data-idx="<?= $i ?>">
                 <input type="hidden" name="<?= $base ?>[id]" value="<?= esc($test['id']) ?>">
                 <input type="hidden" name="<?= $base ?>[name]" value="<?= esc($test['name']) ?>">
@@ -90,7 +95,7 @@ foreach ($tests as $i => $test) {
                         <div class="lab-date" data-lab-date-text<?= ($test['date'] ?? '') === '' ? ' hidden' : '' ?>><?= esc($test['date'] ?? '') ?></div>
                     </div>
                     <?php if (! $freeText): ?>
-                        <span class="lab-pill <?= ui_tone('labStatus', $test['status']) ?>" data-lab-pill><?= esc(UiStore::RESULT_LABEL[$test['status']] ?? $test['status']) ?></span>
+                        <span class="lab-pill <?= ui_tone('labStatus', $test['status']) ?>" data-lab-pill<?= $answered ? '' : ' hidden' ?>><?= $answered ? esc(UiStore::RESULT_LABEL[$test['status']] ?? $test['status']) : '' ?></span>
                         <?php // Beside the pill rather than at the end of the answers:
                               // five answers already wrap on a narrow column, and the
                               // pencil was being carried onto a line of its own. ?>

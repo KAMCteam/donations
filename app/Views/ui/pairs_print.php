@@ -125,8 +125,9 @@ $mrpName = static function (string $id) use ($mrps): string {
                         <td><?= esc($mrpName($donor['donorMrp'] ?? '')) ?></td>
                         <td><?= esc($donor['donorGender'] ?? $dash) ?></td>
                         <td class="c-mono"><?= esc($donor['phone'] ?? $dash) ?></td>
-                        <td>N/A</td>
-                        <td>N/A</td>
+                        <?php // Spelled out, as on the screen. ?>
+                        <td>Not applicable</td>
+                        <td>Not applicable</td>
                         <td class="c-mono"><?= esc($orDash((string) ($pair['scheduledDate'] ?? ''))) ?></td>
                     </tr>
                 </tbody>

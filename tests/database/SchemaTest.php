@@ -369,9 +369,19 @@ final class SchemaTest extends CIUnitTestCase
         $this->assertSame('free_text', $types['Other']);
         $this->assertSame([], UiStore::RESULT_OPTIONS['free_text']);
 
-        // Every test that does ask something starts where nobody has looked.
+        // A vaccination that was not given says so; "Not done" beside
+        // "Not given" was the same answer under two names, so it is not
+        // offered. The record still holds `not_done` until one of the four
+        // is pressed — that is how the workup knows it is outstanding — but
+        // the card shows no answer rather than one it cannot give.
+        $this->assertSame('given_not_given', $types['MMR']);
+        $this->assertNotContains('not_done', UiStore::RESULT_OPTIONS['given_not_given']);
+        $this->assertFalse(UiStore::offersAnswer('given_not_given', 'not_done'));
+        $this->assertContains('not_done', UiStore::RESULT_UNANSWERED);
+
+        // Every other test that asks something starts where nobody has looked.
         foreach (UiStore::RESULT_OPTIONS as $vocabulary => $answers) {
-            if ($answers === []) {
+            if ($answers === [] || $vocabulary === 'given_not_given') {
                 continue;
             }
 

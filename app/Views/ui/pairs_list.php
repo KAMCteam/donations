@@ -166,8 +166,11 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                             <td class="t-600"><?= esc($mrpName($donor['donorMrp'] ?? '')) ?></td>
                             <td class="t-600"><?= esc($donor['donorGender'] ?? $dash) ?></td>
                             <td class="t-mono t-600 cell-phone"><?= esc($donor['phone'] ?? $dash) ?></td>
-                            <td class="t-500">N/A</td>
-                            <td class="t-500">N/A</td>
+                            <?php // Dialysis and Entry Date are the recipient's
+                                  // questions; a donor has no answer to give,
+                                  // which is not the same as having none yet. ?>
+                            <td class="t-500 cell-na">Not applicable</td>
+                            <td class="t-500 cell-na">Not applicable</td>
                             <td class="t-mono t-500"><?= esc(($pair['scheduledDate'] ?? '') !== '' ? $pair['scheduledDate'] : $dash) ?></td>
                             <td class="t-500 cell-last"><?= $dash ?></td>
                         </tr>

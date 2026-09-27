@@ -78,6 +78,9 @@
 
     var pill = card.querySelector("[data-lab-pill]");
     if (pill) {
+      // A card that started with no answer — a vaccination — keeps its pill
+      // hidden until one is pressed.
+      pill.hidden = false;
       pill.className = "lab-pill " + chosen.getAttribute("data-lab-tone");
       pill.textContent = chosen.getAttribute("data-lab-label");
     }

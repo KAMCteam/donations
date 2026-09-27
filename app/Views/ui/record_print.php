@@ -154,10 +154,16 @@ $dash = '—';
                                     $status     = (string) $test['status'];
                                     $unanswered = in_array($status, UiStore::RESULT_UNANSWERED, true);
                                     $flag       = (UiStore::RESULT_TONE[$status] ?? '') === 'tone-red';
+                                    // A test that does not offer the answer it
+                                    // holds has not been answered at all, and
+                                    // the sheet says so the way an empty field
+                                    // does — with a dash, not with a word the
+                                    // screen never showed.
+                                    $blank      = $freeText || ! UiStore::offersAnswer($test['resultType'], $status);
                                     ?>
                                     <tr>
                                         <td class="l-test"><?= esc($test['name']) ?></td>
-                                        <td class="l-answer<?= $unanswered ? ' l-answer--unanswered' : '' ?><?= $flag ? ' l-answer--flag' : '' ?>"><?= $freeText ? $dash : esc(UiStore::RESULT_LABEL[$status] ?? $status) ?></td>
+                                        <td class="l-answer<?= $unanswered ? ' l-answer--unanswered' : '' ?><?= $flag ? ' l-answer--flag' : '' ?>"><?= $blank ? $dash : esc(UiStore::RESULT_LABEL[$status] ?? $status) ?></td>
                                         <td class="l-value"><?= esc(($test['result'] ?? '') !== '' ? $test['result'] : $dash) ?></td>
                                         <td class="l-date"><?= esc(($test['date'] ?? '') !== '' ? $test['date'] : $dash) ?></td>
                                         <td class="l-comment"><?= esc(($test['notes'] ?? '') !== '' ? $test['notes'] : $dash) ?></td>

@@ -150,7 +150,12 @@ final class UiStore
         'acceptable_abnormal'    => ['not_done', 'pending', 'acceptable', 'abnormal'],
         'acceptable_abnormal_na' => ['not_done', 'pending', 'acceptable', 'abnormal', 'not_applicable'],
         'cleared_not_cleared'    => ['not_done', 'pending', 'cleared', 'not_cleared', 'not_applicable'],
-        'given_not_given'        => ['not_done', 'given', 'not_required', 'not_given', 'not_applicable'],
+        // No "Not done": a vaccination that was not given says so, and the
+        // two would have been the same answer under two names. Until one of
+        // these is pressed the card simply has no answer on it — the record
+        // still holds `not_done`, which is how the workup knows it is
+        // outstanding, but nothing on the screen says it out loud.
+        'given_not_given'        => ['given', 'not_required', 'not_given', 'not_applicable'],
         'seen_not_seen'          => ['not_done', 'seen', 'not_seen'],
         // No answer at all: the card is its comment box and nothing else.
         'free_text'              => [],
@@ -1211,6 +1216,18 @@ final class UiStore
     public static function isoToDMY(string $iso): string
     {
         return implode('/', array_reverse(explode('-', $iso)));
+    }
+
+    /**
+     * Whether a test's own answer list contains the answer it is holding.
+     *
+     * It does not when the record has never been answered and the test does
+     * not offer "Not done" — a vaccination, as of now. Such a card shows no
+     * answer at all rather than one the test cannot give.
+     */
+    public static function offersAnswer(string $resultType, string $status): bool
+    {
+        return in_array($status, self::RESULT_OPTIONS[$resultType] ?? self::RESULT_OPTIONS['text'], true);
     }
 
     /**

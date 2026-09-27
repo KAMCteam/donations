@@ -2059,6 +2059,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         $this->assertStringContainsString('Offered Recipient', $html);
         $this->assertStringContainsString('File number:', $html);
+
+        // The row opens the pair, and carries a real link for it as well.
+        $this->assertStringContainsString('data-href="' . site_url('pairs/' . $pairId) . '"', $html);
+        $this->assertStringContainsString('<a href="' . site_url('pairs/' . $pairId) . '">' . $pairId . '</a>', $html);
         $this->assertStringNotContainsString('Blood type:', $html);
         $this->assertStringNotContainsString('Status:', $html);
 

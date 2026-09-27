@@ -72,8 +72,13 @@ $headers = ['Pair #', 'Recipient', 'MRN', 'Blood', 'Donor', 'MRN', 'Blood', 'Sta
                 </thead>
                 <tbody>
                     <?php foreach ($rows as $row): ?>
-                        <tr>
-                            <td class="mono"><?= esc($row['id']) ?></td>
+                        <?php $pairUrl = site_url('pairs/' . rawurlencode((string) $row['id'])); ?>
+                        <?php // The row opens the pair, as every other list opens
+                              // the record it lists — these rows already had the
+                              // pointer cursor for it. The names still go to the
+                              // two people, and Create exchange still posts. ?>
+                        <tr data-href="<?= $pairUrl ?>">
+                            <td class="mono"><a href="<?= $pairUrl ?>"><?= esc($row['id']) ?></a></td>
                             <td class="cell-name"><a href="<?= site_url('recipients/' . rawurlencode($row['r_mrn'])) ?>"><?= esc($row['r_name']) ?></a></td>
                             <td class="mono"><?= esc($row['r_mrn']) ?></td>
                             <td class="mono"><?= esc($row['r_blood_group']) ?></td>

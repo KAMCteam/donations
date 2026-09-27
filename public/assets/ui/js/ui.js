@@ -50,7 +50,10 @@
   function initRowLinks() {
     document.addEventListener("click", function (e) {
       var row = e.target.closest("[data-href]");
-      if (!row || e.target.closest("a")) return;
+      // Anything in the row that is itself something to press keeps its own
+      // click: a link goes where it says, and a button submits the form it
+      // belongs to rather than navigating away from it mid-post.
+      if (!row || e.target.closest("a, button, input, select, textarea, label")) return;
       window.location.href = row.getAttribute("data-href");
     });
   }

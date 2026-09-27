@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Libraries\UiStore;
+use App\Models\PairModel;
 use CodeIgniter\HTTP\RedirectResponse;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -894,6 +895,11 @@ class Ui extends BaseController
             'v'         => ($fixed === null ? [] : $this->fixedValues($prefix, $fixedSide, $fixed)) + [
                 'relationship'   => '',
                 'crossmatchDate' => '',
+                // Active is where a pair has always started; it is a field to
+                // change now rather than a value to discover afterwards.
+                'pairStatus'     => 'active',
+                'closedReason'   => '',
+                'rStatus'        => UiStore::PAIRS_DEFAULT_STATUS,
                 'rMrn'           => '',
                 'rName'          => '',
                 'rAge'           => '',
@@ -986,6 +992,12 @@ class Ui extends BaseController
         $crossmatch   = (string) $this->request->getPost('crossmatchDate');
         $fixedSide    = $this->fixedSide();
 
+        // The pair's own status, from its card. Anything the menu does not
+        // offer is somebody editing the form by hand, and a new pair is
+        // Active.
+        $pairStatus = (string) $this->request->getPost('pairStatus');
+        $pairStatus = isset(UiStore::PAIR_STATUS_OPTIONS[$pairStatus]) ? $pairStatus : 'active';
+
         // Both numbers come off the form, and both are checked before either
         // person is stored — half a pair is worse than none.
         $recipientId = trim((string) $this->request->getPost('rMrn'));
@@ -1028,6 +1040,7 @@ class Ui extends BaseController
                 'gender'         => (string) $this->request->getPost('rGender'),
                 'selectedMrp'    => (string) $this->request->getPost('rMrp'),
                 'firstDialysis'  => (string) $this->request->getPost('rFirstDialysis'),
+                'status'         => (string) $this->request->getPost('rStatus'),
                 'dateRegistered' => $entryDate,
                 'notes'          => (string) $this->request->getPost('rNotes'),
                 'labTests'       => $this->postedLabTests('rLabs'),
@@ -1061,15 +1074,28 @@ class Ui extends BaseController
             $this->store->updateDonor($donorId, ['relationship' => $relationship]);
         }
 
+        // Created with the status the form asked for. `addPair` carries it
+        // down to the recipient where a person's own record can hold the same
+        // word, which is why this comes after the recipient is stored: the two
+        // are one fact, and the pair's card is where the case's status is set.
         $pairId = $this->store->addPair([
             'organ'         => $organ,
-            'status'        => 'active',
+            'status'        => $pairStatus,
             'recipientId'   => $recipientId,
             'donorId'       => $donorId,
             'relationship'  => $relationship,
             'scheduledDate' => $crossmatch,
             'createdDate'   => $entryDate,
         ]);
+
+        // Only a closed pair keeps a reason, and `updatePair` drops it again
+        // on any other status, so this is safe to send unconditionally.
+        if ($pairStatus === PairModel::CLOSED) {
+            $this->store->updatePair((string) $pairId, [
+                'status'       => $pairStatus,
+                'closedReason' => (string) $this->request->getPost('closedReason'),
+            ]);
+        }
 
         return redirect()->to(site_url('pairs/' . rawurlencode((string) $pairId)));
     }
@@ -1118,6 +1144,7 @@ class Ui extends BaseController
                 'rGender'        => $recipient['gender'] ?? 'Male',
                 'rMrp'           => $recipient['selectedMrp'] ?? '',
                 'rFirstDialysis' => $recipient['firstDialysis'] ?? '',
+                'rStatus'        => $recipient['status'] ?? UiStore::PAIRS_DEFAULT_STATUS,
                 'rNotes'         => $recipient['notes'] ?? '',
                 'dName'          => $donor['name'] ?? '',
                 'dAge'           => isset($donor['age']) ? (string) $donor['age'] : '',
@@ -1193,6 +1220,7 @@ class Ui extends BaseController
                 'gender'        => $post('rGender'),
                 'selectedMrp'   => $post('rMrp'),
                 'firstDialysis' => $post('rFirstDialysis'),
+                'status'        => $post('rStatus'),
             ]);
         }
 

@@ -363,6 +363,32 @@
     });
   }
 
+  /* Add Pair asks for the pair's status and the recipient's in one form, and
+     where the two lists share a word they are one fact — the store keeps them
+     in step whichever screen sets it. So each select follows the other while
+     it can: a pair moved to Transplanted, Paired Exchange or Closed says
+     nothing about the person, and leaves their own status where it was.
+
+     Without this file the server still decides, and the pair's card wins,
+     because it is applied last. This only makes that visible before saving. */
+  function initPairedStatuses() {
+    var pair = document.querySelector("[data-pair-status]");
+    var person = document.querySelector("[data-person-status]");
+    if (!pair || !person) return;
+
+    function offers(select, value) {
+      return Array.prototype.some.call(select.options, function (o) { return o.value === value; });
+    }
+
+    pair.addEventListener("change", function () {
+      if (offers(person, pair.value)) person.value = pair.value;
+    });
+
+    person.addEventListener("change", function () {
+      if (offers(pair, person.value)) pair.value = person.value;
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initSidebar();
     initRowLinks();
@@ -372,6 +398,7 @@
     initConfirmDelete();
     initAutoSubmit();
     initDialogClosers();
+    initPairedStatuses();
     initConfirmButtons();
     initReveals();
   });

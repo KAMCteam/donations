@@ -57,7 +57,7 @@ foreach ($v as $field => $value) {
 
         <div class="card card--pad">
             <h2 class="card-title card-title--mb5">Pair Details</h2>
-            <div class="form-grid-2">
+            <div class="form-grid-3">
                 <div>
                     <label class="field-label" for="f-relationship">Relationship</label>
                     <input type="text" id="f-relationship" name="relationship" class="input" value="<?= esc($v['relationship']) ?>" placeholder="e.g. Sibling, Spouse">
@@ -65,6 +65,26 @@ foreach ($v as $field => $value) {
                 <div>
                     <label class="field-label" for="f-crossmatch">Date of Crossmatch</label>
                     <?= view('ui/partials/date_field', ['id' => 'f-crossmatch', 'name' => 'crossmatchDate', 'value' => $v['crossmatchDate']], ['saveData' => false]) ?>
+                </div>
+                <div>
+                    <?php // The same field, the same list and the same Closed
+                          // behaviour as the pair's own screen, so a pair is
+                          // not created in one state and then moved to the one
+                          // it was always in. ?>
+                    <label class="field-label" for="f-status">Status</label>
+                    <select id="f-status" name="pairStatus" class="input" data-reveal="closed-reason" data-reveal-when="closed" data-pair-status>
+                        <?php foreach (UiStore::PAIR_STATUS_OPTIONS as $value => $label): ?>
+                            <option value="<?= esc($value) ?>"<?= $v['pairStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+
+            <div class="stack-4 reveal" id="closed-reason"<?= $v['pairStatus'] === 'closed' ? '' : ' hidden' ?>>
+                <div>
+                    <label class="field-label" for="f-closed-reason">Why was it closed?</label>
+                    <textarea class="textarea" id="f-closed-reason" name="closedReason" rows="3"
+                              placeholder="The reason this pair was closed"><?= esc($v['closedReason']) ?></textarea>
                 </div>
             </div>
         </div>
@@ -156,6 +176,18 @@ foreach ($v as $field => $value) {
                             <input type="checkbox" id="f-r-urgent" name="rUrgent" value="1"<?= $v['rUrgent'] ? ' checked' : '' ?>>
                             <span>This case is urgent</span>
                         </label>
+                    </div>
+                    <div>
+                        <?php // The person's own three, beside the pair's six.
+                              // Where the two vocabularies meet they are one
+                              // fact — the store keeps them in step — so
+                              // ui.js moves each to follow the other. ?>
+                        <label class="field-label" for="f-r-status">Recipient Status</label>
+                        <select id="f-r-status" name="rStatus" class="input" data-person-status>
+                            <?php foreach (UiStore::PERSON_STATUS_OPTIONS as $value => $label): ?>
+                                <option value="<?= esc($value) ?>"<?= $v['rStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                 </div>
             </div>

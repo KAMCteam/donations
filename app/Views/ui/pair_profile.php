@@ -204,6 +204,18 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                             <span>This case is urgent</span>
                         </label>
                     </div>
+                    <div>
+                        <?php // The person's own three. Saving this card moves
+                              // the pair's Status with it where the pair can
+                              // hold the same word — they are one fact, and
+                              // this is the half the person's record keeps. ?>
+                        <label class="field-label" for="f-r-status">Recipient Status</label>
+                        <select id="f-r-status" name="rStatus" class="input">
+                            <?php foreach (UiStore::PERSON_STATUS_OPTIONS as $value => $label): ?>
+                                <option value="<?= esc($value) ?>"<?= $v['rStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
             </div>
             </fieldset>

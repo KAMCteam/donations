@@ -1933,6 +1933,91 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringNotContainsString('Export CSV', $html);
     }
 
+    /**
+     * Add Pair sets the pair's status, rather than always creating it Active
+     * and leaving somebody to change it on the next screen.
+     */
+    public function testAddPairSetsThePairsOwnStatus(): void
+    {
+        $html = $this->get('pairs/new')->getBody();
+        $this->assertStringContainsString('name="pairStatus"', $html);
+        $this->assertStringContainsString('Paired Exchange', $html);
+        $this->assertStringContainsString('name="closedReason"', $html);
+
+        $this->post('pairs/new', [
+            'rMrn' => '9501', 'dMrn' => '9502',
+            'rName' => 'On Hold Recipient', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'On Hold Donor', 'dAge' => '30', 'dBloodType' => 'A',
+            'pairStatus' => 'on_hold', 'rStatus' => 'on_hold',
+        ]);
+
+        $pair = $this->db->table('pairs')->where('recipient_mrn', 9501)->get()->getRowArray();
+        $this->assertSame('on_hold', $pair['status']);
+
+        // A status the menu does not offer is not a status.
+        $this->post('pairs/new', [
+            'rMrn' => '9503', 'dMrn' => '9504',
+            'rName' => 'Bad Status', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Bad Status Donor', 'dAge' => '30', 'dBloodType' => 'A',
+            'pairStatus' => 'nonsense',
+        ]);
+        $this->assertSame('active', $this->db->table('pairs')->where('recipient_mrn', 9503)->get()->getRowArray()['status']);
+    }
+
+    /** Closed on Add Pair keeps its reason, the same as closing one later does. */
+    public function testAddPairKeepsTheReasonAPairWasClosedFor(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9505', 'dMrn' => '9506',
+            'rName' => 'Closed Recipient', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Closed Donor', 'dAge' => '30', 'dBloodType' => 'A',
+            'pairStatus' => 'closed', 'closedReason' => 'Donor withdrew before workup.',
+        ]);
+
+        $pair = $this->db->table('pairs')->where('recipient_mrn', 9505)->get()->getRowArray();
+        $this->assertSame('closed', $pair['status']);
+        $this->assertSame('Donor withdrew before workup.', $pair['closed_reason']);
+    }
+
+    /**
+     * The recipient's own status is on the pair's screens too, and saving it
+     * moves the pair with it — they are one fact where both lists have the
+     * word.
+     */
+    public function testTheRecipientStatusOnAPairScreenMovesThePairWithIt(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9507', 'dMrn' => '9508',
+            'rName' => 'Status Recipient', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Status Donor', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+
+        $pairId = (int) $this->db->table('pairs')->where('recipient_mrn', 9507)->get()->getRowArray()['id'];
+
+        $html = $this->get('pairs/' . $pairId)->getBody();
+        $this->assertStringContainsString('name="rStatus"', $html);
+        $this->assertStringContainsString('Recipient Status', $html);
+
+        $this->post('pairs/' . $pairId, [
+            'section' => 'recipient',
+            'rName' => 'Status Recipient', 'rAge' => '40', 'rBloodType' => 'A',
+            'rStatus' => 'declined',
+        ]);
+
+        $this->assertSame('declined', $this->db->table('recipients')->where('mrn', 9507)->get()->getRowArray()['status']);
+        $this->assertSame('declined', $this->db->table('pairs')->where('id', $pairId)->get()->getRowArray()['status']);
+
+        // And back the other way: the pair's card carries down to the person
+        // when the word is one their own record can hold.
+        $this->post('pairs/' . $pairId, ['section' => 'pair', 'pairStatus' => 'active']);
+        $this->assertSame('active', $this->db->table('recipients')->where('mrn', 9507)->get()->getRowArray()['status']);
+
+        // Transplanted is the case, not the person, so theirs is left alone.
+        $this->post('pairs/' . $pairId, ['section' => 'pair', 'pairStatus' => 'transplanted']);
+        $this->assertSame('transplanted', $this->db->table('pairs')->where('id', $pairId)->get()->getRowArray()['status']);
+        $this->assertSame('active', $this->db->table('recipients')->where('mrn', 9507)->get()->getRowArray()['status']);
+    }
+
     /** Every record screen offers its own sheet, and the sheet has the record on it. */
     public function testARecordPrintsAsItsOwnSheet(): void
     {

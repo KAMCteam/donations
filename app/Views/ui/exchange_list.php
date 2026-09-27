@@ -9,28 +9,23 @@ use App\Libraries\UiStore;
  * The pairs a paired exchange can be built from.
  *
  * Only the pairs whose own screen has had Pair Exchange pressed on it, and
- * that an exchange can still move — open, not already transplanted. The search
- * box takes a file number, either side's, and the two chip rows are the Pairs
- * List's own filters, so this reads as that screen narrowed to the question
- * being asked.
+ * that an exchange can still move — open, not already transplanted. Pressing
+ * that button is the filter; the list is short by construction, so the file
+ * number is all it asks for.
  *
- * @var list<array<string, mixed>> $rows          Joined pairs, already filtered
+ * It carried the Pairs List's blood-type and status chips as well. Neither
+ * belonged here: a blood group narrows a register you are reading, but an
+ * exchange is built by matching groups to each other, so hiding all but one of
+ * them hides exactly what the screen is for. And a pair is on this list only
+ * while its status is one an exchange can move, which left a status filter
+ * choosing between two or three words that were all already true.
+ *
+ * @var list<array<string, mixed>> $rows      Joined pairs, already filtered
  * @var string                     $query
- * @var string                     $statusFilter
- * @var string                     $btFilter
- * @var bool                       $hasDraft      An exchange already part-built
+ * @var bool                       $hasDraft  An exchange already part-built
  * @var string                     $error
  */
 $headers = ['Pair #', 'Recipient', 'MRN', 'Blood', 'Donor', 'MRN', 'Blood', 'Status', ''];
-
-/** Rebuilds the current query string with one filter swapped out. */
-$filterUrl = static function (string $key, string $value) use ($query, $btFilter, $statusFilter): string {
-    $params        = ['q' => $query, 'bt' => $btFilter, 'status' => $statusFilter];
-    $params[$key]  = $value;
-    $params        = array_filter($params, static fn (string $v): bool => $v !== '' && $v !== 'all');
-
-    return site_url('exchange') . ($params === [] ? '' : '?' . http_build_query($params));
-};
 ?>
 <div class="page">
     <div class="page-header page-header--center page-header--wrap">
@@ -52,31 +47,11 @@ $filterUrl = static function (string $key, string $value) use ($query, $btFilter
         <form class="search-row" method="get" action="<?= site_url('exchange') ?>">
             <label class="filter-label filter-label--mr" for="ex-q">File number:</label>
             <input type="search" id="ex-q" name="q" class="input search-input" value="<?= esc($query) ?>" placeholder="MRN or name" inputmode="search">
-            <?php // The chips are query parameters too, so searching keeps them. ?>
-            <input type="hidden" name="bt" value="<?= esc($btFilter) ?>">
-            <input type="hidden" name="status" value="<?= esc($statusFilter) ?>">
             <button type="submit" class="btn-outline">Search</button>
             <?php if ($query !== ''): ?>
-                <a class="stat-link" href="<?= $filterUrl('q', '') ?>">Clear</a>
+                <a class="stat-link" href="<?= site_url('exchange') ?>">Clear</a>
             <?php endif; ?>
         </form>
-
-        <div class="filter-row">
-            <span class="filter-label">Blood type:</span>
-            <a class="chip<?= $btFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', 'all') ?>">All</a>
-            <?php foreach (UiStore::BLOOD_TYPES as $bloodType): ?>
-                <a class="chip chip--mono<?= $btFilter === $bloodType ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', $bloodType) ?>"><?= esc($bloodType) ?></a>
-            <?php endforeach; ?>
-        </div>
-
-        <div class="filter-row">
-            <span class="filter-label">Status:</span>
-            <a class="chip<?= $statusFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('status', 'all') ?>">All</a>
-            <?php foreach (UiStore::PAIR_STATUS_OPTIONS as $status => $statusLabel): ?>
-                <?php if (! App\Libraries\ExchangeDraft::isExchangeableStatus($status)) { continue; } ?>
-                <a class="chip<?= $statusFilter === $status ? ' is-active' : '' ?>" href="<?= $filterUrl('status', $status) ?>"><?= esc($statusLabel) ?></a>
-            <?php endforeach; ?>
-        </div>
     </div>
 
     <div class="card card--scroll">

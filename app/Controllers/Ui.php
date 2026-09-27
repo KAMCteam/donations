@@ -213,11 +213,16 @@ class Ui extends BaseController
 
     public function donors(): string
     {
+        // The same chips the waitlist has, narrowing the same way: the two
+        // registers are read with the same question in mind.
+        $filter = $this->bloodTypeFilter();
+
         return view('ui/donors_list', [
-            'title'   => 'Donors List',
-            'navPage' => 'donors',
-            'organ'   => $this->store->organ(),
-            'donors'  => $this->store->availableDonors(),
+            'title'    => 'Donors List',
+            'navPage'  => 'donors',
+            'organ'    => $this->store->organ(),
+            'donors'   => $this->store->availableDonors($filter === 'all' ? null : $filter),
+            'btFilter' => $filter,
         ]);
     }
 

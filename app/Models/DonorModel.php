@@ -26,7 +26,7 @@ class DonorModel extends Model
      *
      * @return list<array<string, mixed>>
      */
-    public function register(?string $organCode = null, bool $unmatchedOnly = false): array
+    public function register(?string $organCode = null, bool $unmatchedOnly = false, ?string $bloodGroup = null): array
     {
         $builder = $this->db->table('donors d')
             ->select('d.*, op.label AS program_label, m.name AS mrp_name, c.name AS coordinator_name')
@@ -43,6 +43,10 @@ class DonorModel extends Model
 
         if ($unmatchedOnly) {
             $builder->where('NOT EXISTS (SELECT 1 FROM pairs p WHERE p.donor_mrn = d.mrn AND p.status <> \'closed\')', null, false);
+        }
+
+        if ($bloodGroup !== null && $bloodGroup !== '') {
+            $builder->where('d.blood_group', $bloodGroup);
         }
 
         return $builder->orderBy('d.mrn')->get()->getResultArray();

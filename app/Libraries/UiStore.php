@@ -399,11 +399,11 @@ final class UiStore
      *
      * @return list<array<string, mixed>>
      */
-    public function availableDonors(): array
+    public function availableDonors(?string $bloodGroup = null): array
     {
         return array_map(
             fn (array $row): array => $this->donorToUi($row),
-            $this->donors->register($this->organ(), true)
+            $this->donors->register($this->organ(), true, $bloodGroup)
         );
     }
 

@@ -13,8 +13,7 @@ use Psr\Log\LoggerInterface;
  * Paired exchange: swapping donors between pairs that cannot use their own.
  *
  * Two screens. The first lists the pairs an exchange can be built from and
- * narrows them — by file number, by status, by blood group. The second is the
- * building itself: the chosen pair comes apart into a column of recipients and
+ * narrows them by file number. The second is the building itself: the chosen pair comes apart into a column of recipients and
  * a column of donors, each drawn from the pairs in play plus everyone on the
  * waiting list and the donor register who is free.
  *
@@ -39,7 +38,7 @@ class Exchange extends BaseController
     }
 
     /**
-     * The pairs an exchange can start from, searched and filtered.
+     * The pairs an exchange can start from, searched by file number.
      *
      * No sign-in check, for the same reason no other screen has one: there is
      * nothing to check yet. `Ui::attemptLogin()` still takes any non-empty
@@ -47,21 +46,17 @@ class Exchange extends BaseController
      */
     public function index(): string
     {
-        $organ  = $this->store->organ();
-        $query  = trim((string) $this->request->getGet('q'));
-        $status = (string) ($this->request->getGet('status') ?: 'all');
-        $bt     = (string) ($this->request->getGet('bt') ?: 'all');
+        $organ = $this->store->organ();
+        $query = trim((string) $this->request->getGet('q'));
 
         return view('ui/exchange_list', [
-            'title'        => 'Paired Exchange',
-            'navPage'      => 'exchange',
-            'organ'        => $organ,
-            'rows'         => $this->draft->exchangeablePairs($organ, $query, $status, $bt),
-            'query'        => $query,
-            'statusFilter' => $status,
-            'btFilter'     => $bt,
-            'hasDraft'     => $this->draft->isOpen($organ),
-            'error'        => (string) ($this->session->getFlashdata('ui_error') ?? ''),
+            'title'    => 'Paired Exchange',
+            'navPage'  => 'exchange',
+            'organ'    => $organ,
+            'rows'     => $this->draft->exchangeablePairs($organ, $query),
+            'query'    => $query,
+            'hasDraft' => $this->draft->isOpen($organ),
+            'error'    => (string) ($this->session->getFlashdata('ui_error') ?? ''),
         ]);
     }
 

@@ -2018,6 +2018,57 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertSame('active', $this->db->table('recipients')->where('mrn', 9507)->get()->getRowArray()['status']);
     }
 
+    /** The Donors List narrows by blood type, the same way the waitlist does. */
+    public function testTheDonorsListFiltersByBloodType(): void
+    {
+        $this->post('donors/new', ['mrn' => '9601', 'name' => 'Type A Donor', 'age' => '30', 'bloodType' => 'A']);
+        $this->post('donors/new', ['mrn' => '9602', 'name' => 'Type O Donor', 'age' => '35', 'bloodType' => 'O']);
+
+        $all = $this->get('donors')->getBody();
+        $this->assertStringContainsString('Type A Donor', $all);
+        $this->assertStringContainsString('Type O Donor', $all);
+        $this->assertStringContainsString(site_url('donors') . '?bt=A', $all);
+
+        $onlyA = $this->get('donors?bt=A')->getBody();
+        $this->assertStringContainsString('Type A Donor', $onlyA);
+        $this->assertStringNotContainsString('Type O Donor', $onlyA);
+
+        // Nothing of that type is not the same as an empty register.
+        $none = $this->get('donors?bt=AB')->getBody();
+        $this->assertStringContainsString('No unmatched donors with blood type AB', $none);
+        $this->assertStringContainsString('Show all blood types', $none);
+    }
+
+    /**
+     * Paired Exchange asks for a file number and nothing else: being on the
+     * list is already a status, and an exchange matches blood groups to each
+     * other rather than reading one at a time.
+     */
+    public function testPairedExchangeHasNoBloodTypeOrStatusChips(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9603', 'dMrn' => '9604',
+            'rName' => 'Offered Recipient', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Offered Donor', 'dAge' => '30', 'dBloodType' => 'B',
+        ]);
+
+        $pairId = (int) $this->db->table('pairs')->where('recipient_mrn', 9603)->get()->getRowArray()['id'];
+        $this->post('pairs/' . $pairId, ['section' => 'exchange', 'forExchange' => '1']);
+
+        $html = $this->get('exchange')->getBody();
+
+        $this->assertStringContainsString('Offered Recipient', $html);
+        $this->assertStringContainsString('File number:', $html);
+        $this->assertStringNotContainsString('Blood type:', $html);
+        $this->assertStringNotContainsString('Status:', $html);
+
+        // The search still works, and a blood-type parameter is simply ignored
+        // rather than hiding a pair the screen is meant to show.
+        $this->assertStringContainsString('Offered Recipient', $this->get('exchange?q=9603')->getBody());
+        $this->assertStringContainsString('Offered Recipient', $this->get('exchange?bt=AB')->getBody());
+        $this->assertStringNotContainsString('Offered Recipient', $this->get('exchange?q=1234')->getBody());
+    }
+
     /** Every record screen offers its own sheet, and the sheet has the record on it. */
     public function testARecordPrintsAsItsOwnSheet(): void
     {

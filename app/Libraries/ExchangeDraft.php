@@ -523,9 +523,12 @@ final class ExchangeDraft
      *
      * @return list<array<string, mixed>>
      */
-    public function exchangeablePairs(string $organ, string $query, string $status, string $bloodType): array
+    public function exchangeablePairs(string $organ, string $query = ''): array
     {
-        $rows = $this->pairs->overview($organ, $status === 'all' ? null : $status, $bloodType === 'all' ? null : $bloodType);
+        // No status and no blood group: being on this list is already a status,
+        // and an exchange matches blood groups to one another rather than
+        // reading one of them at a time.
+        $rows = $this->pairs->overview($organ);
         $rows = array_filter($rows, static fn (array $r): bool => self::isExchangeable($r));
 
         if ($query !== '') {

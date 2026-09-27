@@ -80,7 +80,9 @@ $chooser = static function (string $action, string $ownField, string $ownMrn, st
                     <button type="submit" class="btn-outline"><?= ui_icon('back') ?>Undo last step</button>
                 </form>
             <?php endif; ?>
-            <a class="btn-outline" href="<?= site_url('exchange/build') . '#cancel' ?>" data-dialog="cancel-exchange">Cancel exchange</a>
+            <?php // Cancel is at the foot of the page, beside Review and save,
+                  // and only there: it was in both places, and the header is
+                  // not where a decision about the whole chain is taken. ?>
         </div>
     </div>
 

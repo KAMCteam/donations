@@ -88,7 +88,8 @@ class ExchangeDemoSeeder extends Seeder
                 'updated_at'    => date('Y-m-d H:i:s'),
             ]);
 
-            $this->db->table('recipients')->where('mrn', $rMrn)->update(['status' => 'paired_exchange']);
+            // The pair is what is in a paired exchange; the person is Active.
+            $this->db->table('recipients')->where('mrn', $rMrn)->update(['status' => 'active']);
         }
 
         foreach (self::FREE_DONORS as [$mrn, $name, $group]) {
@@ -116,7 +117,7 @@ class ExchangeDemoSeeder extends Seeder
             'city'        => 'Makkah',
             'entry_date'  => date('Y-m-d'),
             'is_urgent'   => $urgent,
-            'status'      => 'pending',
+            'status'      => 'on_hold',
             'created_at'  => date('Y-m-d H:i:s'),
             'updated_at'  => date('Y-m-d H:i:s'),
         ]);

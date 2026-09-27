@@ -47,37 +47,68 @@ final class UiStore
     public const BLOOD_TYPES = ['A', 'B', 'O', 'AB'];
 
     /**
-     * One status vocabulary, shared by a recipient and the pair they are in.
+     * Every status any of the three can hold, and what it is called.
      *
-     * A recipient's status and their pair's Match Status are the same fact
-     * about the same case, so they are the same list and the same value:
-     * setting either one sets the other, and neither screen can show something
-     * the other contradicts. A recipient with no pair simply keeps their own.
-     *
-     * `closed` is the one with meaning beyond its label — it is what "open
-     * pair" is defined against, so closing a pair puts both sides back on
-     * their lists. The rest are descriptive.
+     * This is the label lookup, not a menu: it still names `pending`,
+     * `confirmed` and `completed`, which no screen offers any more, so a
+     * record saved before they were retired still reads correctly instead of
+     * showing a bare key. What each screen *offers* is below.
      */
     public const STATUS_OPTIONS = [
-        'pending'         => 'Pending',
-        'confirmed'       => 'Confirmed',
-        'closed'          => 'Closed',
-        'completed'       => 'Completed',
-        'paired_exchange' => 'Paired Exchange',
         'on_hold'         => 'On Hold',
         'active'          => 'Active',
         'declined'        => 'Declined',
+        'transplanted'    => 'Transplanted',
+        'paired_exchange' => 'Paired Exchange',
+        'closed'          => 'Closed',
+        // Retired: still stored on older records, never offered again.
+        'pending'         => 'Pending',
+        'confirmed'       => 'Confirmed',
+        'completed'       => 'Completed',
+    ];
+
+    /**
+     * What the Pair Details card offers.
+     *
+     * `closed` is the one with meaning beyond its label — it is what "open
+     * pair" is defined against, so closing a pair puts both sides back on
+     * their lists, and the card asks why in so many words. The rest are
+     * descriptive.
+     */
+    public const PAIR_STATUS_OPTIONS = [
+        'on_hold'         => 'On Hold',
+        'active'          => 'Active',
+        'declined'        => 'Declined',
+        'transplanted'    => 'Transplanted',
+        'paired_exchange' => 'Paired Exchange',
+        'closed'          => 'Closed',
+    ];
+
+    /**
+     * What a person's own record offers — a recipient's and a donor's alike.
+     *
+     * Three of the pair's six, and deliberately not the other three: a person
+     * is not transplanted, closed or in a paired exchange; their *case* is,
+     * and that is the pair's to say. Where the two do overlap they are still
+     * kept in step — setting one sets the other — which is why these three are
+     * exactly a subset rather than a separate vocabulary.
+     */
+    public const PERSON_STATUS_OPTIONS = [
+        'on_hold'  => 'On Hold',
+        'active'   => 'Active',
+        'declined' => 'Declined',
     ];
 
     public const STATUS_TONE = [
-        'pending'         => 'tone-amber-soft',
-        'confirmed'       => 'tone-blue-soft',
-        'closed'          => 'tone-slate',
-        'completed'       => 'tone-emerald',
-        'paired_exchange' => 'tone-teal',
         'on_hold'         => 'tone-amber',
         'active'          => 'tone-blue',
         'declined'        => 'tone-red',
+        'transplanted'    => 'tone-emerald',
+        'paired_exchange' => 'tone-teal',
+        'closed'          => 'tone-slate',
+        'pending'         => 'tone-amber-soft',
+        'confirmed'       => 'tone-blue-soft',
+        'completed'       => 'tone-emerald',
     ];
 
     /**
@@ -202,11 +233,18 @@ final class UiStore
     /** Add Pair and the pair profile: the recipient is known. */
     public const DONATION_TYPES_ON_PAIR = ['living_related', 'living_unrelated', 'deceased'];
 
+    /**
+     * The same three, in the spelling the donor screens post.
+     *
+     * The donor form has always sent the label and converted on the way in
+     * ("On Hold" -> `on_hold`), where the recipient form sends the key. Left
+     * as it is: changing it would rewrite the mapping for no gain, and the
+     * three values are the recipient's three.
+     */
     public const DONOR_STATUS_OPTIONS = [
-        'On Hold'   => 'On Hold',
-        'Active'    => 'Active',
-        'Completed' => 'Completed',
-        'Cancelled' => 'Cancelled',
+        'On Hold'  => 'On Hold',
+        'Active'   => 'Active',
+        'Declined' => 'Declined',
     ];
 
     /**
@@ -572,9 +610,10 @@ final class UiStore
             'notes'           => $pair['notes'] ?? null,
         ]);
 
-        // The two are one status from the moment the pair exists, so the
-        // recipient does not sit at Pending behind an active pair.
-        $this->recipients->update((int) $pair['recipientId'], ['status' => $status]);
+        // The two are kept in step from the moment the pair exists, so the
+        // recipient does not sit On Hold behind an active pair — but only
+        // where the pair's status is one a person's record can hold.
+        $this->carryToRecipient((int) $pair['recipientId'], $status);
 
         return $id;
     }
@@ -612,11 +651,12 @@ final class UiStore
             $this->saveLabTests((int) $id, 'recipient', $changes['labTests']);
         }
 
-        // A recipient's status and their pair's Match Status are one fact, so
-        // whichever screen sets it, the other follows. Written straight to the
-        // model rather than back through updatePair(), which would come round
-        // here again.
-        $status = $this->statusKey((string) ($changes['status'] ?? ''));
+        // A recipient's status and their pair's are one fact where they can
+        // be, so whichever screen sets it the other follows. Written straight
+        // to the model rather than back through updatePair(), which would come
+        // round here again. All three of a person's own statuses are statuses
+        // a pair can hold, so this direction always carries.
+        $status = $this->personStatusKey((string) ($changes['status'] ?? ''));
         $pair   = $status === '' ? null : $this->pairs->openPairForRecipient((int) $id);
 
         if ($pair !== null) {
@@ -664,17 +704,44 @@ final class UiStore
             $row['relationship'] = $changes['relationship'];
         }
 
+        // Why it was closed, kept only while it is. Moving a pair off Closed
+        // clears the reason rather than leaving a sentence about an ending
+        // that has been undone.
+        if (array_key_exists('closedReason', $changes)) {
+            $reason              = trim((string) $changes['closedReason']);
+            $row['closed_reason'] = $status === 'closed' && $reason !== '' ? $reason : null;
+        }
+
         if ($row !== []) {
             $this->pairs->update((int) $id, $row);
         }
 
-        // The other half of the link above.
+        // The other half of the link above, and the direction that does not
+        // always carry: Transplanted, Paired Exchange and Closed describe the
+        // case, not the person, and a recipient's own record has no such
+        // value. Their status is left alone rather than forced.
         if ($status !== '') {
             $pair = $this->pairs->find((int) $id);
 
             if ($pair !== null) {
-                $this->recipients->update((int) $pair['recipient_mrn'], ['status' => $status]);
+                $this->carryToRecipient((int) $pair['recipient_mrn'], $status);
             }
+        }
+    }
+
+    /**
+     * Gives a recipient their pair's status, where it is one they can hold.
+     *
+     * Silently does nothing for the three that only describe a pair. That is
+     * the point: a recipient whose pair has just been closed is not himself
+     * "closed", he is whatever he was — and the waiting list, which is defined
+     * against the pair rather than against this column, already shows him
+     * again.
+     */
+    private function carryToRecipient(int $mrn, string $status): void
+    {
+        if ($this->personStatusKey($status) !== '') {
+            $this->recipients->update($mrn, ['status' => $status]);
         }
     }
 
@@ -803,6 +870,7 @@ final class UiStore
             'recipientId'   => (string) $row['recipient_mrn'],
             'donorId'       => (string) $row['donor_mrn'],
             'relationship'  => (string) $row['relationship'],
+            'closedReason'  => (string) ($row['closed_reason'] ?? ''),
             'scheduledDate' => $row['crossmatch_date'] === null ? '' : self::isoToDMY($row['crossmatch_date']),
             'createdDate'   => substr((string) $row['created_at'], 0, 10),
             'notes'         => (string) $row['notes'],
@@ -1093,6 +1161,12 @@ final class UiStore
     private function statusKey(string $status): string
     {
         return isset(self::STATUS_OPTIONS[$status]) ? $status : '';
+    }
+
+    /** The three a person's own record may be set to, and nothing else. */
+    private function personStatusKey(string $status): string
+    {
+        return isset(self::PERSON_STATUS_OPTIONS[$status]) ? $status : '';
     }
 
     /** The same, for the donation type: both columns are ENUMs. */

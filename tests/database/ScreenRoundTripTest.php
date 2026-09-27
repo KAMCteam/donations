@@ -875,14 +875,21 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     {
         $html = $this->get('recipients/new')->getBody();
 
-        foreach (UiStore::STATUS_OPTIONS as $value => $label) {
+        foreach (UiStore::PERSON_STATUS_OPTIONS as $value => $label) {
             $this->assertStringContainsString('value="' . $value . '"', $html);
             $this->assertStringContainsString('>' . $label . '</option>', $html);
+        }
+
+        // The three a pair alone can be are not on a person's own record:
+        // somebody is not "transplanted", their case is.
+        foreach (['transplanted', 'paired_exchange', 'closed'] as $pairOnly) {
+            $this->assertStringNotContainsString('value="' . $pairOnly . '"', $html);
         }
     }
 
     /** The pair's Match Status is the same list, not a second one. */
-    public function testThePairOffersTheSameListAsTheRecipient(): void
+    /** The pair offers six; a person's three are exactly the first three. */
+    public function testThePairOffersItsOwnLongerList(): void
     {
         $this->post('pairs/new', [
             'rMrn' => '2001', 'dMrn' => '2002',
@@ -893,9 +900,20 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
         $html   = $this->get('pairs/' . $pairId)->getBody();
 
-        foreach (array_keys(UiStore::STATUS_OPTIONS) as $value) {
+        foreach (array_keys(UiStore::PAIR_STATUS_OPTIONS) as $value) {
             $this->assertStringContainsString('<option value="' . $value . '"', $html);
         }
+
+        // Retired words are still named for old records, never offered again.
+        foreach (['pending', 'confirmed', 'completed'] as $retired) {
+            $this->assertStringNotContainsString('<option value="' . $retired . '"', $html);
+            $this->assertArrayHasKey($retired, UiStore::STATUS_OPTIONS);
+        }
+
+        $this->assertSame(
+            array_keys(UiStore::PERSON_STATUS_OPTIONS),
+            array_slice(array_keys(UiStore::PAIR_STATUS_OPTIONS), 0, 3)
+        );
     }
 
     /** They agree from the moment the pair exists. */
@@ -924,14 +942,24 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'name'      => 'R',
             'age'       => '40',
             'bloodType' => 'A',
-            'status'    => 'paired_exchange',
+            'status'    => 'declined',
         ]);
 
-        $this->seeInDatabase('recipients', ['mrn' => 2005, 'status' => 'paired_exchange']);
-        $this->seeInDatabase('pairs', ['recipient_mrn' => 2005, 'status' => 'paired_exchange']);
+        // All three of a person's statuses are statuses a pair can hold, so
+        // this direction always carries.
+        $this->seeInDatabase('recipients', ['mrn' => 2005, 'status' => 'declined']);
+        $this->seeInDatabase('pairs', ['recipient_mrn' => 2005, 'status' => 'declined']);
     }
 
-    public function testSettingTheMatchStatusOnThePairSetsTheRecipients(): void
+    /**
+     * The pair's status reaches the recipient only where it can.
+     *
+     * The three they share carry across as they always did. The three only a
+     * pair can be — Transplanted, Paired Exchange, Closed — describe the case
+     * and not the person, so the recipient's own status is left alone rather
+     * than forced into a word their record does not have.
+     */
+    public function testTheMatchStatusReachesTheRecipientOnlyWhereItCan(): void
     {
         $this->post('pairs/new', [
             'rMrn' => '2007', 'dMrn' => '2008',
@@ -940,17 +968,30 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         ]);
 
         $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
-        $this->post('pairs/' . $pairId, ['section' => 'pair', 'pairStatus' => 'completed']);
 
-        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'completed']);
-        $this->seeInDatabase('recipients', ['mrn' => 2007, 'status' => 'completed']);
+        // Shared: it carries.
+        $this->post('pairs/' . $pairId, ['section' => 'pair', 'pairStatus' => 'on_hold']);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'on_hold']);
+        $this->seeInDatabase('recipients', ['mrn' => 2007, 'status' => 'on_hold']);
+
+        // The pair's own: it does not.
+        $this->post('pairs/' . $pairId, ['section' => 'pair', 'pairStatus' => 'transplanted']);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'transplanted']);
+        $this->seeInDatabase('recipients', ['mrn' => 2007, 'status' => 'on_hold']);
     }
 
     /**
      * `closed` is the one status with meaning beyond its label: it is what an
      * open pair is defined against, so it still frees both sides.
      */
-    public function testClosingFromEitherScreenPutsBothSidesBackOnTheirLists(): void
+    /**
+     * Closing is the pair's to do, and the pair asks why.
+     *
+     * It is the one status that means something beyond its label — both sides
+     * go back on their lists — so it is the one the card asks a reason for,
+     * and the reason is kept only while the pair is closed.
+     */
+    public function testClosingAPairAsksWhyAndReleasesBothSides(): void
     {
         $this->post('pairs/new', [
             'rMrn' => '2009', 'dMrn' => '2010',
@@ -958,18 +999,47 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
         ]);
 
-        $this->post('recipients/2009', [
-            'section'   => 'personal',
-            'name'      => 'R',
-            'age'       => '40',
-            'bloodType' => 'A',
-            'status'    => 'closed',
+        $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
+
+        // The box is on the card, and says what it is for.
+        $this->assertStringContainsString('Why was it closed?', $this->get('pairs/' . $pairId)->getBody());
+
+        $this->post('pairs/' . $pairId, [
+            'section'      => 'pair',
+            'pairStatus'   => 'closed',
+            'closedReason' => 'Crossmatch positive on repeat',
+        ]);
+
+        $this->seeInDatabase('pairs', [
+            'id'            => $pairId,
+            'status'        => 'closed',
+            'closed_reason' => 'Crossmatch positive on repeat',
         ]);
 
         $store = new UiStore();
         $this->assertCount(1, $store->waitingList());
         $this->assertCount(1, $store->availableDonors());
-        $this->seeInDatabase('pairs', ['recipient_mrn' => 2009, 'status' => 'closed']);
+
+        // Reopening it drops the reason: it is about an ending that is undone.
+        $this->post('pairs/' . $pairId, ['section' => 'pair', 'pairStatus' => 'active', 'closedReason' => '']);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'active', 'closed_reason' => null]);
+    }
+
+    /** A donor's own record offers the same three a recipient's does. */
+    public function testTheDonorStatusOffersTheSameThree(): void
+    {
+        $html = $this->get('donors/new')->getBody();
+
+        foreach (['On Hold', 'Active', 'Declined'] as $label) {
+            $this->assertStringContainsString('>' . $label . '</option>', $html);
+        }
+
+        foreach (['Completed', 'Cancelled'] as $retired) {
+            $this->assertStringNotContainsString('>' . $retired . '</option>', $html);
+        }
+
+        $this->post('donors/new', ['mrn' => '2011', 'name' => 'D', 'age' => '30', 'bloodType' => 'A', 'donorStatus' => 'Declined']);
+        $this->seeInDatabase('donors', ['mrn' => 2011, 'status' => 'declined']);
     }
 
     /** A recipient with no pair simply keeps their own status. */

@@ -87,7 +87,7 @@ class CreateDonors extends Migration
             // can show, which reads as the record having lost its status.
             'status' => [
                 'type'       => 'ENUM',
-                'constraint' => ['on_hold', 'active', 'completed', 'cancelled'],
+                'constraint' => ['on_hold', 'active', 'declined', 'completed', 'cancelled'],
                 'default'    => 'on_hold',
             ],
             'mrp_id' => [

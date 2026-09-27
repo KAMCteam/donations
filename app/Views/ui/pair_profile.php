@@ -86,11 +86,24 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                 </div>
                 <div>
                     <label class="field-label" for="f-status">Status</label>
-                    <select id="f-status" name="pairStatus" class="input">
-                        <?php foreach (UiStore::STATUS_OPTIONS as $value => $label): ?>
+                    <select id="f-status" name="pairStatus" class="input" data-reveal="closed-reason" data-reveal-when="closed">
+                        <?php foreach (UiStore::PAIR_STATUS_OPTIONS as $value => $label): ?>
                             <option value="<?= esc($value) ?>"<?= $v['pairStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+            </div>
+
+            <?php // Closing a pair is the one status that means something
+                  // beyond its label — both sides go back on their lists — so
+                  // it is the one that asks why. Hidden by ui.js until Closed
+                  // is chosen; without scripting it is simply always there,
+                  // and an empty reason on any other status is discarded. ?>
+            <div class="stack-4 reveal" id="closed-reason"<?= $v['pairStatus'] === 'closed' ? '' : ' hidden' ?>>
+                <div>
+                    <label class="field-label" for="f-closed-reason">Why was it closed?</label>
+                    <textarea class="textarea" id="f-closed-reason" name="closedReason" rows="3"
+                              placeholder="The reason this pair was closed"><?= esc($v['closedReason']) ?></textarea>
                 </div>
             </div>
             </fieldset>

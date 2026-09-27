@@ -66,7 +66,7 @@ class CreatePairs extends Migration
             // keeps both sides off their lists until the pair is closed.
             'status' => [
                 'type'       => 'ENUM',
-                'constraint' => ['pending', 'confirmed', 'closed', 'completed', 'paired_exchange', 'on_hold', 'active', 'declined'],
+                'constraint' => ['pending', 'confirmed', 'closed', 'completed', 'transplanted', 'paired_exchange', 'on_hold', 'active', 'declined'],
                 'default'    => 'pending',
             ],
             // Offered for a paired exchange, by the button on the pair's own

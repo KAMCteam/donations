@@ -175,7 +175,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                                   // Match Status: setting either sets the other. ?>
                             <label class="field-label" for="f-status">Recipient Status</label>
                             <select id="f-status" name="status" class="input">
-                                <?php foreach (UiStore::STATUS_OPTIONS as $value => $label): ?>
+                                <?php foreach (UiStore::PERSON_STATUS_OPTIONS as $value => $label): ?>
                                     <option value="<?= esc($value) ?>"<?= $v['status'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
                                 <?php endforeach; ?>
                             </select>

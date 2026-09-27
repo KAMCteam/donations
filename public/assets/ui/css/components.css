@@ -595,6 +595,11 @@ textarea.lab-editor-field { resize: none; }
 
 /* The one Save on an add screen, at the foot of the form. Sits below the
    last card rather than inside one, because it commits all of them. */
+/* A block a single answer asks for. `hidden` alone loses to the display the
+   layout gives it, so it is restated. */
+.reveal { margin-top: 1.25rem; }
+.reveal[hidden] { display: none; }
+
 .form-actions {
   display: flex;
   justify-content: flex-end;

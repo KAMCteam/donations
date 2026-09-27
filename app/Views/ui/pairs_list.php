@@ -74,7 +74,7 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
         <div class="filter-row">
             <span class="filter-label">Status:</span>
             <a class="chip<?= $statusFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('status', 'all') ?>">All</a>
-            <?php foreach (UiStore::STATUS_OPTIONS as $status => $statusLabel): ?>
+            <?php foreach (UiStore::PAIR_STATUS_OPTIONS as $status => $statusLabel): ?>
                 <a class="chip<?= $statusFilter === $status ? ' is-active' : '' ?>" href="<?= $filterUrl('status', $status) ?>"><?= esc($statusLabel) ?></a>
             <?php endforeach; ?>
         </div>

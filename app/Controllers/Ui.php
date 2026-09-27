@@ -861,6 +861,7 @@ class Ui extends BaseController
                 'relationship'   => $donor['relationship'] ?? $pair['notes'] ?? '',
                 'crossmatchDate' => $pair['scheduledDate'] ?? '',
                 'pairStatus'     => $pair['status'],
+                'closedReason'   => $pair['closedReason'] ?? '',
                 'rName'          => $recipient['name'] ?? '',
                 'rAge'           => isset($recipient['age']) ? (string) $recipient['age'] : '',
                 'rBloodType'     => $recipient['bloodType'] ?? 'O',
@@ -924,6 +925,7 @@ class Ui extends BaseController
                 'status'        => $post('pairStatus'),
                 'scheduledDate' => $post('crossmatchDate'),
                 'relationship'  => $post('relationship'),
+                'closedReason'  => $post('closedReason'),
             ]);
 
             if ($donor !== null) {

@@ -98,7 +98,7 @@ class CreateDirectory extends Migration
                 'unsigned'       => true,
                 'auto_increment' => true,
             ],
-            // What the login screen calls Staff ID.
+            // What the login screen calls User ID.
             'staff_id' => [
                 'type'       => 'VARCHAR',
                 'constraint' => 30,

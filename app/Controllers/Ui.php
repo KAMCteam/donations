@@ -80,7 +80,7 @@ class Ui extends BaseController
 
     public function login(): string
     {
-        return view('ui/login', ['title' => 'Staff login']);
+        return view('ui/login', ['title' => 'User login']);
     }
 
     public function attemptLogin(): string|RedirectResponse
@@ -92,9 +92,9 @@ class Ui extends BaseController
         // staff directory before the screens go anywhere near production.
         if ($id === '' || $password === '') {
             return view('ui/login', [
-                'title' => 'Staff login',
+                'title' => 'User login',
                 'id'    => $id,
-                'error' => 'Please enter your Staff ID and password.',
+                'error' => 'Please enter your User ID and password.',
             ]);
         }
 

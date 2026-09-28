@@ -17,7 +17,7 @@ class StaffModel extends Model
      * The staff member behind these credentials, or null.
      *
      * Always runs password_verify, even when the account does not exist, so a
-     * wrong Staff ID and a wrong password take the same time to answer.
+     * wrong User ID and a wrong password take the same time to answer.
      */
     public function authenticate(string $staffId, string $password): ?array
     {

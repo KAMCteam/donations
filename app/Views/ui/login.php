@@ -4,7 +4,7 @@
 <?php
 
 /**
- * Staff login. Was `js/pages/login.js`.
+ * User login. Was `js/pages/login.js`.
  *
  * The prototype validated in the browser and then swapped the rendered page;
  * this is a real form post, and the error paragraph below is rendered only
@@ -27,19 +27,19 @@
         <div class="login-box">
             <div class="login-heading-block">
                 <div class="login-mobile-logo"><img src="<?= base_url('assets/ui/img/kamc.svg') ?>" alt="King Abdullah Medical City"></div>
-                <h2 class="login-title">Staff login</h2>
+                <h2 class="login-title">User login</h2>
                 <p class="login-sub">Enter your credentials to access the platform.</p>
             </div>
 
             <form class="stack-5" method="post" action="<?= site_url('login') ?>" novalidate>
                 <?= csrf_field() ?>
                 <div>
-                    <label class="login-label" for="staff-id">Staff ID</label>
-                    <input type="text" id="staff-id" name="id" class="input" value="<?= esc($id ?? '') ?>" placeholder="e.g. DR-00421" style="font-family:&quot;DM Mono&quot;, monospace">
+                    <label class="login-label" for="user-id">User ID</label>
+                    <input type="text" id="user-id" name="id" class="input" value="<?= esc($id ?? '') ?>" placeholder="e.g. DR-00421" style="font-family:&quot;DM Mono&quot;, monospace">
                 </div>
                 <div>
-                    <label class="login-label" for="staff-password">Password</label>
-                    <input type="password" id="staff-password" name="password" class="input" placeholder="••••••••">
+                    <label class="login-label" for="user-password">Password</label>
+                    <input type="password" id="user-password" name="password" class="input" placeholder="••••••••">
                 </div>
                 <?php if (! empty($error)): ?>
                     <p class="login-error"><?= esc($error) ?></p>

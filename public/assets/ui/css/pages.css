@@ -33,12 +33,19 @@
    type scale, which stops at 2.25rem. It grows with the window between a
    floor that still fits the narrowest panel the screen ever shows — 64rem is
    where it appears at all — and a ceiling that keeps it from running away on
-   a very wide one. */
+   a very wide one.
+
+   Weight 600, which is what every other title on the platform is set in.
+   It was 300 — the lightest DM Sans carries — and a light face in white on
+   this blue is the one combination that goes thin and washed out, at any
+   size. Large type also wants its tracking pulled in a little, and its lines
+   closer together than a paragraph's. */
 .login-headline {
   color: #fff;
-  font-size: clamp(2.5rem, 3.4vw, 3.75rem);
-  font-weight: 300;
-  line-height: 1.2;
+  font-size: clamp(3rem, 4.4vw, 5rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
   text-wrap: balance;
 }
 

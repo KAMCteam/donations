@@ -17,12 +17,10 @@
 <div class="login">
     <div class="login-brand">
         <img class="login-brand-logo" src="<?= base_url('assets/ui/img/kamc.svg') ?>" alt="King Abdullah Medical City">
-        <div>
-            <div class="login-tagline">Organ Donation &amp; Transplant Platform</div>
-            <h1 class="login-headline">Every transplant<br>begins with a match.</h1>
-            <p class="login-lede">Secure access for medical staff. Manage recipients, donors, and transplant pairs across Kidney and Liver programs.</p>
-        </div>
-        <div class="login-copy">&copy; 2026 National Transplant Registry &mdash; Restricted Access</div>
+        <?php // The panel is the logo and the name of what this is, and nothing
+              // else: the slogan, the paragraph under it and the notice along
+              // the foot have all gone. ?>
+        <h1 class="login-headline">Organ Donation &amp; Transplantation</h1>
     </div>
 
     <div class="login-panel">

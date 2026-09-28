@@ -92,18 +92,11 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
 
     <div class="card card--scroll">
         <?php if ($rows === []): ?>
-            <?php // The screen hides more than it used to, so an empty table
-                  // has to say whether the register is empty or the chips are
-                  // simply holding pairs back — and offer the way out. ?>
-            <div class="empty-state">
-                <?php if ($btFilter === 'all' && $statusFilter === 'all'): ?>
-                    No pairs found.
-                <?php else: ?>
-                    No pairs match these filters.<br>
-                    <?php // Clears both chip rows, not just the status one. ?>
-                    <a class="stat-link" href="<?= site_url('pairs') ?>?status=all">Show all pairs</a>
-                <?php endif; ?>
-            </div>
+            <?php // One sentence and nothing else, as on every other list. The
+                  // chips are right above it and already say what is being
+                  // asked for, so a link back to All was a second way to press
+                  // a button that is already on the screen. ?>
+            <div class="empty-state">No pairs found.</div>
         <?php else: ?>
             <table class="table pairs-table">
                 <thead>

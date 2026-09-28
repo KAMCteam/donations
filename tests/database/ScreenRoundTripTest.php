@@ -2199,11 +2199,11 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         // And the default drops back out of the URL rather than piling up.
         $this->assertStringContainsString('href="' . site_url('pairs') . '"', $all);
 
-        // An empty table now has to say which of the two it is, because the
-        // screen hides pairs by default.
+        // An empty table says so in one sentence, whatever emptied it. The
+        // chips sit above it and are the way back.
         $none = $this->get('pairs?status=closed')->getBody();
-        $this->assertStringContainsString('No pairs match these filters.', $none);
-        $this->assertStringContainsString('Show all pairs', $none);
+        $this->assertStringContainsString('No pairs found.', $none);
+        $this->assertStringNotContainsString('Show all pairs', $none);
     }
 
     // ---- Lab workup ------------------------------------------------------

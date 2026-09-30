@@ -2136,6 +2136,41 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('Donor Two', $sheet);
     }
 
+    /**
+     * Linking from a recipient's record comes back to it, not to the pair.
+     *
+     * A recipient collects donors, so there is usually another to add before
+     * any one of them is the one. Being sent to the pair made the first donor
+     * look like the decision.
+     */
+    public function testLinkingFromARecipientsRecordComesBackToIt(): void
+    {
+        // A donor already on the register, linked from the recipient's side.
+        $this->post('donors/new', ['mrn' => '8711', 'name' => 'On The Register', 'age' => '30', 'bloodType' => 'A']);
+        $this->post('recipients/new', ['mrn' => '8700', 'name' => 'Collector', 'age' => '44', 'bloodType' => 'A']);
+
+        $this->post('recipients/8700/link/existing', ['mrn' => '8711'])
+            ->assertRedirectTo(site_url('recipients/8700') . '?donor=1');
+
+        // And a brand new donor, through Add Pair opened from the record.
+        $this->post('pairs/new', [
+            'fixedSide'  => 'recipient',
+            'rMrn'       => '8700',
+            'dMrn'       => '8712',
+            'dName'      => 'Brand New', 'dAge' => '31', 'dBloodType' => 'A',
+        ])->assertRedirectTo(site_url('recipients/8700') . '?donor=2');
+
+        // From the donor's own side the pair is what was just made, so that is
+        // still where it goes.
+        $this->post('donors/new', ['mrn' => '8713', 'name' => 'From My Side', 'age' => '32', 'bloodType' => 'A']);
+        $this->post('recipients/new', ['mrn' => '8701', 'name' => 'Other', 'age' => '45', 'bloodType' => 'A']);
+        $this->post('donors/8713/link/existing', ['mrn' => '8701']);
+
+        $pair = $this->db->table('pairs')->where('donor_mrn', 8713)->get()->getRowArray();
+        $this->assertNotNull($pair);
+        $this->assertSame(2, $this->db->table('pairs')->where('recipient_mrn', 8700)->countAllResults());
+    }
+
     /** Every record screen offers its own sheet, and the sheet has the record on it. */
     public function testARecordPrintsAsItsOwnSheet(): void
     {

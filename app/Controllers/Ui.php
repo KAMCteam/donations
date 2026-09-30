@@ -1365,7 +1365,7 @@ class Ui extends BaseController
             ]);
         }
 
-        return redirect()->to(site_url('pairs/' . rawurlencode((string) $pairId)));
+        return redirect()->to($this->afterLinking($fixedSide, $recipientId, $donorId, (string) $pairId));
     }
 
     public function pair(string $id): string|RedirectResponse
@@ -1660,7 +1660,40 @@ class Ui extends BaseController
         // The donors list shows the relationship, so the donor carries it too.
         $this->store->updateDonor($donorId, ['relationship' => (string) $this->request->getPost('relationship')]);
 
-        return redirect()->to(site_url('pairs/' . rawurlencode((string) $pairId)));
+        return redirect()->to($this->afterLinking($personType, $recipientId, $donorId, (string) $pairId));
+    }
+
+    /**
+     * Where linking leaves you.
+     *
+     * Not on the pair, when the link was made from a recipient's record. A
+     * recipient collects donors — that is the point of the tabs — and there is
+     * usually another to add before any one of them is the one. Sending them
+     * to the pair every time made the first donor look like the decision.
+     *
+     * So: back to the recipient, with the donor just linked showing. The pair
+     * has its own screen and the tab leads to it; it is not where the work is
+     * at this point.
+     *
+     * From a donor's record, or from Add Pair with neither side fixed, the
+     * pair is the thing that was just made and is where to go.
+     */
+    private function afterLinking(string $startedFrom, string $recipientMrn, string $donorMrn, string $pairId): string
+    {
+        if ($startedFrom !== 'recipient') {
+            return site_url('pairs/' . rawurlencode($pairId));
+        }
+
+        $recipient = $this->store->findRecipient($recipientMrn);
+        $tab       = 0;
+
+        foreach ($recipient['donors'] ?? [] as $candidate) {
+            if ((string) $candidate['donorId'] === $donorMrn) {
+                $tab = (int) $candidate['number'];
+            }
+        }
+
+        return site_url('recipients/' . rawurlencode($recipientMrn)) . ($tab === 0 ? '' : '?donor=' . $tab);
     }
 
     /**

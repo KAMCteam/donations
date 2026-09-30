@@ -135,11 +135,9 @@
   white-space: nowrap;
 }
 
-.rec-labs .l-test    { width: 26%; font-weight: 600; }
-.rec-labs .l-answer  { width: 14%; }
-.rec-labs .l-value   { width: 16%; }
-.rec-labs .l-date    { width: 12%; font-family: "Consolas", "DM Mono", ui-monospace, monospace; white-space: nowrap; }
-.rec-labs .l-comment { width: 32%; white-space: pre-wrap; }
+.rec-labs .l-test    { width: 32%; font-weight: 600; }
+.rec-labs .l-answer  { width: 16%; }
+.rec-labs .l-comment { width: 52%; white-space: pre-wrap; }
 
 /* An answer nobody has given yet is greyed, so a half-finished workup can
    be read at arm's length. Printed in black and white the weight still

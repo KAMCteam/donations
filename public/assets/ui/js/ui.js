@@ -96,7 +96,11 @@
 
   /* "3 of 7 completed", the bar and the percentage. */
   function updateLabSummary(section) {
-    var cards = section.querySelectorAll(".lab-card");
+    // Not the Other box: it has no answer to give, so it is neither done nor
+    // outstanding. `UiStore::labProgress` leaves it out for the same reason,
+    // and the two counts have to agree — otherwise the total jumps the moment
+    // the first answer is pressed.
+    var cards = section.querySelectorAll(".lab-card:not(.lab-card--free)");
     var total = cards.length;
     var done = 0;
 
@@ -119,53 +123,18 @@
     if (label) label.textContent = pct + "%";
   }
 
-  /* Mirrors an edited result / date back into the card head. The two lines are
-     present but `hidden` while empty, which renders the same as the source's
-     "only add the node when there is a value". */
-  function applyEditor(card) {
-    var editor = card.querySelector("[data-lab-editor]");
-    if (!editor) return;
-
-    [["[data-lab-result]", 0], ["[data-lab-date-text]", 1]].forEach(function (pair) {
-      var target = card.querySelector(pair[0]);
-      var field = editor.querySelectorAll(".lab-editor-field")[pair[1]];
-      if (!target || !field) return;
-
-      target.textContent = field.value;
-      target.hidden = field.value === "";
-    });
-  }
-
   function initLabSections() {
     document.querySelectorAll("[data-lab-section]").forEach(function (section) {
       section.addEventListener("click", function (e) {
         var card = e.target.closest(".lab-card");
         if (!card) return;
 
+        // Answering is all a card does now: the value, the date and the
+        // pencil that opened them have gone.
         var statusBtn = e.target.closest("[data-lab-status]");
         if (statusBtn) {
           setLabStatus(card, statusBtn.getAttribute("data-lab-status"));
           updateLabSummary(section);
-          return;
-        }
-
-        var editor = card.querySelector("[data-lab-editor]");
-
-        if (e.target.closest("[data-lab-edit]")) {
-          if (!editor) return;
-          var opening = editor.hidden;
-
-          // One editor at a time, as in the source.
-          section.querySelectorAll("[data-lab-editor]").forEach(function (other) {
-            other.hidden = true;
-          });
-          editor.hidden = !opening;
-          return;
-        }
-
-        if (e.target.closest("[data-lab-save]")) {
-          applyEditor(card);
-          if (editor) editor.hidden = true;
         }
       });
     });

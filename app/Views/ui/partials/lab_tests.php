@@ -18,14 +18,12 @@ use App\Libraries\UiStore;
  * @var list<array<string, mixed>> $tests      Each carries the group it is listed under.
  * @var string                     $field      Form field prefix, e.g. "labs" or "rLabs".
  * @var bool                       $animated   Adds the colour transition (PersonForm / AddPair).
- * @var string|null                $editTitle  Tooltip on the pencil (PersonForm only).
  * @var bool                       $editing    False renders the workup read-only.
  * @var string|null                $editUrl    Where the card's Edit goes; null hides it.
  * @var string|null                $viewUrl    Where Cancel goes.
  * @var string|null                $section    Which card a save is for.
  */
-$animated  = $animated ?? false;
-$editTitle = $editTitle ?? null;
+$animated = $animated ?? false;
 // The add screens have nothing to view yet, so they default to editable with
 // no Edit button of their own.
 $editing  = $editing ?? true;
@@ -91,15 +89,9 @@ foreach ($tests as $i => $test) {
                 <div class="lab-card-head">
                     <div class="lab-info">
                         <div class="lab-name"><?= esc($test['name']) ?></div>
-                        <div class="lab-result" data-lab-result<?= ($test['result'] ?? '') === '' ? ' hidden' : '' ?>><?= esc($test['result'] ?? '') ?></div>
-                        <div class="lab-date" data-lab-date-text<?= ($test['date'] ?? '') === '' ? ' hidden' : '' ?>><?= esc($test['date'] ?? '') ?></div>
                     </div>
                     <?php if (! $freeText): ?>
                         <span class="lab-pill <?= ui_tone('labStatus', $test['status']) ?>" data-lab-pill<?= $answered ? '' : ' hidden' ?>><?= $answered ? esc(UiStore::RESULT_LABEL[$test['status']] ?? $test['status']) : '' ?></span>
-                        <?php // Beside the pill rather than at the end of the answers:
-                              // five answers already wrap on a narrow column, and the
-                              // pencil was being carried onto a line of its own. ?>
-                        <button type="button" class="lab-edit-btn" data-lab-edit<?= $editTitle !== null ? ' title="' . esc($editTitle) . '"' : '' ?>><?= ui_icon('edit') ?></button>
                     <?php endif; ?>
                 </div>
 
@@ -124,17 +116,9 @@ foreach ($tests as $i => $test) {
                     ?>
                     <div class="lab-comment">
                         <label class="lab-comment-label" for="<?= $commentId ?>"><?= $freeText ? 'Notes' : 'Comment' ?></label>
-                        <textarea id="<?= $commentId ?>" class="lab-editor-field lab-comment-field" name="<?= $base ?>[notes]"
+                        <textarea id="<?= $commentId ?>" class="lab-comment-field" name="<?= $base ?>[notes]"
                                   rows="<?= $freeText ? 3 : ($hint['rows'] ?? 1) ?>"<?= $hint === null ? ($freeText ? ' placeholder="Anything the workup has no line for"' : '') : ' placeholder="' . esc($hint['placeholder']) . '"' ?>><?= esc($test['notes'] ?? '') ?></textarea>
                     </div>
-                <?php endif; ?>
-
-                <?php if (! $freeText): ?>
-                <div class="lab-editor stack-2" data-lab-editor hidden>
-                    <input type="text" class="lab-editor-field" name="<?= $base ?>[result]" value="<?= esc($test['result'] ?? '') ?>" placeholder="Value / finding">
-                    <input type="text" class="lab-editor-field lab-editor-field--mono" name="<?= $base ?>[date]" value="<?= esc($test['date'] ?? '') ?>" placeholder="Date (DD/MM/YYYY)" inputmode="numeric" maxlength="10" autocomplete="off" data-date-text>
-                    <button type="button" class="lab-editor-save" data-lab-save>Save</button>
-                </div>
                 <?php endif; ?>
             </div>
         <?php endforeach; ?>

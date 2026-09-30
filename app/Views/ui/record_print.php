@@ -137,10 +137,11 @@ $dash = '—';
                         <table class="rec-labs">
                             <thead>
                                 <tr>
+                                    <?php // Value / finding and Date have gone from
+                                          // the cards, so there is nothing left to
+                                          // print in a column for them. ?>
                                     <th class="l-test">Test</th>
                                     <th class="l-answer">Result</th>
-                                    <th class="l-value">Value / finding</th>
-                                    <th class="l-date">Date</th>
                                     <th class="l-comment">Comment</th>
                                 </tr>
                             </thead>
@@ -164,8 +165,6 @@ $dash = '—';
                                     <tr>
                                         <td class="l-test"><?= esc($test['name']) ?></td>
                                         <td class="l-answer<?= $unanswered ? ' l-answer--unanswered' : '' ?><?= $flag ? ' l-answer--flag' : '' ?>"><?= $blank ? $dash : esc(UiStore::RESULT_LABEL[$status] ?? $status) ?></td>
-                                        <td class="l-value"><?= esc(($test['result'] ?? '') !== '' ? $test['result'] : $dash) ?></td>
-                                        <td class="l-date"><?= esc(($test['date'] ?? '') !== '' ? $test['date'] : $dash) ?></td>
                                         <td class="l-comment"><?= esc(($test['notes'] ?? '') !== '' ? $test['notes'] : $dash) ?></td>
                                     </tr>
                                 <?php endforeach; ?>

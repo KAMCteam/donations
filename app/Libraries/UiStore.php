@@ -1075,8 +1075,6 @@ final class UiStore
                 continue;
             }
 
-            $value = (string) ($test['result'] ?? '');
-            $date  = (string) ($test['date'] ?? '');
             $notes = (string) ($test['notes'] ?? '');
 
             $lab = $this->labs->find($labId);
@@ -1096,15 +1094,17 @@ final class UiStore
             $status  = in_array($status, $offered, true) ? $status : 'not_done';
 
             // Nothing recorded and nothing said: no row to write.
-            if ($status === 'not_done' && $value === '' && $date === '' && $notes === '') {
+            if ($status === 'not_done' && $notes === '') {
                 continue;
             }
 
+            // `value` and `taken_on` are not written from here any more — the
+            // cards stopped asking for them. Leaving the keys out means an
+            // existing row keeps whatever it already holds rather than having
+            // it nulled by a screen that can no longer show it.
             $this->labResults->record($mrn, $personType, $labId, [
-                'status'   => $status,
-                'value'    => $value === '' ? null : $value,
-                'taken_on' => $this->toDate($date),
-                'notes'    => $notes === '' ? null : $notes,
+                'status' => $status,
+                'notes'  => $notes === '' ? null : $notes,
             ]);
         }
     }

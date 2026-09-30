@@ -2218,6 +2218,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             ->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'HIV'])
             ->get()->getRowArray();
 
+        // An answer and a comment: all a card collects now.
         $this->post('recipients/' . $mrn, [
             'section'   => 'labs',
             'name'      => 'Ahmed Test',
@@ -2227,8 +2228,6 @@ final class ScreenRoundTripTest extends CIUnitTestCase
                 'id'     => $lab['id'],
                 'name'   => $lab['name'],
                 'status' => 'negative',
-                'result' => 'Non-reactive',
-                'date'   => '17/09/2026',
                 'notes'  => 'repeat in 3 months',
             ]],
         ]);
@@ -2238,10 +2237,81 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'person_type' => 'recipient',
             'lab_id'      => $lab['id'],
             'status'      => 'negative',
-            'value'       => 'Non-reactive',
-            'taken_on'    => '2026-09-17',
             'notes'       => 'repeat in 3 months',
         ]);
+    }
+
+    /**
+     * A value recorded before the cards stopped asking for one is not erased
+     * by saving the card that no longer shows it.
+     *
+     * The screens write `status` and `notes` and nothing else, so the two
+     * columns keep whatever they hold rather than being nulled by a form that
+     * has no field to null them from.
+     */
+    public function testSavingACardLeavesAValueRecordedEarlierAlone(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4021', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $lab = $this->db->table('labs')
+            ->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'HIV'])
+            ->get()->getRowArray();
+
+        // As an older version of the screens would have left it.
+        $this->db->table('lab_results')->insert([
+            'person_mrn'  => 4021,
+            'person_type' => 'recipient',
+            'lab_id'      => $lab['id'],
+            'status'      => 'pending',
+            'value'       => 'Non-reactive',
+            'taken_on'    => '2026-09-17',
+        ]);
+
+        $this->post('recipients/4021', [
+            'section'   => 'labs',
+            'name'      => 'Ahmed Test',
+            'age'       => '41',
+            'bloodType' => 'O',
+            'labs'      => [[
+                'id'     => $lab['id'],
+                'name'   => $lab['name'],
+                'status' => 'negative',
+                'notes'  => 'repeat in 3 months',
+            ]],
+        ]);
+
+        $this->seeInDatabase('lab_results', [
+            'person_mrn' => 4021,
+            'lab_id'     => $lab['id'],
+            'status'     => 'negative',
+            'notes'      => 'repeat in 3 months',
+            'value'      => 'Non-reactive',
+            'taken_on'   => '2026-09-17',
+        ]);
+    }
+
+    /** The cards ask for an answer and a comment, and nothing else. */
+    public function testTheCardsNoLongerOfferAValueOrADate(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4022', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $html = $this->get('recipients/4022?edit=labs')->getBody();
+
+        $this->assertStringNotContainsString('Value / finding', $html);
+        $this->assertStringNotContainsString('Date (DD/MM/YYYY)', $html);
+        $this->assertStringNotContainsString('data-lab-edit', $html);
+        $this->assertStringNotContainsString('data-lab-editor', $html);
+        $this->assertStringNotContainsString('[result]', $html);
+        $this->assertStringNotContainsString('[date]', $html);
+
+        // What is left: the answers, and one comment box per test.
+        $this->assertStringContainsString('data-lab-status', $html);
+        $this->assertStringContainsString('class="lab-comment"', $html);
+
+        // And the printed sheet has no column for them either.
+        $sheet = $this->get('recipients/4022/print')->getBody();
+        $this->assertStringNotContainsString('Value / finding', $sheet);
+        $this->assertStringContainsString('Comment', $sheet);
     }
 
     /**

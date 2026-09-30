@@ -1576,8 +1576,6 @@ class Ui extends BaseController
                 'id'     => (string) ($row['id'] ?? ''),
                 'name'   => (string) $row['name'],
                 'status' => in_array($status, UiStore::LAB_STATUSES, true) ? $status : 'pending',
-                'result' => (string) ($row['result'] ?? ''),
-                'date'   => (string) ($row['date'] ?? ''),
                 'notes'  => (string) ($row['notes'] ?? ''),
             ];
         }

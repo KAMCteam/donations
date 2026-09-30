@@ -283,7 +283,6 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             'tests'     => $labTests,
             'field'     => 'labs',
             'animated'  => true,
-            'editTitle' => 'Add result',
             'editing'   => $editable('labs'),
             'editUrl'   => $mode === 'add' ? null : $editUrl('labs'),
             'viewUrl'   => $mode === 'add' ? null : $viewUrl,

@@ -287,12 +287,12 @@ final class SchemaTest extends CIUnitTestCase
         $labs = model(LabModel::class);
 
         // Each side of each programme gets its own sheet's tests, and only
-        // those: 71 on the recipient's sheet and 51 on the donor's, plus the
+        // those: 70 on the recipient's sheet and 50 on the donor's, plus the
         // clinic's two appointments and the one Other box on each.
-        $this->assertCount(74, $labs->workupFor('kidney', 'recipient'));
-        $this->assertCount(54, $labs->workupFor('kidney', 'donor'));
-        $this->assertCount(74, $labs->workupFor('liver', 'recipient'));
-        $this->assertCount(54, $labs->workupFor('liver', 'donor'));
+        $this->assertCount(73, $labs->workupFor('kidney', 'recipient'));
+        $this->assertCount(53, $labs->workupFor('kidney', 'donor'));
+        $this->assertCount(73, $labs->workupFor('liver', 'recipient'));
+        $this->assertCount(53, $labs->workupFor('liver', 'donor'));
 
         $recipientNames = array_column($labs->workupFor('kidney', 'recipient'), 'name');
         $donorNames     = array_column($labs->workupFor('kidney', 'donor'), 'name');
@@ -345,6 +345,29 @@ final class SchemaTest extends CIUnitTestCase
         ], $donorGroups);
     }
 
+    /** Two tests that close the group they are in, on both sheets. */
+    public function testTheSheetsPutTheseTestsLast(): void
+    {
+        $labs = model(LabModel::class);
+
+        $inGroup = static function (array $workup, string $group): array {
+            $rows = array_filter($workup, static fn (array $r): bool => $r['parent_name'] === $group);
+
+            return array_column($rows, 'name');
+        };
+
+        $recipient = $labs->workupFor('kidney', 'recipient');
+        $referrals = $inGroup($recipient, 'Referrals and Clearances');
+        $jabs      = $inGroup($recipient, 'Vaccinations');
+
+        $this->assertSame('Anaesthesia', end($referrals));
+        $this->assertSame('Pneumococcal 13', end($jabs));
+
+        // The donor's sheet calls the group Clearances, and closes it the same.
+        $clearances = $inGroup($labs->workupFor('kidney', 'donor'), 'Clearances');
+        $this->assertSame('Anaesthesia', end($clearances));
+    }
+
     public function testATestOffersOnlyTheAnswersItsSheetPrints(): void
     {
         $types = array_column(
@@ -360,6 +383,26 @@ final class SchemaTest extends CIUnitTestCase
         $this->assertSame('acceptable_abnormal', $types['CBC'], 'asked of everyone, so it cannot not apply');
         $this->assertNotContains('not_applicable', UiStore::RESULT_OPTIONS['acceptable_abnormal']);
         $this->assertContains('not_applicable', UiStore::RESULT_OPTIONS['acceptable_abnormal_na']);
+
+        // The imaging and the two urine tests are asked of everyone as well,
+        // on both sheets.
+        $donorTypes = array_column(
+            model(LabModel::class)->workupFor('kidney', 'donor'),
+            'result_type',
+            'name'
+        );
+
+        foreach (['CXR', 'ECG', 'Echo', 'Cr clearance', '24h-urine for protein'] as $test) {
+            $this->assertSame('acceptable_abnormal', $types[$test], $test . ' cannot not apply');
+        }
+
+        foreach (['CXR', 'ECG', 'Echo', 'Creatinine Clearance', '24h-urine for protein'] as $test) {
+            $this->assertSame('acceptable_abnormal', $donorTypes[$test], $test . ' cannot not apply');
+        }
+
+        // US KUB is off both sheets.
+        $this->assertArrayNotHasKey('US KUB', $types);
+        $this->assertArrayNotHasKey('US KUB', $donorTypes);
 
         // The clinic's two appointments are answered Seen or Not seen.
         $this->assertSame('seen_not_seen', $types['Transplant Nephrology Clinic']);
@@ -405,8 +448,8 @@ final class SchemaTest extends CIUnitTestCase
             model(LabModel::class)->workupFor('kidney', 'recipient')
         );
 
-        $this->assertCount(74, $workup);
-        $this->assertSame(73, UiStore::labProgress($workup)['total']);
+        $this->assertCount(73, $workup);
+        $this->assertSame(72, UiStore::labProgress($workup)['total']);
     }
 
     public function testAnUnrecordedTestStillComesBackAsNotDone(): void
@@ -415,7 +458,7 @@ final class SchemaTest extends CIUnitTestCase
         $results = model(LabResultModel::class);
 
         $workup = $results->workupFor(1001, 'recipient', 'kidney');
-        $this->assertCount(74, $workup);
+        $this->assertCount(73, $workup);
         $this->assertSame('not_done', $workup[0]['status'], 'no row yet, so nobody has looked');
         $this->assertNull($workup[0]['result_id']);
     }

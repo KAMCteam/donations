@@ -118,31 +118,31 @@ class DatabaseSeeder extends Seeder
             ['U/S gyn', 'acceptable_abnormal_na'],
         ],
         'Imaging' => [
-            ['CXR', 'acceptable_abnormal_na'],
-            ['ECG', 'acceptable_abnormal_na'],
-            ['Echo', 'acceptable_abnormal_na'],
+            // Asked of everyone, so they cannot not apply.
+            ['CXR', 'acceptable_abnormal'],
+            ['ECG', 'acceptable_abnormal'],
+            ['Echo', 'acceptable_abnormal'],
             ['CT angio pelvis', 'acceptable_abnormal_na'],
             ['Coronary Angio', 'acceptable_abnormal_na'],
-            ['US KUB', 'acceptable_abnormal_na'],
         ],
         'Referrals and Clearances' => [
             ['Dental', 'cleared_not_cleared'],
-            ['Anaesthesia', 'cleared_not_cleared'],
             ['Cardiology', 'cleared_not_cleared'],
             ['Transplant Surgeons', 'cleared_not_cleared'],
             ['Gynaecology', 'cleared_not_cleared'],
             ['I.D', 'cleared_not_cleared'],
             ['Social worker', 'cleared_not_cleared'],
             ['Gastroenterology', 'cleared_not_cleared'],
+            ['Anaesthesia', 'cleared_not_cleared'],
         ],
         'Vaccinations' => [
             ['MMR', 'given_not_given'],
             ['VZV', 'given_not_given'],
-            ['Pneumococcal 13', 'given_not_given'],
             ['Meningococcal', 'given_not_given'],
             ['Hepatitis B vaccine', 'given_not_given'],
             ['Influenza vaccine', 'given_not_given'],
             ['Pneumococcal 23', 'given_not_given'],
+            ['Pneumococcal 13', 'given_not_given'],
         ],
         'Transplant Clinic' => [
             ['Transplant Nephrology Clinic', 'seen_not_seen'],
@@ -211,20 +211,22 @@ class DatabaseSeeder extends Seeder
             ['Stool Exam', 'acceptable_abnormal'],
         ],
         'Imaging' => [
-            ['CXR', 'acceptable_abnormal_na'],
-            ['ECG', 'acceptable_abnormal_na'],
-            ['Echo', 'acceptable_abnormal_na'],
+            // As on the recipient's sheet.
+            ['CXR', 'acceptable_abnormal'],
+            ['ECG', 'acceptable_abnormal'],
+            ['Echo', 'acceptable_abnormal'],
             ['CT angio pelvis', 'acceptable_abnormal_na'],
             ['US Gynae', 'acceptable_abnormal_na'],
-            ['US KUB', 'acceptable_abnormal_na'],
             ['Mammogram', 'acceptable_abnormal_na'],
         ],
+        // The donor's own name for Referrals and Clearances, and Anaesthesia
+        // closes it here too.
         'Clearances' => [
-            ['Anaesthesia', 'cleared_not_cleared'],
             ['Advocate', 'cleared_not_cleared'],
             ['Social worker', 'cleared_not_cleared'],
             ['Cardio', 'cleared_not_cleared'],
             ['Transplant Surgery', 'cleared_not_cleared'],
+            ['Anaesthesia', 'cleared_not_cleared'],
         ],
         'Transplant Clinic' => [
             ['Transplant Nephrology Clinic', 'seen_not_seen'],

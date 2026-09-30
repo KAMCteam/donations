@@ -35,6 +35,7 @@ $title    = $internal ? 'Internal Report' : 'Report';
 /** One cell's text, formatted as the screen formats it. */
 $cell = static function (array $row, string $key): string {
     return match ($key) {
+        'recordType'     => $row['type'] === 'recipient' ? 'recipient' : 'donor',
         'related'        => (string) $row['related'],
         'status'         => UiStore::STATUS_OPTIONS[$row['status']] ?? (string) $row['status'],
         'donationType'   => UiStore::DONATION_TYPES[$row['donationType']] ?? (string) $row['donationType'],
@@ -102,7 +103,15 @@ $mono = ['mrn', 'bloodGroup', 'phone', 'entryDate', 'firstDialysis', 'crossmatch
                     <tr>
                         <?php foreach ($columns as [$key, $heading]): ?>
                             <?php $value = $cell($row, $key); ?>
-                            <td class="<?= $key === 'name' ? 'c-name' : (in_array($key, $mono, true) ? 'c-mono' : '') ?>"><?= esc($value !== '' ? $value : $dash) ?></td>
+                            <?php
+                            $class = match (true) {
+                                $key === 'name'                 => 'c-name',
+                                $key === 'recordType'           => 'c-role',
+                                in_array($key, $mono, true)     => 'c-mono',
+                                default                         => '',
+                            };
+                            ?>
+                            <td class="<?= $class ?>"><?= esc($value !== '' ? $value : $dash) ?></td>
                         <?php endforeach; ?>
                     </tr>
                 <?php endforeach; ?>

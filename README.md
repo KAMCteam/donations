@@ -296,7 +296,12 @@ because a donor has no entry date and a recipient has no donor type:
 | --- | --- |
 | Recipient | Recipient MRN, Recipient Name, Age, Blood Group, MRP, Gender, Phone Number, Type Dialysis, First Dialysis, Entry Date, Related Donor, Relationship, Status, Date of Crossmatch |
 | Donor | Donor MRN, Donor Name, Age, Blood Group, MRP, Gender, Phone Number, Donor Type, Related Recipient, Status, Date of Crossmatch |
-| Both, or neither | MRN, Name, Age, Blood Group, MRP, Gender, Phone Number, Type Dialysis, First Dialysis, Entry Date, Related Donor/Recipient, Relationship, Status, Date of Crossmatch |
+| Both, or neither | MRN, Name, Age, **Type**, Blood Group, MRP, Gender, Phone Number, Type Dialysis, First Dialysis, Entry Date, Related Donor/Recipient, Relationship, Status, Date of Crossmatch |
+
+**Type** appears only in the mixed table, and only there because only there is
+it needed: the other two sets say which register a row came from in their own
+headings — "Recipient MRN", "Donor Name" — and a table of both cannot. It is
+fixed, not one of the optional columns, for the same reason.
 
 The Columns filter offers only the five a report may or may not be about —
 Type Dialysis, First Dialysis, Entry Date, Relationship, Date of Crossmatch —

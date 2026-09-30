@@ -55,7 +55,12 @@ class Reports extends BaseController
             ['crossmatchDate', 'Date of Crossmatch'],
         ],
         'all' => [
-            ['mrn', 'MRN'], ['name', 'Name'], ['age', 'Age'],
+            // A mixed table is the one place a row does not say what it is:
+            // the recipient set and the donor set each name it in their MRN
+            // and Name headings, and this set cannot. So it says so outright,
+            // and always — nobody reading both registers at once can do
+            // without it, which is why it is not among the optional five.
+            ['mrn', 'MRN'], ['name', 'Name'], ['age', 'Age'], ['recordType', 'Type'],
             ['bloodGroup', 'Blood Group'], ['mrp', 'MRP'], ['gender', 'Gender'],
             ['phone', 'Phone Number'], ['dialysisType', 'Type Dialysis'],
             ['firstDialysis', 'First Dialysis'], ['entryDate', 'Entry Date'],

@@ -156,6 +156,7 @@ foreach ($choices['labs'] as $lab) {
                                 $value = match ($key) {
                                     'mrn'            => $row['mrn'],
                                     'name'           => $row['name'],
+                                    'recordType'     => $row['type'] === 'recipient' ? 'recipient' : 'donor',
                                     'related'        => $row['related'],
                                     'status'         => UiStore::STATUS_OPTIONS[$row['status']] ?? $row['status'],
                                     'donationType'   => UiStore::DONATION_TYPES[$row['donationType']] ?? $row['donationType'],
@@ -171,6 +172,9 @@ foreach ($choices['labs'] as $lab) {
                                         <a href="<?= $url ?>"><?= esc($value) ?></a>
                                     <?php elseif ($key === 'status'): ?>
                                         <span class="badge <?= ui_tone('status', $row['status']) ?>"><?= esc($value) ?></span>
+                                    <?php elseif ($key === 'recordType'): ?>
+                                        <?php // The same tag, in the same two colours, as the pairs register. ?>
+                                        <span class="role-tag <?= $row['type'] === 'recipient' ? 'tone-blue-soft' : 'tone-teal-soft' ?>"><?= esc($value) ?></span>
                                     <?php else: ?>
                                         <?= esc($value !== '' ? $value : $dash) ?>
                                     <?php endif; ?>

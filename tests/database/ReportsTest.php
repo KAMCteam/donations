@@ -169,11 +169,15 @@ final class ReportsTest extends CIUnitTestCase
         $mixed = $this->get('reports')->getBody();
         $this->assertStringContainsString('<th>MRN</th>', $mixed);
         $this->assertStringContainsString('<th>Related Donor/Recipient</th>', $mixed);
+        // Only the mixed table needs to say which register a row came from.
+        $this->assertStringContainsString('<th>Type</th>', $mixed);
 
         $recipients = $this->get('reports?type[]=recipient')->getBody();
         $this->assertStringContainsString('<th>Recipient MRN</th>', $recipients);
         $this->assertStringContainsString('<th>Related Donor</th>', $recipients);
         $this->assertStringNotContainsString('<th>Donor Type</th>', $recipients);
+        // Every row is a recipient; a column saying so would say it 34 times.
+        $this->assertStringNotContainsString('<th>Type</th>', $recipients);
 
         $donors = $this->get('reports?type[]=donor')->getBody();
         $this->assertStringContainsString('<th>Donor MRN</th>', $donors);
@@ -184,12 +188,31 @@ final class ReportsTest extends CIUnitTestCase
         $this->assertStringNotContainsString('<th>Entry Date</th>', $donors);
     }
 
+    /**
+     * And it says which, per row, in the same tag the pairs register uses.
+     *
+     * It is fixed: the Columns filter cannot reach it, because a mixed table
+     * with no way of telling a recipient from a donor is not a report.
+     */
+    public function testTheMixedTableSaysWhichRegisterEachRowCameFrom(): void
+    {
+        $html = $this->get('reports')->getBody();
+
+        $this->assertStringContainsString('<span class="role-tag tone-blue-soft">recipient</span>', $html);
+        $this->assertStringContainsString('<span class="role-tag tone-teal-soft">donor</span>', $html);
+        $this->assertStringNotContainsString('name="column[]" value="recordType"', $html);
+
+        // Not even when every optional column is switched off.
+        $this->assertStringContainsString('<th>Type</th>', $this->get('reports?applied=1')->getBody());
+    }
+
     /** Both types chosen is the same question as neither, so it is the same table. */
     public function testChoosingBothTypesReadsAsAll(): void
     {
         $html = $this->get('reports?type[]=recipient&type[]=donor')->getBody();
 
         $this->assertStringContainsString('<th>MRN</th>', $html);
+        $this->assertStringContainsString('<th>Type</th>', $html);
         $this->assertStringContainsString('3 records', $html);
     }
 

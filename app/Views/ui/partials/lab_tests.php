@@ -85,7 +85,11 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
         <?php if ($groupName !== ''): ?>
             <div class="lab-group-head">
                 <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
-                <?php if ($isCustomGroup && $addLabUrl !== null): ?>
+                <?php // Only while the card is open. It is a submit button
+                      // inside the card's fieldset, so on a saved card the
+                      // browser disables it — it would look live and do
+                      // nothing, which is worse than not being there. ?>
+                <?php if ($isCustomGroup && $addLabUrl !== null && $editing): ?>
                     <?php // A plain post: it creates the test and comes back to
                           // this card, so it needs nothing from the browser. ?>
                     <button type="submit" class="btn-add-lab" formaction="<?= esc($addLabUrl) ?>" formnovalidate><?= ui_icon('plus') ?>Add lab</button>
@@ -93,7 +97,7 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
             </div>
         <?php endif; ?>
         <?php if ($isCustomGroup && $groupTests === []): ?>
-            <p class="lab-group-empty">No tests added. Use <strong>Add lab</strong> for anything the check list has no line for.</p>
+            <p class="lab-group-empty">No tests added.<?= $editing ? ' Use <strong>Add lab</strong> for anything the check list has no line for.' : ' Press Edit to add one.' ?></p>
         <?php endif; ?>
         <div class="lab-grid">
         <?php foreach ($groupTests as $i => $test): ?>
@@ -134,7 +138,12 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
                     <?php endif; ?>
                 </div>
 
-                <?php if (! $freeText): ?>
+                <?php // Only while the card is open for editing. Saved, the
+                      // answer that was chosen is on the pill above and the
+                      // fifteen or sixteen nobody chose have nothing left to
+                      // say — a custom test offers seventeen, and a read-only
+                      // card printing all of them buries the one that counts. ?>
+                <?php if (! $freeText && $editing): ?>
                 <div class="lab-actions">
                     <?php // This test's own answers, from the check list: a serology
                           // offers Positive / Negative, a referral Cleared / not.
@@ -160,7 +169,9 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
                     </div>
                 <?php endif; ?>
 
-                <?php if ($custom && $removeLabUrl !== null): ?>
+                <?php // Taking a test away is an edit, so it belongs with the
+                      // rest of them rather than on a card being read. ?>
+                <?php if ($custom && $removeLabUrl !== null && $editing): ?>
                     <?php // Theirs to add, theirs to take away — at the foot of
                           // the card, after everything it holds. The question is
                           // asked on the page it leads to, so this is a link. ?>

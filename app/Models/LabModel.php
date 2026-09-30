@@ -28,6 +28,32 @@ class LabModel extends Model
      * @return list<array<string, mixed>>
      */
     /**
+     * Every test the catalogue names, once each, for a filter that lists them.
+     *
+     * Grouped by name because the same test is a row on each sheet and in each
+     * programme, and a filter offering "CBC" four times would be asking the
+     * same question four ways. Selecting one selects all its rows.
+     *
+     * @return list<array{ids: string, name: string}>
+     */
+    public function named(): array
+    {
+        $rows = $this->db->table('labs')
+            ->select('name, GROUP_CONCAT(id) AS ids', false)
+            ->where('is_active', 1)
+            ->where('person_mrn', null)
+            ->groupBy('name')
+            ->orderBy('name')
+            ->get()
+            ->getResultArray();
+
+        return array_map(
+            static fn (array $row): array => ['ids' => (string) $row['ids'], 'name' => (string) $row['name']],
+            $rows
+        );
+    }
+
+    /**
      * The id of the group that heads the tests a record adds for itself.
      *
      * Each side has its own row for it, as every group does. Null when the

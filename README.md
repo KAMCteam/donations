@@ -72,6 +72,9 @@ alias to `public/` rather than the old `.htaccess` rewrite.
 | `/pairs` | Pairs register, filterable by blood type and status |
 | `/pairs/export` | The filtered pairs as CSV |
 | `/pairs/new`, `/pairs/{id}` | Add / open a pair |
+| `/exchange` | Paired exchange: the chains, and the builder |
+| `/reports` | Both registers read across, under nine filters |
+| `/reports/export/{general\|internal}` | The filtered report as a printable sheet |
 | `/mrp` | Register a Medical Responsible Person |
 
 Auto-routing is off, so `app/Config/Routes.php` lists every reachable endpoint.
@@ -273,6 +276,50 @@ on their lists. The rest are descriptive.
 
 A donor still has its own separate status (On Hold / Active / Completed /
 Cancelled), which is not tied to the pair.
+
+### Reports
+
+Every other screen answers one question — who is waiting, who is free, which
+pairs there are. `/reports` answers whatever is asked of it: both registers in
+one table, under nine filters, with two ways of taking the answer away.
+
+One rule decides the filters. Each is a list of checkboxes, each starts empty,
+and **empty means all** — so an untouched filter narrows nothing and the query
+does not mention it at all. That is one rule for all nine rather than a default
+per filter, and it is why the button on a filter reads "All" both when nothing
+is chosen and when everything is: those select the same records.
+
+The columns are not the user's to choose. The **record type** decides them,
+because a donor has no entry date and a recipient has no donor type:
+
+| Record type | Columns |
+| --- | --- |
+| Recipient | Recipient MRN, Recipient Name, Age, Blood Group, MRP, Gender, Phone Number, Type Dialysis, First Dialysis, Entry Date, Related Donor, Relationship, Status, Date of Crossmatch |
+| Donor | Donor MRN, Donor Name, Age, Blood Group, MRP, Gender, Phone Number, Donor Type, Related Recipient, Status, Date of Crossmatch |
+| Both, or neither | MRN, Name, Age, Blood Group, MRP, Gender, Phone Number, Type Dialysis, First Dialysis, Entry Date, Related Donor/Recipient, Relationship, Status, Date of Crossmatch |
+
+The Columns filter offers only the five a report may or may not be about —
+Type Dialysis, First Dialysis, Entry Date, Relationship, Date of Crossmatch —
+and all five start on. The rest are what a row *is*, and a table without them
+could not be read. A column the chosen record type does not have stays off
+whether or not it is ticked: there is nothing to show.
+
+**Type Dialysis has no column behind it.** Nothing in the schema records what
+kind of dialysis somebody is on — `recipients` holds `dialysis_start` and
+nothing else — so that column renders for every row and is empty for every row.
+It is here because the report asks for it; filling it needs a field on
+`recipients` and a control on the recipient form.
+
+Related Donor/Recipient is a list, not a single name: a recipient may hold
+several donors, and the cell names each one with their MRN.
+
+Both exports print the rows the filters chose and no others, which is the point
+of exporting from here rather than from a register. **General** is the table as
+it stands, in the columns showing at the time. **Internal** is that table
+followed by each of its rows opened out — the whole record and the whole
+workup, one per page — built from `App\Libraries\RecordBlocks`, the same
+blocks a single record's own printed sheet is made of, so the two sheets cannot
+drift apart.
 
 ### Dates
 

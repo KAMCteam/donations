@@ -73,5 +73,9 @@ $routes->post('exchange/start/(:segment)', 'Exchange::start/$1');
 $routes->match(['get', 'post'], 'exchange/build', 'Exchange::build');
 $routes->get('exchange/review', 'Exchange::review');
 
+// Reports. One screen, and the same report on paper at two depths.
+$routes->get('reports', 'Reports::index');
+$routes->get('reports/export/(:segment)', 'Reports::export/$1');
+
 $routes->get('mrp', 'Ui::mrp');
 $routes->post('mrp', 'Ui::addMrp');

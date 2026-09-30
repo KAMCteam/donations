@@ -1,0 +1,63 @@
+/* =========================================================
+   A report on paper.
+
+   Loaded last by both flavours. The general report is the table alone; the
+   internal one is that table followed by every record in it, opened out —
+   which means it loads the register's stylesheet and the record's at once,
+   and those two set the page up differently. This settles them.
+
+   Landscape wins, because the table is fourteen columns wide and a record
+   block reads perfectly well across a wider page, where a table does not read
+   at all down a narrower one.
+   ========================================================= */
+
+@page {
+  size: A4 landscape;
+  margin: 10mm 8mm 12mm;
+}
+
+/* record-print.css narrows the body to a portrait column; the table above it
+   needs the full width, so the width is given back and each record keeps its
+   own. */
+:root { --sheet-width: 1120px; }
+
+.sheet-record {
+  max-width: var(--sheet-width);
+  margin: 1.5rem auto 0;
+}
+
+/* One record per page. A record is a document in its own right — somebody
+   pulls one out of the report and hands it on — and reading it across a break
+   in the middle of the workup is what makes that impossible. */
+.sheet-record { break-before: page; page-break-before: always; }
+
+.sheet-record-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid #15508A;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #15508A;
+}
+
+/* Who they are, in the same line as their name but not competing with it. */
+.sheet-record-title small {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+/* The blocks are laid out for a portrait column; on a landscape page they can
+   stand two abreast, which halves the length of the report. */
+.sheet-record .sheet-body,
+.sheet-record .rec-block { max-width: none; }
+
+/* ---- The table ---------------------------------------------------------
+   The register's sheet was built for a name per row; this has one per record
+   and fourteen columns beside it, so the name is given enough width not to
+   break itself into a stack of syllables. */
+
+.sheet-table td.c-name { min-width: 8rem; }

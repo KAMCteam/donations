@@ -362,6 +362,27 @@ final class UiStore
         return (string) ($row['label'] ?? ucfirst($this->organ()));
     }
 
+    /**
+     * Every programme, for a filter that offers them all rather than the one
+     * the session is in.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function organs(): array
+    {
+        return $this->programs->orderBy('sort_order')->findAll();
+    }
+
+    /**
+     * Every coordinator, for the same reason.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function coordinators(): array
+    {
+        return $this->coordinators->orderBy('name')->findAll();
+    }
+
     public function setOrgan(string $organ): void
     {
         if (in_array($organ, self::ORGANS, true)) {
@@ -1398,6 +1419,18 @@ final class UiStore
     public static function isoToDMY(string $iso): string
     {
         return implode('/', array_reverse(explode('-', $iso)));
+    }
+
+    /** The other way, for a date typed into a filter. '' when it is neither. */
+    public static function dmyToIso(string $value): string
+    {
+        $value = trim($value);
+
+        if (preg_match('~^(\d{2})/(\d{2})/(\d{4})$~', $value, $m) === 1) {
+            return "{$m[3]}-{$m[2]}-{$m[1]}";
+        }
+
+        return preg_match('~^\d{4}-\d{2}-\d{2}$~', $value) === 1 ? $value : '';
     }
 
     /**

@@ -58,6 +58,68 @@
     });
   }
 
+  /* ---- Dropdown filters -------------------------------------------------- */
+
+  /* The Reports filters and its export menu are each a `<details>`, so they
+     open, hold a choice and close again with scripting off. The one thing a
+     `<details>` will not do by itself is close when you press somewhere else,
+     which leaves two menus overlapping each other; that is all this adds.
+
+     A press inside a menu is left alone on purpose: the filters are checkboxes
+     and choosing one is not the end of choosing. */
+  function initMenus() {
+    document.addEventListener("click", function (e) {
+      var open = document.querySelectorAll("details.filter[open], details.export[open]");
+      if (!open.length) return;
+
+      var inside = e.target.closest("details.filter, details.export");
+
+      Array.prototype.forEach.call(open, function (details) {
+        if (details !== inside) details.removeAttribute("open");
+      });
+    });
+
+    /* The number on the button is rendered from the report on screen, so
+       until Apply is pressed it describes the last report rather than the one
+       being asked for. Recounting as the boxes are ticked is the whole of the
+       difference; with scripting off the button simply waits for Apply. */
+    document.addEventListener("change", function (e) {
+      var details = e.target.closest("details.filter");
+      if (!details) return;
+
+      var count = details.querySelector(".filter-count");
+      if (!count) return;
+
+      var boxes = details.querySelectorAll('input[type="checkbox"]');
+      var text;
+
+      if (boxes.length) {
+        var chosen = details.querySelectorAll('input[type="checkbox"]:checked').length;
+        // None and all select the same records, and both say so as "All".
+        text = chosen === 0 || chosen >= boxes.length ? "All" : String(chosen);
+      } else {
+        // The date range is two ends rather than a list of values.
+        text = "All";
+        Array.prototype.forEach.call(details.querySelectorAll('input[type="text"]'), function (input) {
+          if (input.value !== "") text = "Set";
+        });
+      }
+
+      count.textContent = text;
+      count.classList.toggle("is-set", text !== "All");
+    });
+
+    /* Escape closes whichever is open, as it does for the dialogs. */
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+
+      Array.prototype.forEach.call(
+        document.querySelectorAll("details.filter[open], details.export[open]"),
+        function (details) { details.removeAttribute("open"); }
+      );
+    });
+  }
+
   /* ---- Lab test cards (lab-section.js) ---------------------------------- */
 
   function labStatus(card) {
@@ -364,6 +426,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     initSidebar();
     initRowLinks();
+    initMenus();
     initLabSections();
     initDateFields();
     initDialogs();

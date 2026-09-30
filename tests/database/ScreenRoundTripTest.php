@@ -2309,7 +2309,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->post('recipients/new', ['mrn' => '4024', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
 
         $html = $this->get('recipients/4024?edit=labs')->getBody();
-        $this->assertSame(73, substr_count($html, 'class="lab-comment"'), 'one per test');
+        $this->assertSame(75, substr_count($html, 'class="lab-comment"'), 'one per test');
 
         // HLA typing asks for the loci the sheet prints under its comment.
         $this->assertStringContainsString('DRB1', $this->cardFor($html, 'HLA Typing'));
@@ -2362,8 +2362,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         ]);
 
         $html = $this->get('recipients/4023')->getBody();
-        // 73 cards, but Other has no answer to give, so 72 can be completed.
-        $this->assertStringContainsString('2 of 72 completed', $html);
+        // 75 cards, but Other has no answer to give, so 74 can be completed.
+        $this->assertStringContainsString('2 of 74 completed', $html);
     }
 
     /** @return string The markup of one test's card. */

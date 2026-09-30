@@ -287,12 +287,12 @@ final class SchemaTest extends CIUnitTestCase
         $labs = model(LabModel::class);
 
         // Each side of each programme gets its own sheet's tests, and only
-        // those: 70 on the recipient's sheet and 50 on the donor's, plus the
+        // those: 72 on the recipient's sheet and 52 on the donor's, plus the
         // clinic's two appointments and the one Other box on each.
-        $this->assertCount(73, $labs->workupFor('kidney', 'recipient'));
-        $this->assertCount(53, $labs->workupFor('kidney', 'donor'));
-        $this->assertCount(73, $labs->workupFor('liver', 'recipient'));
-        $this->assertCount(53, $labs->workupFor('liver', 'donor'));
+        $this->assertCount(75, $labs->workupFor('kidney', 'recipient'));
+        $this->assertCount(55, $labs->workupFor('kidney', 'donor'));
+        $this->assertCount(75, $labs->workupFor('liver', 'recipient'));
+        $this->assertCount(55, $labs->workupFor('liver', 'donor'));
 
         $recipientNames = array_column($labs->workupFor('kidney', 'recipient'), 'name');
         $donorNames     = array_column($labs->workupFor('kidney', 'donor'), 'name');
@@ -404,6 +404,12 @@ final class SchemaTest extends CIUnitTestCase
         $this->assertArrayNotHasKey('US KUB', $types);
         $this->assertArrayNotHasKey('US KUB', $donorTypes);
 
+        // The two Dopplers differ from each other by exactly one answer.
+        foreach ([$types, $donorTypes] as $sheet) {
+            $this->assertSame('acceptable_abnormal', $sheet['Ultrasound Doppler Renal Transplant']);
+            $this->assertSame('acceptable_abnormal_na', $sheet['Ultrasound Doppler Abdomen Complete']);
+        }
+
         // The clinic's two appointments are answered Seen or Not seen.
         $this->assertSame('seen_not_seen', $types['Transplant Nephrology Clinic']);
         $this->assertSame('seen_not_seen', $types['Transplant Surgery Clinic']);
@@ -448,8 +454,8 @@ final class SchemaTest extends CIUnitTestCase
             model(LabModel::class)->workupFor('kidney', 'recipient')
         );
 
-        $this->assertCount(73, $workup);
-        $this->assertSame(72, UiStore::labProgress($workup)['total']);
+        $this->assertCount(75, $workup);
+        $this->assertSame(74, UiStore::labProgress($workup)['total']);
     }
 
     public function testAnUnrecordedTestStillComesBackAsNotDone(): void
@@ -458,7 +464,7 @@ final class SchemaTest extends CIUnitTestCase
         $results = model(LabResultModel::class);
 
         $workup = $results->workupFor(1001, 'recipient', 'kidney');
-        $this->assertCount(73, $workup);
+        $this->assertCount(75, $workup);
         $this->assertSame('not_done', $workup[0]['status'], 'no row yet, so nobody has looked');
         $this->assertNull($workup[0]['result_id']);
     }

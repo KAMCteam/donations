@@ -124,6 +124,10 @@ class DatabaseSeeder extends Seeder
             ['Echo', 'acceptable_abnormal'],
             ['CT angio pelvis', 'acceptable_abnormal_na'],
             ['Coronary Angio', 'acceptable_abnormal_na'],
+            // The renal transplant Doppler is asked of everyone on this sheet;
+            // the abdominal one is the study a history can rule out.
+            ['Ultrasound Doppler Renal Transplant', 'acceptable_abnormal'],
+            ['Ultrasound Doppler Abdomen Complete', 'acceptable_abnormal_na'],
         ],
         'Referrals and Clearances' => [
             ['Dental', 'cleared_not_cleared'],
@@ -218,6 +222,9 @@ class DatabaseSeeder extends Seeder
             ['CT angio pelvis', 'acceptable_abnormal_na'],
             ['US Gynae', 'acceptable_abnormal_na'],
             ['Mammogram', 'acceptable_abnormal_na'],
+            // The same two, answered the same way, as on the recipient's sheet.
+            ['Ultrasound Doppler Renal Transplant', 'acceptable_abnormal'],
+            ['Ultrasound Doppler Abdomen Complete', 'acceptable_abnormal_na'],
         ],
         // The donor's own name for Referrals and Clearances, and Anaesthesia
         // closes it here too.

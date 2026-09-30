@@ -546,6 +546,165 @@ class Ui extends BaseController
         ]);
     }
 
+    // ---- Tests a record adds for itself ------------------------------------
+
+    /**
+     * Adds a blank test to one record's workup and returns to the card.
+     *
+     * A post, because it creates something. `$back` is where the screen that
+     * asked is: a person's own record, or the pair screen showing that
+     * person's half of the workup.
+     */
+    public function addLab(string $personType, string $mrn): RedirectResponse
+    {
+        $this->keepWhatWasTyped($personType, $mrn, 'labs');
+
+        if ($this->store->addCustomLab($mrn, $personType) === 0) {
+            $this->session->setFlashdata('ui_error', 'That test could not be added.');
+        }
+
+        return redirect()->to($this->labScreenUrl($personType, $mrn));
+    }
+
+    public function addPairLab(string $id, string $side): RedirectResponse
+    {
+        [$pair, $personType, $mrn] = $this->pairSide($id, $side);
+
+        if ($pair === null) {
+            return redirect()->to(site_url('pairs'));
+        }
+
+        $back = site_url('pairs/' . rawurlencode($pair['id'])) . '?edit=' . ($side === 'recipient' ? 'rlabs' : 'dlabs');
+
+        $this->keepWhatWasTyped($personType, $mrn, $side === 'recipient' ? 'rLabs' : 'dLabs');
+
+        if ($this->store->addCustomLab($mrn, $personType) === 0) {
+            $this->session->setFlashdata('ui_error', 'That test could not be added.');
+        }
+
+        return redirect()->to($back);
+    }
+
+    /**
+     * Asks before taking one away, as every other delete on the platform does.
+     *
+     * Whatever was recorded against it goes with it, and there is no undo, so
+     * it is worth a question.
+     */
+    public function removeLab(string $personType, string $mrn, string $labId): string|RedirectResponse
+    {
+        return $this->confirmRemoveLab(
+            $personType,
+            $mrn,
+            (int) $labId,
+            $personType . 's/' . rawurlencode($mrn) . '/labs/' . rawurlencode($labId) . '/delete',
+            $this->labScreenUrl($personType, $mrn)
+        );
+    }
+
+    public function removePairLab(string $id, string $side, string $labId): string|RedirectResponse
+    {
+        [$pair, $personType, $mrn] = $this->pairSide($id, $side);
+
+        if ($pair === null) {
+            return redirect()->to(site_url('pairs'));
+        }
+
+        return $this->confirmRemoveLab(
+            $personType,
+            $mrn,
+            (int) $labId,
+            'pairs/' . rawurlencode($pair['id']) . '/labs/' . rawurlencode($side) . '/' . rawurlencode($labId) . '/delete',
+            site_url('pairs/' . rawurlencode($pair['id'])) . '?edit=' . ($side === 'recipient' ? 'rlabs' : 'dlabs')
+        );
+    }
+
+    /** The one confirmation, whichever screen asked for it. */
+    private function confirmRemoveLab(string $personType, string $mrn, int $labId, string $action, string $backUrl): string|RedirectResponse
+    {
+        $lab = $this->store->customLab($mrn, $personType, $labId);
+
+        if ($lab === null) {
+            return redirect()->to($backUrl);
+        }
+
+        if (strtolower($this->request->getMethod()) !== 'post') {
+            return view('ui/confirm_delete', [
+                'title'   => 'Remove ' . $lab['name'],
+                'navPage' => '',
+                'organ'   => $this->store->organ(),
+                'name'    => $lab['name'],
+                'kind'    => 'test',
+                'detail'  => 'This test was added to this record, so only this record has it. '
+                    . 'It will be removed along with the answer and the comment on it. This cannot be undone.',
+                'action'  => site_url($action),
+                'backUrl' => $backUrl,
+            ]);
+        }
+
+        $removed = $this->store->removeCustomLab($mrn, $personType, $labId);
+
+        $this->session->setFlashdata(
+            $removed ? 'ui_notice' : 'ui_error',
+            $removed ? $lab['name'] . ' has been removed.' : 'That test could not be removed.'
+        );
+
+        return redirect()->to($backUrl);
+    }
+
+    /**
+     * Saves the workup the page was holding before adding to it.
+     *
+     * Add lab is a button inside the card's own form, so pressing it posts
+     * everything on the card. Without this, an answer or a comment typed
+     * just before it would be thrown away by the redirect — the card comes
+     * back from the database, and the database would not have heard.
+     */
+    private function keepWhatWasTyped(string $personType, string $mrn, string $field): void
+    {
+        $tests = $this->postedLabTests($field);
+
+        if ($tests === []) {
+            return;
+        }
+
+        if ($personType === 'recipient') {
+            $this->store->updateRecipient($mrn, ['labTests' => $tests]);
+
+            return;
+        }
+
+        $this->store->updateDonor($mrn, ['labTests' => $tests]);
+    }
+
+    /** Back to the record's own screen, with the workup card open. */
+    private function labScreenUrl(string $personType, string $mrn): string
+    {
+        return site_url($personType . 's/' . rawurlencode($mrn)) . '?edit=labs';
+    }
+
+    /**
+     * The pair, and which of its two people a screen is asking about.
+     *
+     * @return array{0: array<string, mixed>|null, 1: string, 2: string}
+     */
+    private function pairSide(string $id, string $side): array
+    {
+        $pair = $this->store->findPair($id);
+
+        if ($pair === null
+            || $pair['organ'] !== $this->store->organ()
+            || ! in_array($side, ['recipient', 'donor'], true)) {
+            return [null, '', ''];
+        }
+
+        return [
+            $pair,
+            $side,
+            (string) ($side === 'recipient' ? $pair['recipientId'] : $pair['donorId']),
+        ];
+    }
+
     // ---- One record on paper -----------------------------------------------
 
     /**

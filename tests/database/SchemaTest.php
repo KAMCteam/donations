@@ -288,11 +288,12 @@ final class SchemaTest extends CIUnitTestCase
 
         // Each side of each programme gets its own sheet's tests, and only
         // those: 72 on the recipient's sheet and 52 on the donor's, plus the
-        // clinic's two appointments and the one Other box on each.
-        $this->assertCount(75, $labs->workupFor('kidney', 'recipient'));
-        $this->assertCount(55, $labs->workupFor('kidney', 'donor'));
-        $this->assertCount(75, $labs->workupFor('liver', 'recipient'));
-        $this->assertCount(55, $labs->workupFor('liver', 'donor'));
+        // clinic's two appointments. Other is a heading with nothing under it
+        // until a record adds something, so it contributes none.
+        $this->assertCount(74, $labs->workupFor('kidney', 'recipient'));
+        $this->assertCount(54, $labs->workupFor('kidney', 'donor'));
+        $this->assertCount(74, $labs->workupFor('liver', 'recipient'));
+        $this->assertCount(54, $labs->workupFor('liver', 'donor'));
 
         $recipientNames = array_column($labs->workupFor('kidney', 'recipient'), 'name');
         $donorNames     = array_column($labs->workupFor('kidney', 'donor'), 'name');
@@ -328,7 +329,6 @@ final class SchemaTest extends CIUnitTestCase
             'Referrals and Clearances',
             'Vaccinations',
             'Transplant Clinic',
-            'Other',
         ], $groups);
 
         // The donor's sheet has its own headings, shorter and fewer.
@@ -341,7 +341,6 @@ final class SchemaTest extends CIUnitTestCase
             'Imaging',
             'Clearances',
             'Transplant Clinic',
-            'Other',
         ], $donorGroups);
     }
 
@@ -414,9 +413,11 @@ final class SchemaTest extends CIUnitTestCase
         $this->assertSame('seen_not_seen', $types['Transplant Nephrology Clinic']);
         $this->assertSame('seen_not_seen', $types['Transplant Surgery Clinic']);
 
-        // Other offers nothing at all: it is a box, not a question.
-        $this->assertSame('free_text', $types['Other']);
+        // Other is a heading now, not a test: the check list seeds nothing
+        // under it, and what a record adds there offers every answer.
+        $this->assertArrayNotHasKey('Other', $types);
         $this->assertSame([], UiStore::RESULT_OPTIONS['free_text']);
+        $this->assertCount(17, UiStore::RESULT_OPTIONS['custom']);
 
         // A vaccination that was not given says so; "Not done" beside
         // "Not given" was the same answer under two names, so it is not
@@ -454,8 +455,13 @@ final class SchemaTest extends CIUnitTestCase
             model(LabModel::class)->workupFor('kidney', 'recipient')
         );
 
-        $this->assertCount(75, $workup);
-        $this->assertSame(74, UiStore::labProgress($workup)['total']);
+        $this->assertCount(74, $workup);
+        $this->assertSame(74, UiStore::labProgress($workup)['total'], 'the catalogue has no free-text card left');
+
+        // The rule itself, on a card that does have nothing to answer.
+        $withBox = array_merge($workup, [['resultType' => 'free_text', 'status' => 'not_done']]);
+        $this->assertCount(75, $withBox);
+        $this->assertSame(74, UiStore::labProgress($withBox)['total']);
     }
 
     public function testAnUnrecordedTestStillComesBackAsNotDone(): void
@@ -464,7 +470,7 @@ final class SchemaTest extends CIUnitTestCase
         $results = model(LabResultModel::class);
 
         $workup = $results->workupFor(1001, 'recipient', 'kidney');
-        $this->assertCount(75, $workup);
+        $this->assertCount(74, $workup);
         $this->assertSame('not_done', $workup[0]['status'], 'no row yet, so nobody has looked');
         $this->assertNull($workup[0]['result_id']);
     }

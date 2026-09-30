@@ -235,6 +235,10 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             'editUrl' => $editUrl('rlabs'),
             'viewUrl' => $viewUrl,
             'section' => 'rlabs',
+            // The recipient's own tests, added and removed from this screen but
+            // belonging to their record wherever it is opened.
+            'addLabUrl'    => site_url('pairs/' . rawurlencode($pair['id']) . '/labs/recipient'),
+            'removeLabUrl' => site_url('pairs/' . rawurlencode($pair['id']) . '/labs/recipient'),
         ]) ?>
 
         <div class="card card--pad">
@@ -364,6 +368,10 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             'editUrl' => $editUrl('dlabs'),
             'viewUrl' => $viewUrl,
             'section' => 'dlabs',
+            // The donor's own tests, added and removed from this screen but
+            // belonging to their record wherever it is opened.
+            'addLabUrl'    => site_url('pairs/' . rawurlencode($pair['id']) . '/labs/donor'),
+            'removeLabUrl' => site_url('pairs/' . rawurlencode($pair['id']) . '/labs/donor'),
         ]) ?>
 
         <div class="card card--pad">

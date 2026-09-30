@@ -287,6 +287,9 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             'editUrl'   => $mode === 'add' ? null : $editUrl('labs'),
             'viewUrl'   => $mode === 'add' ? null : $viewUrl,
             'section'   => $mode === 'add' ? null : 'labs',
+            // Nothing to add a test to until the record exists.
+            'addLabUrl'    => $mode === 'add' ? null : site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id']) . '/labs'),
+            'removeLabUrl' => $mode === 'add' ? null : site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id']) . '/labs'),
         ]) ?>
 
         <div class="card card--pad">

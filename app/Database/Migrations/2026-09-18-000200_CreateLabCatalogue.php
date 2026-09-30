@@ -83,6 +83,14 @@ class CreateLabCatalogue extends Migration
                 'constraint' => ['recipient', 'donor'],
                 'default'    => 'recipient',
             ],
+            // NULL for the catalogue every record on the programme is asked,
+            // and one person's MRN for a test their record added for itself.
+            'person_mrn' => [
+                'type'       => 'INT',
+                'constraint' => 11,
+                'unsigned'   => true,
+                'null'       => true,
+            ],
             // How the result is captured, in the check list's own wording.
             // `text` is free entry — a value, a finding, a report line — and
             // `numeric` a figure. The rest are the answers the sheet offers:
@@ -95,13 +103,16 @@ class CreateLabCatalogue extends Migration
             //   given_not_given         Given / not required / not given / not applicable
             //   seen_not_seen           Not done / Seen / Not seen
             //   free_text               no answer at all, only the comment box
+            //   custom                  every answer there is — a test a record
+            //                           added for itself, where the sheet cannot
+            //                           know what it answers
             // "Not applicable" is offered test by test, not everywhere: the
             // sheet adds it where a patient's sex or history can rule the test
             // out, and withholds it from the bloods and serologies asked of
             // everyone. Hence two acceptable/abnormal lists, one with it.
             'result_type' => [
                 'type'       => 'ENUM',
-                'constraint' => ['text', 'numeric', 'free_text', 'blood_group', 'done', 'positive_negative', 'acceptable_abnormal', 'acceptable_abnormal_na', 'cleared_not_cleared', 'given_not_given', 'seen_not_seen'],
+                'constraint' => ['text', 'numeric', 'free_text', 'blood_group', 'done', 'positive_negative', 'acceptable_abnormal', 'acceptable_abnormal_na', 'cleared_not_cleared', 'given_not_given', 'seen_not_seen', 'custom'],
                 'default'    => 'text',
             ],
             'sort_order' => [
@@ -134,7 +145,9 @@ class CreateLabCatalogue extends Migration
         // twice. The group belongs in the key: the check list has VZV under
         // Infectious workup as a serology and under Vaccinations as a jab,
         // and they are two different things to record.
-        $this->forge->addUniqueKey(['name', 'lab_parent_id', 'organ_code', 'person_type']);
+        // The owner is part of it: two records may each add a test of the
+        // same name under Other, and neither is a duplicate of the other.
+        $this->forge->addUniqueKey(['name', 'lab_parent_id', 'organ_code', 'person_type', 'person_mrn']);
         $this->forge->addForeignKey('lab_parent_id', 'lab_parents', 'id', 'CASCADE', 'SET NULL');
         $this->forge->addForeignKey('organ_code', 'organ_programs', 'code', 'CASCADE', 'RESTRICT');
 

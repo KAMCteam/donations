@@ -2290,6 +2290,156 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         ]);
     }
 
+    // ---- Tests a record adds for itself ----------------------------------
+
+    /**
+     * Other is a heading with a button under it, not a test.
+     *
+     * The check list seeds nothing there, so the group is empty until
+     * somebody adds something — and the button has to be on the screen for
+     * them to add the first one.
+     */
+    public function testTheOtherGroupOffersAddLabWhenItIsEmpty(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4030', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $html = $this->get('recipients/4030?edit=labs')->getBody();
+
+        $this->assertStringContainsString('Add lab', $html);
+        $this->assertStringContainsString(site_url('recipients/4030') . '/labs', $html);
+        $this->assertStringContainsString('No tests added.', $html);
+    }
+
+    /** Added, named, answered and commented on — then read back. */
+    public function testATestARecordAddsIsItsOwnToNameAndAnswer(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4031', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('recipients/4031/labs');
+
+        $lab = $this->db->table('labs')->where('person_mrn', 4031)->get()->getRowArray();
+        $this->assertNotNull($lab, 'the test belongs to the record that added it');
+        $this->assertSame('custom', $lab['result_type']);
+        $this->assertSame('recipient', $lab['person_type']);
+
+        // Its name is typed on the card and saved with the answer.
+        $this->post('recipients/4031', [
+            'section'   => 'labs',
+            'name'      => 'Ahmed Test',
+            'age'       => '41',
+            'bloodType' => 'O',
+            'labs'      => [[
+                'id'     => $lab['id'],
+                'name'   => 'Ultrasound Doppler Hepatic Vein',
+                'status' => 'acceptable',
+                'notes'  => 'Requested.',
+            ]],
+        ]);
+
+        $this->seeInDatabase('labs', ['id' => $lab['id'], 'name' => 'Ultrasound Doppler Hepatic Vein']);
+        $this->seeInDatabase('lab_results', [
+            'person_mrn' => 4031,
+            'lab_id'     => $lab['id'],
+            'status'     => 'acceptable',
+            'notes'      => 'Requested.',
+        ]);
+
+        $html = $this->get('recipients/4031?edit=labs')->getBody();
+        $this->assertStringContainsString('Ultrasound Doppler Hepatic Vein', $html);
+        $this->assertStringContainsString('lab-name-field', $html);
+
+        // Every answer the platform has, and nothing a catalogue test offers
+        // is missing from it.
+        foreach (UiStore::RESULT_OPTIONS['custom'] as $status) {
+            $this->assertStringContainsString('data-lab-status="' . $status . '"', $html);
+        }
+    }
+
+    /** One record's test is not on anybody else's sheet. */
+    public function testATestOneRecordAddedIsNotOnAnothers(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4032', 'name' => 'First', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('recipients/new', ['mrn' => '4033', 'name' => 'Second', 'age' => '42', 'bloodType' => 'A']);
+        $this->post('recipients/4032/labs');
+
+        $lab = $this->db->table('labs')->where('person_mrn', 4032)->get()->getRowArray();
+        $this->db->table('labs')->where('id', $lab['id'])->update(['name' => 'Only Ones Own Test']);
+
+        $this->assertStringContainsString('Only Ones Own Test', $this->get('recipients/4032?edit=labs')->getBody());
+        $this->assertStringNotContainsString('Only Ones Own Test', $this->get('recipients/4033?edit=labs')->getBody());
+
+        // Nor may the other record answer it by posting its id.
+        $this->post('recipients/4033', [
+            'section' => 'labs', 'name' => 'Second', 'age' => '42', 'bloodType' => 'A',
+            'labs'    => [['id' => $lab['id'], 'name' => 'Stolen', 'status' => 'acceptable', 'notes' => 'no']],
+        ]);
+
+        $this->dontSeeInDatabase('lab_results', ['person_mrn' => 4033, 'lab_id' => $lab['id']]);
+        $this->seeInDatabase('labs', ['id' => $lab['id'], 'name' => 'Only Ones Own Test']);
+    }
+
+    /** Removing it takes the answer recorded against it too. */
+    public function testRemovingATestARecordAddedTakesItsResult(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4034', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('recipients/4034/labs');
+
+        $lab = $this->db->table('labs')->where('person_mrn', 4034)->get()->getRowArray();
+        $this->post('recipients/4034', [
+            'section' => 'labs', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O',
+            'labs'    => [['id' => $lab['id'], 'name' => 'Going away', 'status' => 'acceptable', 'notes' => 'x']],
+        ]);
+        $this->seeInDatabase('lab_results', ['lab_id' => $lab['id']]);
+
+        // It asks first.
+        $this->assertStringContainsString(
+            'This cannot be undone.',
+            $this->get('recipients/4034/labs/' . $lab['id'] . '/delete')->getBody()
+        );
+        $this->seeInDatabase('labs', ['id' => $lab['id']]);
+
+        $this->post('recipients/4034/labs/' . $lab['id'] . '/delete');
+
+        $this->dontSeeInDatabase('labs', ['id' => $lab['id']]);
+        $this->dontSeeInDatabase('lab_results', ['lab_id' => $lab['id']]);
+    }
+
+    /** A catalogue test is the programme's and cannot be taken off a record. */
+    public function testACatalogueTestCannotBeRemovedFromOneRecord(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4035', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $lab = $this->db->table('labs')
+            ->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'HIV'])
+            ->get()->getRowArray();
+
+        $this->post('recipients/4035/labs/' . $lab['id'] . '/delete');
+
+        $this->seeInDatabase('labs', ['id' => $lab['id']]);
+    }
+
+    /** Pressing Add lab does not throw away what the card was holding. */
+    public function testAddLabKeepsTheAnswersAlreadyOnTheCard(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4036', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $hiv = $this->db->table('labs')
+            ->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'HIV'])
+            ->get()->getRowArray();
+
+        // The button is inside the card's form, so the card comes with it.
+        $this->post('recipients/4036/labs', [
+            'labs' => [['id' => $hiv['id'], 'name' => 'HIV', 'status' => 'negative', 'notes' => 'typed just now']],
+        ]);
+
+        $this->seeInDatabase('lab_results', [
+            'person_mrn' => 4036,
+            'lab_id'     => $hiv['id'],
+            'status'     => 'negative',
+            'notes'      => 'typed just now',
+        ]);
+        $this->assertSame(1, $this->db->table('labs')->where('person_mrn', 4036)->countAllResults());
+    }
+
     /** The cards ask for an answer and a comment, and nothing else. */
     public function testTheCardsNoLongerOfferAValueOrADate(): void
     {
@@ -2379,7 +2529,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->post('recipients/new', ['mrn' => '4024', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
 
         $html = $this->get('recipients/4024?edit=labs')->getBody();
-        $this->assertSame(75, substr_count($html, 'class="lab-comment"'), 'one per test');
+        $this->assertSame(74, substr_count($html, 'class="lab-comment"'), 'one per test');
 
         // HLA typing asks for the loci the sheet prints under its comment.
         $this->assertStringContainsString('DRB1', $this->cardFor($html, 'HLA Typing'));
@@ -2432,7 +2582,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         ]);
 
         $html = $this->get('recipients/4023')->getBody();
-        // 75 cards, but Other has no answer to give, so 74 can be completed.
+        // Every card can be completed now: the one that could not — the
+        // free-text Other box — is not on the sheet any more.
         $this->assertStringContainsString('2 of 74 completed', $html);
     }
 

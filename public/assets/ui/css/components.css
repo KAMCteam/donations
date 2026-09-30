@@ -481,6 +481,9 @@
     background-color: var(--slate-50);
     color: var(--slate-700);
   }
+  .btn-add-lab:hover { border-color: var(--slate-300); background-color: var(--slate-50); }
+  .lab-name-field:hover { border-color: var(--slate-200); }
+  .lab-remove-link:hover { color: #b91c1c; }
 }
 
 /* ---- Responsive ---- */
@@ -790,14 +793,109 @@
    beneath it, then the next heading. */
 .lab-group + .lab-group { margin-top: 1.5rem; }
 
-.lab-group-name {
+/* The heading, and — on the one group that takes them — the button that adds
+   a test to it. The rule under the two is what used to be under the heading
+   alone, so a group with a button looks like every other group. */
+.lab-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
   margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--slate-100);
+}
+
+.lab-group-name {
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
   font-weight: 600;
   color: var(--slate-700);
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--slate-100);
+}
+
+.btn-add-lab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3125rem 0.75rem;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-full);
+  background-color: #fff;
+  color: #15508A;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition-property: var(--transition-colors-props);
+  transition-timing-function: var(--ease);
+  transition-duration: var(--dur);
+}
+
+.lab-group-empty {
+  margin-bottom: 0.75rem;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--slate-500);
+}
+
+/* A test somebody added is named in the card, where it is read. It is a
+   field, but it stands where the heading of every other card stands, so it
+   is set like one until it is focused. */
+.lab-name-field {
+  width: 100%;
+  padding: 0.125rem 0.375rem;
+  margin-left: -0.375rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background-color: transparent;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  font-weight: 600;
+  color: var(--slate-800);
+}
+
+.lab-name-field::placeholder { font-weight: 500; color: var(--slate-400); }
+
+.lab-name-field:focus {
+  outline: none;
+  border-color: var(--slate-300);
+  background-color: #fff;
+}
+
+.lab-remove {
+  padding: 0.5rem 0.75rem;
+  background-color: #fff;
+  border-top: 1px solid var(--slate-100);
+}
+
+.lab-remove-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 500;
+  color: var(--slate-400);
+  text-decoration: none;
+  transition-property: var(--transition-colors-props);
+  transition-timing-function: var(--ease);
+  transition-duration: var(--dur);
+}
+
+/* Visible to a screen reader, and to nothing else: the field's own label,
+   where the card shows the name and not a caption for it. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Five answers rather than three, so they wrap instead of squeezing. The

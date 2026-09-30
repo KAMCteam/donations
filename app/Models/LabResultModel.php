@@ -28,6 +28,9 @@ class LabResultModel extends Model
     {
         return $this->db->table('labs l')
             ->select('l.id AS lab_id, l.name AS lab_name, l.result_type, lp.name AS parent_name')
+            // Aliased: `lab_results` has a `person_mrn` of its own, and the
+            // two mean different things — whose result it is, and whose test.
+            ->select('l.person_mrn AS owner_mrn')
             ->select('lr.id AS result_id, COALESCE(lr.status, \'not_done\') AS status, lr.value, lr.taken_on, lr.notes', false)
             ->join('lab_parents lp', 'lp.id = l.lab_parent_id', 'left')
             ->join(
@@ -38,6 +41,12 @@ class LabResultModel extends Model
             )
             ->where('l.organ_code', $organCode)
             ->where('l.person_type', $personType)
+            // The sheet everyone on this programme is asked, plus the tests
+            // this record added for itself — and nobody else's.
+            ->groupStart()
+                ->where('l.person_mrn', null)
+                ->orWhere('l.person_mrn', $mrn)
+            ->groupEnd()
             ->where('l.is_active', 1)
             ->orderBy('lp.sort_order')
             ->orderBy('l.sort_order')

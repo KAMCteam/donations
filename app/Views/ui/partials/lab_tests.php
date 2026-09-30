@@ -1,5 +1,6 @@
 <?php
 
+use App\Database\Seeds\DatabaseSeeder;
 use App\Libraries\UiStore;
 
 /**
@@ -27,6 +28,10 @@ $animated = $animated ?? false;
 // The add screens have nothing to view yet, so they default to editable with
 // no Edit button of their own.
 $editing  = $editing ?? true;
+// Where Add lab posts and where Remove goes. Null on a screen that has no
+// record yet — there is nobody for a test to belong to.
+$addLabUrl    = $addLabUrl ?? null;
+$removeLabUrl = $removeLabUrl ?? null;
 $editUrl  = $editUrl ?? null;
 $viewUrl  = $viewUrl ?? null;
 $section  = $section ?? null;
@@ -39,6 +44,14 @@ $groups = [];
 
 foreach ($tests as $i => $test) {
     $groups[$test['group'] ?? ''][$i] = $test;
+}
+
+// The group that takes the tests a record adds is the one group that has to
+// be there when it is empty — it is where the button to add the first one
+// lives, and nothing is under it until that button is pressed. Last, as the
+// check list had it.
+if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROUP])) {
+    $groups[DatabaseSeeder::CUSTOM_GROUP] = [];
 }
 ?>
 <div class="card card--pad" data-lab-section>
@@ -65,9 +78,22 @@ foreach ($tests as $i => $test) {
         <input type="hidden" name="section" value="<?= esc($section) ?>">
     <?php endif; ?>
     <?php foreach ($groups as $groupName => $groupTests): ?>
+    <?php // The one group the check list seeds nothing under: it heads the
+          // tests this record adds for itself, so it is the one with a button. ?>
+    <?php $isCustomGroup = $groupName === DatabaseSeeder::CUSTOM_GROUP; ?>
     <div class="lab-group">
         <?php if ($groupName !== ''): ?>
-            <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
+            <div class="lab-group-head">
+                <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
+                <?php if ($isCustomGroup && $addLabUrl !== null): ?>
+                    <?php // A plain post: it creates the test and comes back to
+                          // this card, so it needs nothing from the browser. ?>
+                    <button type="submit" class="btn-add-lab" formaction="<?= esc($addLabUrl) ?>" formnovalidate><?= ui_icon('plus') ?>Add lab</button>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+        <?php if ($isCustomGroup && $groupTests === []): ?>
+            <p class="lab-group-empty">No tests added. Use <strong>Add lab</strong> for anything the check list has no line for.</p>
         <?php endif; ?>
         <div class="lab-grid">
         <?php foreach ($groupTests as $i => $test): ?>
@@ -81,14 +107,27 @@ foreach ($tests as $i => $test) {
                   // offer. The pill is in the markup all the same, so pressing
                   // an answer has something to fill. ?>
             <?php $answered = UiStore::offersAnswer($test['resultType'], $test['status']); ?>
+            <?php $custom = (bool) ($test['custom'] ?? false); ?>
+            <?php $nameId = $field . '-' . $i . '-name'; ?>
             <div class="lab-card<?= $animated ? ' lab-card--animated' : '' ?><?= $freeText ? ' lab-card--free' : '' ?> status-<?= esc($test['status']) ?>" data-idx="<?= $i ?>">
                 <input type="hidden" name="<?= $base ?>[id]" value="<?= esc($test['id']) ?>">
-                <input type="hidden" name="<?= $base ?>[name]" value="<?= esc($test['name']) ?>">
+                <?php if (! $custom): ?>
+                    <input type="hidden" name="<?= $base ?>[name]" value="<?= esc($test['name']) ?>">
+                <?php endif; ?>
                 <input type="hidden" name="<?= $base ?>[status]" value="<?= esc($test['status']) ?>" data-lab-status-value>
 
                 <div class="lab-card-head">
                     <div class="lab-info">
-                        <div class="lab-name"><?= esc($test['name']) ?></div>
+                        <?php if ($custom): ?>
+                            <?php // Its name is typed where it is read, and saved
+                                  // with the answer — the check list did not
+                                  // supply it, so the record does. ?>
+                            <label class="sr-only" for="<?= $nameId ?>">Test name</label>
+                            <input type="text" id="<?= $nameId ?>" class="lab-name-field" name="<?= $base ?>[name]"
+                                   value="<?= esc($test['name']) ?>" placeholder="Name of the test" maxlength="150" autocomplete="off">
+                        <?php else: ?>
+                            <div class="lab-name"><?= esc($test['name']) ?></div>
+                        <?php endif; ?>
                     </div>
                     <?php if (! $freeText): ?>
                         <span class="lab-pill <?= ui_tone('labStatus', $test['status']) ?>" data-lab-pill<?= $answered ? '' : ' hidden' ?>><?= $answered ? esc(UiStore::RESULT_LABEL[$test['status']] ?? $test['status']) : '' ?></span>
@@ -118,6 +157,15 @@ foreach ($tests as $i => $test) {
                         <label class="lab-comment-label" for="<?= $commentId ?>"><?= $freeText ? 'Notes' : 'Comment' ?></label>
                         <textarea id="<?= $commentId ?>" class="lab-comment-field" name="<?= $base ?>[notes]"
                                   rows="<?= $freeText ? 3 : ($hint['rows'] ?? 1) ?>"<?= $hint === null ? ($freeText ? ' placeholder="Anything the workup has no line for"' : '') : ' placeholder="' . esc($hint['placeholder']) . '"' ?>><?= esc($test['notes'] ?? '') ?></textarea>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($custom && $removeLabUrl !== null): ?>
+                    <?php // Theirs to add, theirs to take away — at the foot of
+                          // the card, after everything it holds. The question is
+                          // asked on the page it leads to, so this is a link. ?>
+                    <div class="lab-remove">
+                        <a class="lab-remove-link" href="<?= esc($removeLabUrl) ?>/<?= esc($test['id']) ?>/delete"><?= ui_icon('trash') ?>Remove this test</a>
                     </div>
                 <?php endif; ?>
             </div>

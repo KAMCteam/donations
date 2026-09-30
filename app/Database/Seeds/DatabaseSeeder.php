@@ -56,6 +56,17 @@ class DatabaseSeeder extends Seeder
      *
      * Every test starts at Not done, whichever list it answers from.
      */
+    /**
+     * The group that heads the tests a record adds for itself.
+     *
+     * It was the sheet's blank line — one free-text box called Other — and is
+     * now the place where a test the check list has no line for is written
+     * down properly: a name, an answer, a comment, like every other card. The
+     * check list seeds nothing under it, so it is the one group that stays
+     * when it is empty.
+     */
+    public const CUSTOM_GROUP = 'Other';
+
     private const RECIPIENT = [
         'Immunology tests' => [
             ['Blood group', 'blood_group'],
@@ -152,9 +163,9 @@ class DatabaseSeeder extends Seeder
             ['Transplant Nephrology Clinic', 'seen_not_seen'],
             ['Transplant Surgery Clinic', 'seen_not_seen'],
         ],
-        'Other' => [
-            ['Other', 'free_text'],
-        ],
+        // Nothing seeded under it: it heads the tests a record adds for
+        // itself. {@see self::CUSTOM_GROUP}
+        self::CUSTOM_GROUP => [],
     ];
 
     /**
@@ -239,9 +250,7 @@ class DatabaseSeeder extends Seeder
             ['Transplant Nephrology Clinic', 'seen_not_seen'],
             ['Transplant Surgery Clinic', 'seen_not_seen'],
         ],
-        'Other' => [
-            ['Other', 'free_text'],
-        ],
+        self::CUSTOM_GROUP => [],
     ];
 
     public function run(): void
@@ -310,6 +319,10 @@ class DatabaseSeeder extends Seeder
                     'lab_parent_id' => $parentId,
                     'organ_code'    => $organ,
                     'person_type'   => $personType,
+                    // The catalogue only. A record that added a test of its
+                    // own under the same name is not this row, and the sheet
+                    // must not reach across and rewrite it.
+                    'person_mrn'    => null,
                 ];
 
                 $values = [
@@ -364,8 +377,12 @@ class DatabaseSeeder extends Seeder
      */
     private function retireAnythingNotOnTheChecklist(array $keep): void
     {
+        // Only the catalogue is the check list's to tidy. A test somebody
+        // added to their own record is never on it and must survive every run
+        // of this seeder — it is that record's, not the sheet's.
         $stale = $this->db->table('labs')
             ->whereNotIn('id', $keep === [] ? [0] : $keep)
+            ->where('person_mrn', null)
             ->get()
             ->getResultArray();
 
@@ -379,10 +396,13 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // A group left with no tests in it has nothing to head.
+        // A group left with no tests in it has nothing to head — but Other
+        // heads the tests records add for themselves, so it stays whether or
+        // not the check list puts anything under it.
         $this->db->query(
             'DELETE FROM ' . $this->db->protectIdentifiers($this->db->prefixTable('lab_parents'))
-            . ' WHERE id NOT IN (SELECT lab_parent_id FROM '
+            . ' WHERE name <> ' . $this->db->escape(self::CUSTOM_GROUP)
+            . ' AND id NOT IN (SELECT lab_parent_id FROM '
             . $this->db->protectIdentifiers($this->db->prefixTable('labs'))
             . ' WHERE lab_parent_id IS NOT NULL)'
         );

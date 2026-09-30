@@ -2,6 +2,7 @@
 
 namespace App\Libraries;
 
+use App\Database\Seeds\DatabaseSeeder;
 use App\Libraries\ExchangeDraft;
 use App\Models\CoordinatorModel;
 use App\Models\DonorModel;
@@ -159,6 +160,19 @@ final class UiStore
         'seen_not_seen'          => ['not_done', 'seen', 'not_seen'],
         // No answer at all: the card is its comment box and nothing else.
         'free_text'              => [],
+        // A test somebody added to their own record. The sheet cannot know
+        // what it answers, so it offers everything the platform can say —
+        // each keeping the colour it carries on every other card.
+        'custom'                 => [
+            'not_done', 'pending', 'done',
+            'acceptable', 'abnormal',
+            'negative', 'positive',
+            'applicable', 'not_applicable',
+            'cleared', 'not_cleared',
+            'given', 'not_given',
+            'required', 'not_required',
+            'seen', 'not_seen',
+        ],
         'text'                   => ['not_done', 'pending', 'done', 'not_applicable'],
         'numeric'                => ['not_done', 'pending', 'done', 'not_applicable'],
     ];
@@ -174,8 +188,10 @@ final class UiStore
         'cleared'        => 'Cleared',
         'not_cleared'    => 'Not cleared',
         'given'          => 'Given',
+        'required'       => 'Required',
         'not_required'   => 'Not required',
         'not_given'      => 'Not given',
+        'applicable'     => 'Applicable',
         'not_applicable' => 'Not applicable',
         'seen'           => 'Seen',
         'not_seen'       => 'Not seen',
@@ -197,8 +213,12 @@ final class UiStore
         'cleared'        => 'tone-emerald',
         'not_cleared'    => 'tone-red',
         'given'          => 'tone-emerald',
+        // Something still to do reads as attention; something that need not
+        // be done, or does not apply, is neither good news nor bad.
+        'required'       => 'tone-amber',
         'not_required'   => 'tone-slate',
         'not_given'      => 'tone-amber',
+        'applicable'     => 'tone-slate',
         'not_applicable' => 'tone-slate',
         'seen'           => 'tone-emerald',
         'not_seen'       => 'tone-amber',
@@ -231,8 +251,8 @@ final class UiStore
     /** The answers a test can hold, whichever kind it is. */
     public const LAB_STATUSES = [
         'not_done', 'pending', 'done', 'positive', 'negative', 'acceptable',
-        'abnormal', 'cleared', 'not_cleared', 'given', 'not_required',
-        'not_given', 'not_applicable', 'seen', 'not_seen',
+        'abnormal', 'cleared', 'not_cleared', 'given', 'not_required', 'required',
+        'not_given', 'not_applicable', 'applicable', 'seen', 'not_seen',
         'blood_a', 'blood_b', 'blood_ab', 'blood_o',
     ];
 
@@ -821,6 +841,7 @@ final class UiStore
                 'name'       => $lab['name'],
                 'group'      => (string) ($lab['parent_name'] ?? ''),
                 'resultType' => (string) ($lab['result_type'] ?? 'text'),
+                'custom'     => false,
                 'status'     => 'not_done',
                 'result'     => '',
                 'date'       => '',
@@ -1037,6 +1058,97 @@ final class UiStore
     }
 
     /**
+     * Adds a test to one record, under the group that heads such tests.
+     *
+     * Blank to begin with: the card it becomes carries the name field, so it
+     * is typed in the same place it is read, and saved with the answer. It
+     * offers every answer the platform has, because the check list is not the
+     * one asking the question.
+     *
+     * Returns the new test's id, or 0 when the record is not one this
+     * programme holds.
+     */
+    public function addCustomLab(string $mrn, string $personType): int
+    {
+        if (! $this->isMrn($mrn) || ! in_array($personType, ['recipient', 'donor'], true)) {
+            return 0;
+        }
+
+        $organ  = $this->organ();
+        $person = $personType === 'recipient' ? $this->findRecipient($mrn) : $this->findDonor($mrn);
+
+        if ($person === null) {
+            return 0;
+        }
+
+        $parentId = $this->labs->customGroupId(DatabaseSeeder::CUSTOM_GROUP, $personType);
+
+        if ($parentId === null) {
+            return 0;
+        }
+
+        // After everything the check list asks for, in the order they were
+        // added. Two blank names would collide under the unique key, so each
+        // starts as its own number until somebody types over it.
+        $last = $this->labs->lastSortOrder($organ, $personType) + 1;
+
+        $this->labs->insert([
+            'name'          => 'New test ' . $last,
+            'lab_parent_id' => $parentId,
+            'organ_code'    => $organ,
+            'person_type'   => $personType,
+            'person_mrn'    => (int) $mrn,
+            'result_type'   => 'custom',
+            'sort_order'    => $last,
+            'is_active'     => 1,
+        ]);
+
+        return (int) $this->labs->getInsertID();
+    }
+
+    /**
+     * One of a record's own tests, or null when it is not theirs.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function customLab(string $mrn, string $personType, int $labId): ?array
+    {
+        if (! $this->isMrn($mrn)) {
+            return null;
+        }
+
+        $lab = $this->labs->find($labId);
+
+        if ($lab === null
+            || $lab['person_mrn'] === null
+            || (int) $lab['person_mrn'] !== (int) $mrn
+            || $lab['person_type'] !== $personType) {
+            return null;
+        }
+
+        return $lab;
+    }
+
+    /**
+     * Takes one of a record's own tests away again.
+     *
+     * Only ever its own: a catalogue test is the programme's and cannot be
+     * removed from one record. Whatever was recorded against it goes with it —
+     * `lab_results.lab_id` cascades — which is right, because the test it was
+     * recorded against will not exist.
+     */
+    public function removeCustomLab(string $mrn, string $personType, int $labId): bool
+    {
+        if ($this->customLab($mrn, $personType, $labId) === null) {
+            return false;
+        }
+
+        $this->labs->delete($labId);
+
+        return true;
+    }
+
+    /**
      * A person's workup: every test their programme calls for, with whatever
      * has been recorded against it — so an untouched test is still a card.
      *
@@ -1050,6 +1162,9 @@ final class UiStore
                 'name'       => $row['lab_name'],
                 'group'      => (string) ($row['parent_name'] ?? ''),
                 'resultType' => (string) ($row['result_type'] ?? 'text'),
+                // A test this record added for itself: its name is theirs to
+                // type and theirs to take away again.
+                'custom'     => $row['owner_mrn'] !== null,
                 'status'     => $row['status'],
                 'result'     => (string) $row['value'],
                 'date'       => $row['taken_on'] === null ? '' : self::isoToDMY($row['taken_on']),
@@ -1085,6 +1200,25 @@ final class UiStore
             // wrong one would be invisible on the screen that entered it.
             if ($lab === null || $lab['person_type'] !== $personType) {
                 continue;
+            }
+
+            // A test somebody added belongs to one record, and only that
+            // record may answer it. Without this, a posted id would reach
+            // another patient's test.
+            $ownedByAnother = $lab['person_mrn'] !== null && (int) $lab['person_mrn'] !== $mrn;
+
+            if ($ownedByAnother) {
+                continue;
+            }
+
+            // Their own test, so its name is theirs to type. The catalogue's
+            // names are the check list's and are never posted back.
+            if ($lab['person_mrn'] !== null) {
+                $typed = trim((string) ($test['name'] ?? ''));
+
+                if ($typed !== '' && $typed !== $lab['name']) {
+                    $this->labs->update($labId, ['name' => mb_substr($typed, 0, 150)]);
+                }
             }
 
             // The answer has to be one this test actually offers. The form

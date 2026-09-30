@@ -33,10 +33,33 @@ class PairModel extends Model
 
     /**
      * The open pair holding this recipient, or null when they are free.
+     *
+     * A recipient may hold several at once — a donor is looked at, then
+     * another — so this is the first of them and is only ever used where one
+     * will do. {@see self::pairsForRecipient()} is the whole list.
      */
     public function openPairForRecipient(int|string $mrn): ?array
     {
         return $this->openPairs()->where('recipient_mrn', $mrn)->get()->getRowArray();
+    }
+
+    /**
+     * Every donor this recipient has been linked with, in the order they were.
+     *
+     * Closed ones included: a link that was undone is still part of the
+     * record, and the screens show it greyed rather than dropping it.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function pairsForRecipient(int|string $mrn): array
+    {
+        return $this->db->table('pairs p')
+            ->select('p.*, d.name AS donor_name, d.blood_group AS donor_blood_group, d.status AS donor_status')
+            ->join('donors d', 'd.mrn = p.donor_mrn', 'left')
+            ->where('p.recipient_mrn', $mrn)
+            ->orderBy('p.id')
+            ->get()
+            ->getResultArray();
     }
 
     /** The open pair holding this donor, or null when they are free. */
@@ -65,17 +88,23 @@ class PairModel extends Model
      *
      * @param array<string, mixed> $attributes
      *
+     * Only the donor's half is exclusive. A recipient may hold several links
+     * at once — donors are looked at one after another, and sometimes
+     * together — but a donor promised to two recipients is a thing the
+     * register should not be able to say. The same pair twice is refused
+     * either way: that is a duplicate, not a second opinion.
+     *
      * @return int|string          the new pair's id
-     * @throws \RuntimeException   when either side is already matched
+     * @throws \RuntimeException   when the donor is already matched
      */
     public function link(int|string $recipientMrn, int|string $donorMrn, array $attributes = []): int|string
     {
-        if ($this->openPairForRecipient($recipientMrn) !== null) {
-            throw new \RuntimeException("Recipient {$recipientMrn} is already in an open pair.");
-        }
-
         if ($this->openPairForDonor($donorMrn) !== null) {
             throw new \RuntimeException("Donor {$donorMrn} is already in an open pair.");
+        }
+
+        if ($this->openPairFor($recipientMrn, $donorMrn) !== null) {
+            throw new \RuntimeException("Recipient {$recipientMrn} and donor {$donorMrn} are already linked.");
         }
 
         $this->insert(array_merge([

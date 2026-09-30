@@ -63,8 +63,12 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             <?php if ($mode === 'view'): ?>
                 <a class="btn-outline" href="<?= site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id'])) ?>/print" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
             <?php endif; ?>
-            <?php if ($mode === 'view' && $linked !== null): ?>
-                <a class="btn-outline" href="<?= site_url(($isRecipient ? 'donors/' : 'recipients/') . rawurlencode($linked['id'])) ?>">Linked: <?= esc($linked['name']) ?></a>
+            <?php // A recipient may be linked with another donor at any time —
+                  // donors are looked at one after another — so the button is
+                  // always there and the tabs below show who they are. A donor
+                  // has one recipient, so theirs turns into a link to them. ?>
+            <?php if ($mode === 'view' && ! $isRecipient && $linked !== null): ?>
+                <a class="btn-outline" href="<?= site_url('recipients/' . rawurlencode($linked['id'])) ?>">Linked: <?= esc($linked['name']) ?></a>
             <?php elseif ($mode === 'view'): ?>
                 <?php // A real link to the choice at its own URL; ui.js opens
                       // the dialog below instead when it can. ?>
@@ -75,6 +79,15 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
     <?php if ($error !== ''): ?>
         <div class="form-error" role="alert"><?= esc($error) ?></div>
+    <?php endif; ?>
+
+    <?php if ($isRecipient && $mode === 'view' && $donorTabs !== []): ?>
+        <?= view('ui/partials/donor_tabs', [
+            'mrn'      => $person['id'],
+            'tabs'     => $donorTabs,
+            'openTab'  => $openTab,
+            'donor'    => $openDonor,
+        ], ['saveData' => false]) ?>
     <?php endif; ?>
 
     <form id="person-form" class="stack-5" method="post" action="<?= current_url() ?>">

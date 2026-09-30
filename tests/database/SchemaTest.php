@@ -190,17 +190,42 @@ final class SchemaTest extends CIUnitTestCase
         $this->assertCount(1, model(RecipientModel::class)->waitingList());
     }
 
-    public function testAPersonCannotBeInTwoOpenPairs(): void
+    /**
+     * A recipient may hold several donors; a donor may not hold several
+     * recipients.
+     *
+     * Donors are looked at one after another, and sometimes together, so the
+     * recipient's half is not exclusive. A donor promised to two recipients is
+     * a thing the register should not be able to say, so theirs is.
+     */
+    public function testARecipientMayHoldSeveralDonorsButNotTheOtherWayRound(): void
     {
         $this->addRecipient(1001);
+        $this->addRecipient(1002);
         $this->addDonor(2001);
         $this->addDonor(2002);
         $pairs = model(PairModel::class);
 
         $pairs->link(1001, 2001);
+        $pairs->link(1001, 2002);
+
+        $this->assertCount(2, $pairs->pairsForRecipient(1001));
 
         $this->expectException(RuntimeException::class);
-        $pairs->link(1001, 2002);
+        $pairs->link(1002, 2001);
+    }
+
+    /** The same two, twice, is a duplicate rather than a second opinion. */
+    public function testTheSamePairCannotBeMadeTwice(): void
+    {
+        $this->addRecipient(1003);
+        $this->addDonor(2003);
+        $pairs = model(PairModel::class);
+
+        $pairs->link(1003, 2003);
+
+        $this->expectException(RuntimeException::class);
+        $pairs->link(1003, 2003);
     }
 
     public function testAReleasedPersonCanBePairedAgain(): void

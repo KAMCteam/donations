@@ -266,6 +266,14 @@ class Ui extends BaseController
         $linked   = $isRecipient ? $this->store->findDonor($linkedId) : $this->store->findRecipient($linkedId);
         $links    = $person === null ? [] : $this->linkUrls($personType, $person['id']);
 
+        // A recipient's donors, and which of them the address is asking for.
+        // The first by default, so opening the record shows somebody rather
+        // than a row of tabs with nothing under it.
+        $donorTabs = $isRecipient && $person !== null ? ($person['donors'] ?? []) : [];
+        $openTab   = (int) ($this->request->getGet('donor') ?? 1);
+        $openTab   = $openTab >= 1 && $openTab <= count($donorTabs) ? $openTab : ($donorTabs === [] ? 0 : 1);
+        $openDonor = $openTab === 0 ? null : $this->store->findDonor($donorTabs[$openTab - 1]['donorId']);
+
         return view('ui/person_form', [
             'title'      => $person !== null ? $person['name'] : ($isRecipient ? 'Add Recipient' : 'Add Donor'),
             // Set when a save bounced back; the fields themselves come from
@@ -282,6 +290,9 @@ class Ui extends BaseController
             'personType' => $personType,
             'person'     => $person,
             'linked'     => $linked,
+            'donorTabs'  => $donorTabs,
+            'openTab'    => $openTab,
+            'openDonor'  => $openDonor,
             'labTests'   => $labTests,
             'mrps'       => $mrps,
             // "Link with …" is a link to the choice at its own URL; the
@@ -546,6 +557,62 @@ class Ui extends BaseController
         ]);
     }
 
+    // ---- A recipient's donors -----------------------------------------------
+
+    /**
+     * Undoes one of a recipient's links, after asking.
+     *
+     * The pair closes and the donor is Declined. Nothing is deleted: the tab
+     * stays on the record, greyed and read-only, because a donor who was
+     * considered and set aside is part of what happened.
+     */
+    public function delinkDonor(string $mrn, string $pairId): string|RedirectResponse
+    {
+        $recipient = $this->store->findRecipient($mrn);
+        $back      = site_url('recipients/' . rawurlencode($mrn));
+
+        if ($recipient === null) {
+            return redirect()->to(site_url('recipients'));
+        }
+
+        $tab = null;
+
+        foreach ($recipient['donors'] ?? [] as $candidate) {
+            if ($candidate['pairId'] === $pairId) {
+                $tab = $candidate;
+            }
+        }
+
+        if ($tab === null || $tab['delinked']) {
+            return redirect()->to($back);
+        }
+
+        if (strtolower($this->request->getMethod()) !== 'post') {
+            return view('ui/confirm_delete', [
+                'title'   => 'Delink ' . $tab['name'],
+                'navPage' => '',
+                'organ'   => $this->store->organ(),
+                'name'    => $tab['name'],
+                'kind'    => 'link',
+                'detail'  => 'This donor will be set to Declined and the link with '
+                    . $recipient['name'] . ' undone. Both records stay on the register, with their '
+                    . 'workups, and the donor keeps their place on this screen — shown as declined, '
+                    . 'and no longer editable from it.',
+                'action'  => site_url('recipients/' . rawurlencode($mrn) . '/donors/' . rawurlencode($pairId) . '/delink'),
+                'backUrl' => $back . '?donor=' . (int) $tab['number'],
+            ]);
+        }
+
+        $error = $this->store->delinkDonor($mrn, $pairId);
+
+        $this->session->setFlashdata(
+            $error === '' ? 'ui_notice' : 'ui_error',
+            $error === '' ? $tab['name'] . ' has been delinked and set to Declined.' : $error
+        );
+
+        return redirect()->to($back . '?donor=' . (int) $tab['number']);
+    }
+
     // ---- Tests a record adds for itself ------------------------------------
 
     /**
@@ -726,17 +793,22 @@ class Ui extends BaseController
             return redirect()->to(site_url('recipients'));
         }
 
-        $donor = $this->store->findDonor($recipient['pairedDonorId'] ?? null);
+        $donor  = $this->store->findDonor($recipient['pairedDonorId'] ?? null);
+        $blocks = [$this->recipientBlock($recipient)];
+
+        // Every donor they have been linked with, the declined ones too: a
+        // donor who was considered and set aside is part of the record, and a
+        // sheet that left them off would read as though they never were.
+        if (($recipient['donors'] ?? []) !== []) {
+            $blocks[] = $this->donorsBlock($recipient['donors']);
+        }
 
         return $this->recordSheet(
             'Recipient Record',
             $recipient,
             'Back to record',
             site_url('recipients/' . rawurlencode($recipient['id'])),
-            array_merge(
-                [$this->recipientBlock($recipient, $donor)],
-                $this->workupBlocks($recipient, 'Required Lab Tests', 'Clinical Notes')
-            )
+            array_merge($blocks, $this->workupBlocks($recipient, 'Required Lab Tests', 'Clinical Notes'))
         );
     }
 
@@ -776,7 +848,7 @@ class Ui extends BaseController
         $blocks = [$this->pairBlock($pair, $recipient, $donor)];
 
         if ($recipient !== null) {
-            $blocks[] = $this->recipientBlock($recipient, $donor);
+            $blocks[] = $this->recipientBlock($recipient);
             $blocks   = array_merge($blocks, $this->workupBlocks(
                 $recipient,
                 'Recipient — Required Lab Tests',
@@ -847,12 +919,11 @@ class Ui extends BaseController
     }
 
     /**
-     * @param array<string, mixed>      $recipient
-     * @param array<string, mixed>|null $donor
+     * @param array<string, mixed> $recipient
      *
      * @return array<string, mixed>
      */
-    private function recipientBlock(array $recipient, ?array $donor): array
+    private function recipientBlock(array $recipient): array
     {
         return [
             'kind'   => 'fields',
@@ -871,9 +942,38 @@ class Ui extends BaseController
                 ['label' => 'Entry Date', 'value' => UiStore::isoToDMY((string) ($recipient['dateRegistered'] ?? '')), 'mono' => true],
                 ['label' => 'Urgent', 'value' => ($recipient['urgent'] ?? false) ? 'Yes' : 'No'],
                 ['label' => 'Recipient Status', 'value' => UiStore::STATUS_OPTIONS[$recipient['status'] ?? ''] ?? (string) ($recipient['status'] ?? '')],
-                ['label' => 'Linked Donor', 'value' => $donor === null ? 'Not linked' : $donor['name'] . ' (' . $donor['id'] . ')', 'wide' => true],
+                // No "Linked Donor" here: a recipient may hold several, and
+                // the Donors block below names every one of them.
             ],
         ];
+    }
+
+    /**
+     * A recipient's donors on paper, in the order they were linked.
+     *
+     * One field each, numbered as the tabs are, saying who and what became of
+     * it — including the ones that were delinked.
+     *
+     * @param list<array<string, mixed>> $tabs
+     *
+     * @return array<string, mixed>
+     */
+    private function donorsBlock(array $tabs): array
+    {
+        $fields = [];
+
+        foreach ($tabs as $tab) {
+            $status = UiStore::STATUS_OPTIONS[$tab['status']] ?? $tab['status'];
+
+            $fields[] = [
+                'label' => 'Donor ' . $tab['number'],
+                'value' => $tab['name'] . ' (' . $tab['donorId'] . ') — ' . $status
+                    . ($tab['delinked'] ? ', delinked' : ''),
+                'wide'  => true,
+            ];
+        }
+
+        return ['kind' => 'fields', 'title' => 'Donors', 'fields' => $fields];
     }
 
     /**
@@ -1035,8 +1135,8 @@ class Ui extends BaseController
             return redirect()->to(site_url('pairs/new'));
         }
 
-        if ($fixed !== null) {
-            $open = $this->store->openPairFor($fixedSide, $fixed['id']);
+        if ($fixed !== null && $fixedSide === 'donor') {
+            $open = $this->store->openPairFor('donor', $fixed['id']);
 
             if ($open !== null) {
                 return redirect()->to(site_url('pairs/' . rawurlencode($open['id'])));
@@ -1179,10 +1279,14 @@ class Ui extends BaseController
         // The known half is on the system already, so what has to hold is that
         // nothing has paired them since the form was opened.
         if ($error === '' && $fixedSide !== '') {
-            $side  = $fixedSide === 'recipient' ? $recipientId : $donorId;
-            $error = $this->findPerson($fixedSide, $side) === null
-                ? 'That record could not be found.'
-                : ($this->store->openPairFor($fixedSide, $side) === null ? '' : 'That record is already in an open pair.');
+            $side = $fixedSide === 'recipient' ? $recipientId : $donorId;
+
+            if ($this->findPerson($fixedSide, $side) === null) {
+                $error = 'That record could not be found.';
+            } elseif ($fixedSide === 'donor' && $this->store->openPairFor('donor', $side) !== null) {
+                // Only the donor's half is exclusive; see pairableError().
+                $error = 'That record is already in an open pair.';
+            }
         }
 
         if ($error !== '') {
@@ -1459,11 +1563,14 @@ class Ui extends BaseController
             return redirect()->to(site_url($personType === 'recipient' ? 'recipients' : 'donors'));
         }
 
-        $open = $this->store->openPairFor($personType, $person['id']);
+        // A donor already in a pair has nothing to choose, so they are shown
+        // it. A recipient always has something to choose: another donor.
+        if ($personType === 'donor') {
+            $open = $this->store->openPairFor('donor', $person['id']);
 
-        // Already paired: there is nothing to choose, so show the pair.
-        if ($open !== null) {
-            return redirect()->to(site_url('pairs/' . rawurlencode($open['id'])));
+            if ($open !== null) {
+                return redirect()->to(site_url('pairs/' . rawurlencode($open['id'])));
+            }
         }
 
         return view('ui/link_choice', [
@@ -1568,12 +1675,16 @@ class Ui extends BaseController
             return 'The recipient and the donor cannot be the same person.';
         }
 
-        if ($this->store->openPairFor('recipient', $recipientMrn) !== null) {
-            return 'That recipient is already in an open pair.';
-        }
-
+        // A recipient may hold several links at once — donors are looked at
+        // one after another, and sometimes together — so nothing stops a
+        // second. A donor may not: being promised to two recipients is not a
+        // thing the register should be able to say.
         if ($this->store->openPairFor('donor', $donorMrn) !== null) {
             return 'That donor is already in an open pair.';
+        }
+
+        if ($this->store->pairWith($recipientMrn, $donorMrn) !== null) {
+            return 'These two are already linked.';
         }
 
         return '';

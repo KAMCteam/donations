@@ -667,11 +667,6 @@ final class UiStore
             'notes'           => $pair['notes'] ?? null,
         ]);
 
-        // The two are kept in step from the moment the pair exists, so the
-        // recipient does not sit On Hold behind an active pair — but only
-        // where the pair's status is one a person's record can hold.
-        $this->carryToRecipient((int) $pair['recipientId'], $status);
-
         return $id;
     }
 
@@ -686,6 +681,14 @@ final class UiStore
         $row = $personType === 'recipient'
             ? $this->pairs->openPairForRecipient($mrn)
             : $this->pairs->openPairForDonor($mrn);
+
+        return $row === null ? null : $this->findPair((string) $row['id']);
+    }
+
+    /** The open pair joining these two specifically, or null. */
+    public function pairWith(int|string $recipientMrn, int|string $donorMrn): ?array
+    {
+        $row = $this->pairs->openPairFor($recipientMrn, $donorMrn);
 
         return $row === null ? null : $this->findPair((string) $row['id']);
     }
@@ -708,17 +711,11 @@ final class UiStore
             $this->saveLabTests((int) $id, 'recipient', $changes['labTests']);
         }
 
-        // A recipient's status and their pair's are one fact where they can
-        // be, so whichever screen sets it the other follows. Written straight
-        // to the model rather than back through updatePair(), which would come
-        // round here again. All three of a person's own statuses are statuses
-        // a pair can hold, so this direction always carries.
-        $status = $this->personStatusKey((string) ($changes['status'] ?? ''));
-        $pair   = $status === '' ? null : $this->pairs->openPairForRecipient((int) $id);
-
-        if ($pair !== null) {
-            $this->pairs->update((int) $pair['id'], ['status' => $status]);
-        }
+        // A recipient's status used to be the same fact as their pair's, and
+        // setting one set the other. It cannot be, now that a recipient may
+        // hold several donors at once: there would be no saying which of them
+        // Declined meant. The person's status is the person's — are they on
+        // the programme — and each link carries its own.
     }
 
     /** @param array<string, mixed> $changes */
@@ -773,17 +770,6 @@ final class UiStore
             $this->pairs->update((int) $id, $row);
         }
 
-        // The other half of the link above, and the direction that does not
-        // always carry: Transplanted, Paired Exchange and Closed describe the
-        // case, not the person, and a recipient's own record has no such
-        // value. Their status is left alone rather than forced.
-        if ($status !== '') {
-            $pair = $this->pairs->find((int) $id);
-
-            if ($pair !== null) {
-                $this->carryToRecipient((int) $pair['recipient_mrn'], $status);
-            }
-        }
     }
 
     /**
@@ -795,13 +781,6 @@ final class UiStore
      * against the pair rather than against this column, already shows him
      * again.
      */
-    private function carryToRecipient(int $mrn, string $status): void
-    {
-        if ($this->personStatusKey($status) !== '') {
-            $this->recipients->update($mrn, ['status' => $status]);
-        }
-    }
-
     // ---- Medical record numbers --------------------------------------------
 
     /**
@@ -888,7 +867,76 @@ final class UiStore
             'notes'          => (string) $row['notes'],
             'labTests'       => $this->labTestsFor($row['mrn'], 'recipient', $row['organ_code']),
             'pairedDonorId'  => $pair === null ? '' : (string) $pair['donor_mrn'],
+            // Every donor they have been linked with, the undone ones too:
+            // the screens show those greyed rather than forgetting them.
+            'donors'         => $this->donorTabs($row['mrn']),
         ];
+    }
+
+    /**
+     * A recipient's donors, one entry per link, in the order they were made.
+     *
+     * Each is a tab on their screen: the number it is, whose link it is, and
+     * what became of it. A closed pair is a link that was undone — it stays
+     * on the record, read-only.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function donorTabs(int|string $mrn): array
+    {
+        $tabs = [];
+
+        foreach ($this->pairs->pairsForRecipient($mrn) as $i => $pair) {
+            $delinked = $pair['status'] === PairModel::CLOSED;
+
+            $tabs[] = [
+                'number'       => $i + 1,
+                'pairId'       => (string) $pair['id'],
+                'donorId'      => (string) $pair['donor_mrn'],
+                'name'         => (string) ($pair['donor_name'] ?? ''),
+                'bloodType'    => (string) ($pair['donor_blood_group'] ?? ''),
+                // The link's own status is what the tab shows. A delinked one
+                // reads Declined whatever the pair row says, because that is
+                // what delinking means.
+                'status'       => $delinked ? 'declined' : (string) $pair['status'],
+                'donorStatus'  => (string) ($pair['donor_status'] ?? ''),
+                'relationship' => (string) ($pair['relationship'] ?? ''),
+                'delinked'     => $delinked,
+                'closedReason' => (string) ($pair['closed_reason'] ?? ''),
+            ];
+        }
+
+        return $tabs;
+    }
+
+    /**
+     * Undoes one of a recipient's links.
+     *
+     * The pair closes and the donor is Declined — they were looked at for
+     * this recipient and are not going ahead. Nothing is deleted: the tab
+     * stays on the record, greyed, because a donor who was considered and
+     * set aside is part of what happened.
+     */
+    public function delinkDonor(string $recipientMrn, string $pairId, string $reason = ''): string
+    {
+        $pair = $this->findPair($pairId);
+
+        if ($pair === null || (string) $pair['recipientId'] !== $recipientMrn) {
+            return 'That link could not be found.';
+        }
+
+        if ($pair['status'] === PairModel::CLOSED) {
+            return 'That link has already been undone.';
+        }
+
+        $this->pairs->update((int) $pair['id'], [
+            'status'        => PairModel::CLOSED,
+            'closed_reason' => trim($reason) === '' ? 'Delinked from the recipient.' : trim($reason),
+        ]);
+
+        $this->donors->update((int) $pair['donorId'], ['status' => 'declined']);
+
+        return '';
     }
 
     /** @param array<string, mixed> $row */

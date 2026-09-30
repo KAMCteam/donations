@@ -38,6 +38,7 @@ $routes->match(['get', 'post'], 'recipients/new', 'Ui::addRecipient');
 // Both link routes come before the record route: `(:segment)` stops at a
 // slash, so they cannot be confused, but reading them in this order makes
 // that obvious.
+$routes->match(['get', 'post'], 'recipients/(:segment)/donors/(:num)/delink', 'Ui::delinkDonor/$1/$2');
 $routes->post('recipients/(:segment)/labs', 'Ui::addLab/recipient/$1');
 $routes->match(['get', 'post'], 'recipients/(:segment)/labs/(:num)/delete', 'Ui::removeLab/recipient/$1/$2');
 $routes->get('recipients/(:segment)/print', 'Ui::printRecipient/$1');

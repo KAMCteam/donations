@@ -10,8 +10,13 @@ use App\Libraries\UiStore;
  *
  * Only the pairs whose own screen has had Pair Exchange pressed on it, and
  * that an exchange can still move — open, not already transplanted. Pressing
- * that button is the filter; the list is short by construction, so the file
- * number is all it asks for.
+ * that button is the filter, and the list is short by construction.
+ *
+ * It had a file-number box of its own. That went to the bar at the top of
+ * every screen, which asks the same question of every register at once: one
+ * place to type an MRN is better than a different one per screen. `?q=` still
+ * narrows this list — the top bar's results link here — so what is left on the
+ * screen is the way out of that, not a second box to type into.
  *
  * It carried the Pairs List's status chips as well, which did not belong: a
  * pair is on this list only while its status is one an exchange can move, so
@@ -72,20 +77,17 @@ $headers = ['Pair #', 'Recipient', 'MRN', 'Blood', 'Donor', 'MRN', 'Blood', 'Sta
             <?php endforeach; ?>
         </div>
 
-        <form class="search-row" method="get" action="<?= site_url('exchange') ?>">
-            <label class="filter-label filter-label--mr" for="ex-q">File number:</label>
-            <?php // The chips are links, so the search form has to carry the
-                  // blood type itself or submitting it would clear the row
-                  // above. ?>
-            <?php if ($btFilter !== 'all'): ?>
-                <input type="hidden" name="bt" value="<?= esc($btFilter) ?>">
-            <?php endif; ?>
-            <input type="search" id="ex-q" name="q" class="input search-input" value="<?= esc($query) ?>" placeholder="MRN or name" inputmode="search">
-            <button type="submit" class="btn-outline">Search</button>
-            <?php if ($query !== ''): ?>
+        <?php // The file-number box that used to sit here has gone to the bar
+              // at the top of every screen, which asks the same question of
+              // every register at once. What is left when a search is still
+              // narrowing this list is the way out of it. ?>
+        <?php if ($query !== ''): ?>
+            <div class="filter-row">
+                <span class="filter-label filter-label--mr">File number:</span>
+                <span class="chip is-active"><?= esc($query) ?></span>
                 <a class="stat-link" href="<?= $filterUrl($btFilter) ?>">Clear</a>
-            <?php endif; ?>
-        </form>
+            </div>
+        <?php endif; ?>
     </div>
 
     <div class="card card--scroll">

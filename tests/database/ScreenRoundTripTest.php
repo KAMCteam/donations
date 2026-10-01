@@ -2037,6 +2037,55 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         }
     }
 
+    /**
+     * One search, in the bar at the top of every screen.
+     *
+     * The moment before you know which list somebody is on belongs to no one
+     * screen, so it does not live on one: every page carries the same box, and
+     * it asks every register at once.
+     */
+    public function testTheTopBarSearchesEveryRegisterAtOnce(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9501', 'dMrn' => '9502',
+            'rName' => 'Hamad Al-Qahtani', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Sara Al-Qahtani', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+        $this->post('mrp', ['id' => 'MRP-500', 'name' => 'Dr. Qahtani', 'kind' => 'doctor']);
+
+        // The box is on every screen, not on one of them.
+        foreach (['dashboard', 'recipients', 'donors', 'pairs', 'exchange', 'reports', 'mrp'] as $screen) {
+            $html = $this->get($screen)->getBody();
+            $this->assertStringContainsString('class="app-search"', $html, $screen . ' carries the search');
+            $this->assertStringContainsString('action="' . site_url('search') . '"', $html);
+        }
+
+        // One name, four kinds of answer.
+        $html = $this->get('search?q=Qahtani')->getBody();
+        $this->assertStringContainsString('Hamad Al-Qahtani', $html);
+        $this->assertStringContainsString('Sara Al-Qahtani', $html);
+        $this->assertStringContainsString('Dr. Qahtani', $html);
+        foreach (['Recipients', 'Donors', 'Pairs', 'Users'] as $group) {
+            $this->assertStringContainsString($group . ' <span>', $html);
+        }
+
+        // An MRN finds the one person it belongs to, and the pair holding them.
+        $byMrn = $this->get('search?q=9502')->getBody();
+        $this->assertStringContainsString('Sara Al-Qahtani', $byMrn);
+        $this->assertStringContainsString('Pairs <span>', $byMrn);
+
+        // The question stays in the bar, so a result opens with it on screen.
+        $this->assertStringContainsString('value="9502"', $byMrn);
+
+        // Nothing found says so, rather than showing four empty headings.
+        $none = $this->get('search?q=zzzznobody')->getBody();
+        $this->assertStringContainsString('Nothing on this programme matches', $none);
+        $this->assertStringNotContainsString('Recipients <span>', $none);
+
+        // And an empty search is an invitation, not a result of none.
+        $this->assertStringContainsString('every register at once', $this->get('search')->getBody());
+    }
+
     /** A status nobody can choose is read as no filter at all. */
     public function testAnUnknownStatusIsNotAFilter(): void
     {
@@ -2068,9 +2117,14 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $html = $this->get('exchange')->getBody();
 
         $this->assertStringContainsString('Offered Recipient', $html);
-        $this->assertStringContainsString('File number:', $html);
         $this->assertStringContainsString('Recipient blood type:', $html);
         $this->assertStringNotContainsString('Status:', $html);
+        // Its own file-number box went to the bar at the top of every screen —
+        // the only `q` on this page now is that one. `?q=` still narrows the
+        // list, which is what the top bar's results link to.
+        $this->assertStringNotContainsString('id="ex-q"', $html);
+        $this->assertSame(1, substr_count($html, 'name="q"'), 'one search box, and it is the top bar\'s');
+        $this->assertStringContainsString('File number:', $this->get('exchange?q=9603')->getBody());
 
         // The row opens the pair, and carries a real link for it as well.
         $this->assertStringContainsString('data-href="' . site_url('pairs/' . $pairId) . '"', $html);

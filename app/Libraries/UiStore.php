@@ -764,6 +764,67 @@ final class UiStore
      *
      * @return string '' on success, or why not
      */
+    /**
+     * Everything on this programme that answers to a name or a number.
+     *
+     * One question asked of every register at once, which is what somebody
+     * typing into the bar at the top of the screen is doing: they have an MRN
+     * on a form, or half a name, and they do not yet know which list it is on.
+     *
+     * Matched on the MRN and on the name, because those are the two things
+     * written on the paperwork a person arrives with. Capped, because a search
+     * that returns the whole register has not answered anything.
+     *
+     * @return array{recipients: list<array<string, mixed>>, donors: list<array<string, mixed>>, pairs: list<array<string, mixed>>, users: list<array<string, mixed>>}
+     */
+    public function search(string $query, int $limit = 25): array
+    {
+        $query = trim($query);
+
+        if ($query === '') {
+            return ['recipients' => [], 'donors' => [], 'pairs' => [], 'users' => []];
+        }
+
+        $organ = $this->organ();
+
+        $people = static function (RecipientModel|DonorModel $model) use ($query, $organ, $limit): array {
+            return $model
+                ->where('organ_code', $organ)
+                ->groupStart()
+                    ->like('mrn', $query)
+                    ->orLike('name', $query)
+                ->groupEnd()
+                ->orderBy('name')
+                ->findAll($limit);
+        };
+
+        // A pair answers to either of its people, by either of their names or
+        // numbers — and to its own number, which is what the Pairs List shows.
+        $pairs = array_values(array_filter(
+            $this->pairs->overview($organ),
+            static function (array $row) use ($query): bool {
+                foreach (['id', 'r_mrn', 'r_name', 'd_mrn', 'd_name'] as $field) {
+                    if (stripos((string) $row[$field], $query) !== false) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        ));
+
+        return [
+            'recipients' => array_map(fn (array $r): array => $this->recipientToUi($r), $people($this->recipients)),
+            'donors'     => array_map(fn (array $r): array => $this->donorToUi($r), $people($this->donors)),
+            'pairs'      => array_slice(array_map(fn (array $r): array => $this->pairToUi($r), $pairs), 0, $limit),
+            'users'      => array_values(array_filter(
+                $this->mrpRegister(),
+                static fn (array $u): bool => stripos($u['name'], $query) !== false
+                    || stripos($u['code'], $query) !== false
+            )),
+        ];
+    }
+
     public function addMrp(string $code, string $name, string $kind = MrpModel::DOCTOR): string
     {
         $code = trim($code);

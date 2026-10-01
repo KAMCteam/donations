@@ -11,6 +11,7 @@
  * @var string $title    Browser tab title.
  * @var string $navPage  Nav item to mark active (dashboard, recipients, ...).
  * @var string $organ    Current programme, for the top-bar title.
+ * @var string $searchQuery  What the top bar's search is showing, if anything.
  */
 $navItems = [
     ['page' => 'dashboard',  'label' => 'Dashboard',          'icon' => 'dashboard', 'url' => site_url('dashboard')],
@@ -72,6 +73,21 @@ $navItems = [
                 </div>
 
                 <div id="page" class="page-host">
+                    <?php // One search, across the top of every screen and in
+                          // the middle of it: the moment before you know which
+                          // list somebody is on belongs to no one screen, so it
+                          // does not live on one. A GET form, so the question
+                          // is in the address and comes back on a refresh, and
+                          // a plain one, so it works with scripting off. ?>
+                    <div class="app-search-bar">
+                        <form class="app-search" method="get" action="<?= site_url('search') ?>" role="search">
+                            <label class="sr-only" for="app-q">Search the registers</label>
+                            <span class="app-search-icon"><?= ui_icon('search') ?></span>
+                            <input type="search" id="app-q" name="q" class="app-search-input"
+                                   value="<?= esc($searchQuery ?? '') ?>" placeholder="Search by MRN or name" inputmode="search" autocomplete="off">
+                        </form>
+                    </div>
+
                     <?php // What just happened, once. Set by the actions that
                           // redirect rather than render — a delete has no screen
                           // of its own to say it worked on. ?>

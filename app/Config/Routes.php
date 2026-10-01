@@ -33,6 +33,10 @@ $routes->get('organ/(:segment)', 'Ui::chooseOrgan/$1');
 
 $routes->get('dashboard', 'Ui::dashboard');
 
+// The bar at the top of every screen. One question of every register at once,
+// for the moment before you know which list somebody is on.
+$routes->get('search', 'Search::index');
+
 $routes->get('recipients', 'Ui::recipients');
 // Before the record route, which would otherwise read `print` as an MRN.
 $routes->get('recipients/print', 'Ui::printRecipients');

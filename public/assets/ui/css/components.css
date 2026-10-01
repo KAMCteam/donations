@@ -1205,6 +1205,101 @@
 .tab--delinked .tab-number,
 .tab--delinked .tab-status { color: var(--slate-400); }
 
+/* ---- The pairing archive ------------------------------------------------
+   Every pair this recipient has had, under the tabs. A `<details>`, so it
+   opens with no scripting; closed to start, because it is history rather than
+   the state of the case. */
+
+.pair-archive {
+  margin-top: 1.5rem;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-xl);
+  background-color: var(--slate-50);
+}
+
+.pair-archive-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--slate-700);
+  cursor: pointer;
+  list-style: none;
+}
+
+.pair-archive-head::-webkit-details-marker { display: none; }
+.pair-archive-head::marker { content: ''; }
+
+/* Drawn rather than left to the browser, so it can turn when it opens. */
+.pair-archive-head::before {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1.5px solid var(--slate-400);
+  border-bottom: 1.5px solid var(--slate-400);
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+
+.pair-archive[open] > .pair-archive-head::before { transform: rotate(45deg); }
+
+.pair-archive-count {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--slate-500);
+}
+
+.pair-archive-list {
+  margin: 0;
+  padding: 0 1rem 0.75rem;
+  list-style: none;
+}
+
+/* Newest first, each with a rule above it rather than a box of its own: this
+   is a list of events, and boxes would make them look like records. */
+.pair-archive-item {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--slate-200);
+}
+
+.pair-archive-who {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--slate-800);
+}
+
+.pair-archive-mrn {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--slate-500);
+}
+
+/* The one still standing, named as such — the rest are what came before. */
+.pair-archive-state {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--slate-500);
+}
+
+.pair-archive-item.is-open .pair-archive-state { color: var(--primary); }
+
+.pair-archive-when,
+.pair-archive-why {
+  margin-top: 0.15rem;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--slate-500);
+}
+
+.pair-archive-why { font-style: italic; }
+
 /* Active or On Hold, from the open tab. The select and its fallback button
    sit on one line with the other controls in that row. */
 .tab-status-form {

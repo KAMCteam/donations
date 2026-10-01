@@ -210,6 +210,36 @@ Two buttons end a candidacy, and they are opposites:
 One recipient, one donor, one pair — which is why Pair up closes everything
 else rather than leaving the list half-decided.
 
+#### A pair does not end the list
+
+The candidates stay on the record afterwards, and so does Pair up, because the
+one thing a list of candidates is for is changing your mind. On a tab that is
+not the pair the button reads **Switch to this donor**: the current pair closes,
+a new one opens with that donor, and the two candidates swap places.
+
+That needs the two ways of being set aside told apart, so `aside_reason` says
+which:
+
+| | What it means | On the tab |
+| --- | --- | --- |
+| `delinked` | A decision about *this* donor: considered, not going ahead | Frozen. No way back. |
+| `superseded` | A decision about *somebody else*: another was paired | Read-only, but Pair up switches back to them |
+
+Both read **Declined**, because both are. The column only says which door they
+came through — and it is why switching back to a donor who was passed over
+works, while a donor who was delinked by hand stays delinked.
+
+#### The pairing history
+
+Under the tabs, closed until it is pressed: every pair this recipient has ever
+had, newest first, with who it was with, when it began, when it ended and what
+ended it — a switch records *Switched to <name>.* on the pair it closed.
+
+It is built from the `pairs` table rather than from a log, because the pairs
+*are* the log: one row per link ever made, and closing one is how a link ends.
+Switching is two rows — the one that closed and the one that opened — which is
+exactly what somebody opening the archive is asking about.
+
 `potential_donors` holds the middle state: one row per pairing considered, with
 its own status. The row stays after a pair is made, so the tabs still say who
 else was looked at. A pair made by any other door — Add Pair, or a donor's own

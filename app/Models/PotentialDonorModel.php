@@ -18,9 +18,18 @@ class PotentialDonorModel extends Model
     protected $primaryKey    = 'id';
     protected $returnType    = 'array';
     protected $useTimestamps = true;
-    protected $allowedFields = ['recipient_mrn', 'donor_mrn', 'status'];
+    protected $allowedFields = ['recipient_mrn', 'donor_mrn', 'status', 'aside_reason'];
 
     public const DECLINED = 'declined';
+
+    /** Set aside by hand: a decision about this donor. The tab freezes. */
+    public const DELINKED = 'delinked';
+
+    /**
+     * Set aside because somebody else was paired: a decision about them, not
+     * about this one. The pair can be switched back here later.
+     */
+    public const SUPERSEDED = 'superseded';
 
     /** What a candidate's status can be. The donor's own record says the same. */
     public const STATUSES = ['active', 'on_hold', 'declined'];
@@ -83,16 +92,33 @@ class PotentialDonorModel extends Model
         // Considered before and set aside: adding them again takes them back
         // up rather than leaving a declined tab that cannot be reopened.
         if ($existing['status'] === self::DECLINED) {
-            $this->update((int) $existing['id'], ['status' => 'active']);
+            $this->update((int) $existing['id'], ['status' => 'active', 'aside_reason' => null]);
         }
     }
 
-    /** Sets every other candidate of this recipient aside. */
+    /**
+     * Sets every other candidate of this recipient aside, as superseded.
+     *
+     * Nothing was decided about them: one of the others was paired, and that
+     * is all this says. Which is why the reason is recorded — a superseded
+     * candidate can be switched back to, and a delinked one cannot.
+     *
+     * A candidate already set aside by hand keeps that reason: being passed
+     * over does not undo having been declined.
+     */
     public function declineOthers(int|string $recipientMrn, int|string $keepId): void
     {
         $this->db->table('potential_donors')
             ->where('recipient_mrn', $recipientMrn)
             ->where('id !=', (int) $keepId)
-            ->update(['status' => self::DECLINED, 'updated_at' => date('Y-m-d H:i:s')]);
+            ->groupStart()
+                ->where('aside_reason', null)
+                ->orWhere('aside_reason', self::SUPERSEDED)
+            ->groupEnd()
+            ->update([
+                'status'       => self::DECLINED,
+                'aside_reason' => self::SUPERSEDED,
+                'updated_at'   => date('Y-m-d H:i:s'),
+            ]);
     }
 }

@@ -22,6 +22,7 @@ use App\Libraries\UiStore;
  * @var list<array<string, mixed>> $labTests
  * @var list<array<string, mixed>> $openDonorLabs  The open tab's workup
  * @var array<string, mixed>       $donorValues    The open tab's fields, d-prefixed
+ * @var list<array<string, mixed>> $pairHistory    Every pair this recipient has had
  * @var list<array<string, mixed>> $candidates     Donors the dialog can offer
  * @var string                     $forRecipient   Whose potential donor this is
  * @var list<array{id: string, name: string}> $mrps
@@ -431,6 +432,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             'editing'  => $editing,
             'mrps'     => $mrps,
             'ageNote'  => $ageNote,
+            'history'  => $pairHistory,
         ], ['saveData' => false]) ?>
     <?php endif; ?>
 

@@ -20,6 +20,16 @@ use App\Libraries\UiStore;
  * made, every other candidate is set aside with it, and the pair's own screen
  * opens. One recipient, one donor, one pair.
  *
+ * A pair does not end the list. The others stay on the screen, and Pair up
+ * stays on them, because the one thing a list of candidates is for is changing
+ * your mind — pressing it on another tab switches the pair to that donor. The
+ * only tabs it leaves are the ones delinked by hand: that was a decision about
+ * the donor, where being passed over was a decision about somebody else.
+ *
+ * Under the tabs is the archive, which is where switching shows: every pair
+ * this recipient has had, who it was with, when it began and ended, and what
+ * ended it.
+ *
  * Tabs are links, not script: which one is open is in the address, so it can
  * be sent to somebody and comes back on a refresh.
  *
@@ -30,6 +40,7 @@ use App\Libraries\UiStore;
  * @var array<string, mixed>       $v        That donor's fields, d-prefixed
  * @var list<array<string, mixed>> $labTests The open tab's workup
  * @var string                     $editing  Which of their cards is open
+ * @var list<array<string, mixed>> $history  Every pair this recipient has had
  * @var list<array{id: string, name: string}> $mrps
  * @var callable                   $ageNote
  */
@@ -63,46 +74,67 @@ $statusWord = static fn (string $status): string => UiStore::STATUS_OPTIONS[$sta
     <?php else: ?>
         <?php $tab = $tabs[$openTab - 1]; ?>
         <div class="tab-panel<?= $tab['delinked'] ? ' tab-panel--delinked' : '' ?>" role="tabpanel">
-            <?php if ($tab['delinked']): ?>
+            <?php if ($tab['delinked'] && $tab['switchable']): ?>
+                <?php // Passed over rather than turned down: nothing was
+                      // decided about this donor, so the way back is open. ?>
+                <p class="tab-note">This potential donor was set aside when another was paired. Their details are shown as they were; pairing them up again switches the pair back to them.</p>
+            <?php elseif ($tab['delinked']): ?>
                 <?php // Why nothing on it can be pressed, said once. ?>
-                <p class="tab-note">This potential donor was set aside, so the tab is shown as it was and cannot be changed.</p>
+                <p class="tab-note">This potential donor was delinked, so the tab is shown as it was and cannot be changed.</p>
             <?php elseif ($tab['pairId'] !== ''): ?>
                 <p class="tab-note">This is the pair.
                     <a class="stat-link" href="<?= site_url('pairs/' . rawurlencode($tab['pairId'])) ?>">Open the pair</a></p>
             <?php endif; ?>
 
+            <?php
+            // Somebody else is the pair: pressing Pair up here moves it, which
+            // the question says in so many words before it happens.
+            $paired = null;
+
+            foreach ($tabs as $other) {
+                if ($other['pairId'] !== '') {
+                    $paired = $other;
+                }
+            }
+
+            $switching = $paired !== null && $paired['number'] !== $tab['number'];
+            ?>
             <div class="tab-panel-head">
                 <div>
                     <div class="eyebrow">donor-<?= (int) $tab['number'] ?> &middot; <?= esc($donor['id']) ?></div>
                     <h3 class="tab-panel-name"><?= esc($donor['name']) ?></h3>
                 </div>
-                <?php if (! $tab['delinked']): ?>
+                <?php if ($tab['switchable']): ?>
                     <div class="header-actions">
-                        <?php // Active or On Hold, from the tab itself. Setting
-                              // aside has its own button, because it cannot be
-                              // undone by choosing again. ?>
-                        <form method="post" action="<?= $recipientUrl ?>/donors/<?= esc($tab['id']) ?>/status" class="inline-form tab-status-form">
-                            <?= csrf_field() ?>
-                            <label class="sr-only" for="tab-status">Status</label>
-                            <select id="tab-status" name="status" class="input" data-auto-submit>
-                                <?php foreach (['active' => 'Active', 'on_hold' => 'On Hold'] as $value => $label): ?>
-                                    <option value="<?= esc($value) ?>"<?= $tab['status'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <button type="submit" class="btn-outline">Set</button>
-                        </form>
+                        <?php if (! $tab['delinked']): ?>
+                            <?php // Active or On Hold, from the tab itself.
+                                  // Setting aside has its own button, because
+                                  // it cannot be undone by choosing again. ?>
+                            <form method="post" action="<?= $recipientUrl ?>/donors/<?= esc($tab['id']) ?>/status" class="inline-form tab-status-form">
+                                <?= csrf_field() ?>
+                                <label class="sr-only" for="tab-status">Status</label>
+                                <select id="tab-status" name="status" class="input" data-auto-submit>
+                                    <?php foreach (['active' => 'Active', 'on_hold' => 'On Hold'] as $value => $label): ?>
+                                        <option value="<?= esc($value) ?>"<?= $tab['status'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button type="submit" class="btn-outline">Set</button>
+                            </form>
 
-                        <?php // The question is asked on the page it leads to. ?>
-                        <a class="btn-outline btn-outline--danger" href="<?= $recipientUrl ?>/donors/<?= esc($tab['id']) ?>/delink"><?= ui_icon('unlink') ?>Delink</a>
+                            <?php // The question is asked on the page it leads to. ?>
+                            <a class="btn-outline btn-outline--danger" href="<?= $recipientUrl ?>/donors/<?= esc($tab['id']) ?>/delink"><?= ui_icon('unlink') ?>Delink</a>
+                        <?php endif; ?>
 
                         <?php if ($tab['pairId'] === ''): ?>
-                            <?php // The decision the list was leading to: one of
-                                  // them is the donor, the rest are set aside,
-                                  // and the pair's own screen opens. ?>
+                            <?php // The decision the list is for — and still for
+                                  // after one has been made, because changing
+                                  // your mind is what a list of candidates is. ?>
                             <form method="post" action="<?= $recipientUrl ?>/donors/<?= esc($tab['id']) ?>/pair" class="inline-form">
                                 <?= csrf_field() ?>
                                 <button type="submit" class="btn-primary"
-                                        data-confirm="Pair <?= esc($donor['name']) ?> with this recipient? Every other potential donor will be set to Declined."><?= ui_icon('link14') ?>Pair up</button>
+                                        data-confirm="<?= $switching
+                                            ? 'Switch the pair from ' . esc($paired['name']) . ' to ' . esc($donor['name']) . '? The pair with ' . esc($paired['name']) . ' will be closed and kept in the archive.'
+                                            : 'Pair ' . esc($donor['name']) . ' with this recipient? Every other potential donor will be set to Declined.' ?>"><?= ui_icon('link14') ?><?= $switching ? 'Switch to this donor' : 'Pair up' ?></button>
                             </form>
                         <?php endif; ?>
                     </div>
@@ -126,5 +158,34 @@ $statusWord = static fn (string $status): string => UiStore::STATUS_OPTIONS[$sta
                 ], ['saveData' => false]) ?>
             </div>
         </div>
+    <?php endif; ?>
+
+    <?php // The archive. Closed on arrival, because it is history rather than
+          // the state of the case — and open in one press, because when a pair
+          // has been switched, who it used to be is the first thing asked. ?>
+    <?php if ($history !== []): ?>
+        <details class="pair-archive">
+            <summary class="pair-archive-head">
+                <span class="pair-archive-title">Pairing history</span>
+                <span class="pair-archive-count"><?= esc(ui_plural(count($history), 'pair')) ?></span>
+            </summary>
+            <ol class="pair-archive-list">
+                <?php foreach ($history as $entry): ?>
+                    <li class="pair-archive-item<?= $entry['open'] ? ' is-open' : '' ?>">
+                        <div class="pair-archive-who">
+                            <a href="<?= site_url('pairs/' . rawurlencode($entry['id'])) ?>"><?= esc($entry['donorName'] !== '' ? $entry['donorName'] : 'MRN ' . $entry['donorId']) ?></a>
+                            <span class="pair-archive-mrn mono"><?= esc($entry['donorId']) ?></span>
+                            <span class="pair-archive-state"><?= $entry['open'] ? 'Current pair' : 'Closed' ?></span>
+                        </div>
+                        <div class="pair-archive-when">
+                            Paired <?= esc(UiStore::isoToDMY($entry['pairedOn'])) ?><?php if ($entry['endedOn'] !== ''): ?> &middot; ended <?= esc(UiStore::isoToDMY($entry['endedOn'])) ?><?php endif; ?>
+                        </div>
+                        <?php if ($entry['reason'] !== ''): ?>
+                            <div class="pair-archive-why"><?= esc($entry['reason']) ?></div>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ol>
+        </details>
     <?php endif; ?>
 </div>

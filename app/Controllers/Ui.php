@@ -337,6 +337,11 @@ class Ui extends BaseController
             // are the same cards.
             'openDonorLabs' => $openDonor['labTests'] ?? [],
             'donorValues'   => $openDonor === null ? [] : $this->donorValues($openDonor),
+            // Every pair this recipient has had, for the archive under the
+            // tabs. Empty until there has been one.
+            'pairHistory'   => $isRecipient && $person !== null
+                ? $this->store->pairingHistory($person['id'])
+                : [],
             'forRecipient'  => $forRecipient,
             // Who the choice dialog can offer: everybody on the register this
             // recipient is not already considering.

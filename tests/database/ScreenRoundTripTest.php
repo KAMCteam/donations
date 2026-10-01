@@ -2322,6 +2322,94 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             ->assertRedirectTo(site_url('pairs/' . $pairId));
     }
 
+    /**
+     * A pair does not end the list: the others stay, and the pair can be moved
+     * to one of them.
+     *
+     * Being passed over is not a decision about that donor, so the way back is
+     * open. Being delinked by hand is, so it is not.
+     */
+    public function testThePairCanBeSwitchedToAnotherPotentialDonor(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8900', 'name' => 'Switcher', 'age' => '44', 'bloodType' => 'A']);
+
+        foreach ([['8901', 'First Donor'], ['8902', 'Second Donor'], ['8903', 'Turned Down']] as [$dMrn, $dName]) {
+            $this->post('donors/new?for=8900', [
+                'for' => '8900', 'mrn' => $dMrn, 'name' => $dName, 'age' => '33', 'bloodType' => 'A',
+            ]);
+        }
+
+        $rows = $this->db->table('potential_donors')->where('recipient_mrn', 8900)->orderBy('id')->get()->getResultArray();
+
+        // One is turned down by hand before anything is paired.
+        $this->post('recipients/8900/donors/' . $rows[2]['id'] . '/delink');
+
+        $this->post('recipients/8900/donors/' . $rows[0]['id'] . '/pair');
+
+        // Passed over, with the reason recorded; turned down stays turned down.
+        $this->seeInDatabase('potential_donors', ['id' => $rows[1]['id'], 'status' => 'declined', 'aside_reason' => 'superseded']);
+        $this->seeInDatabase('potential_donors', ['id' => $rows[2]['id'], 'status' => 'declined', 'aside_reason' => 'delinked']);
+
+        // The whole list is still on the screen, and the one passed over can
+        // be switched to; the one delinked cannot.
+        $html = $this->get('recipients/8900?donor=2')->getBody();
+        $this->assertStringContainsString('Second Donor', $html);
+        $this->assertStringContainsString('Switch to this donor', $html);
+
+        $frozen = $this->get('recipients/8900?donor=3')->getBody();
+        $this->assertStringContainsString('Turned Down', $frozen);
+        $this->assertStringNotContainsString('Switch to this donor', $frozen);
+        $this->assertStringNotContainsString('Pair up', $frozen);
+
+        // Switching moves the pair and closes the old one.
+        $this->post('recipients/8900/donors/' . $rows[1]['id'] . '/pair');
+
+        $pairs = $this->db->table('pairs')->where('recipient_mrn', 8900)->orderBy('id')->get()->getResultArray();
+        $this->assertCount(2, $pairs);
+        $this->assertSame('closed', $pairs[0]['status']);
+        $this->assertSame('8901', (string) $pairs[0]['donor_mrn']);
+        $this->assertStringContainsString('Switched to Second Donor', (string) $pairs[0]['closed_reason']);
+        $this->assertNotSame('closed', $pairs[1]['status']);
+        $this->assertSame('8902', (string) $pairs[1]['donor_mrn']);
+
+        // And the two candidates have swapped places.
+        $this->seeInDatabase('potential_donors', ['id' => $rows[1]['id'], 'status' => 'active', 'aside_reason' => null]);
+        $this->seeInDatabase('potential_donors', ['id' => $rows[0]['id'], 'status' => 'declined', 'aside_reason' => 'superseded']);
+    }
+
+    /** What was switched away from is kept, and shown where it is asked for. */
+    public function testThePairingHistoryIsOnTheRecipientsRecord(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8910', 'name' => 'Archivist', 'age' => '44', 'bloodType' => 'A']);
+
+        foreach ([['8911', 'Was Paired'], ['8912', 'Is Paired']] as [$dMrn, $dName]) {
+            $this->post('donors/new?for=8910', [
+                'for' => '8910', 'mrn' => $dMrn, 'name' => $dName, 'age' => '33', 'bloodType' => 'A',
+            ]);
+        }
+
+        $rows = $this->db->table('potential_donors')->where('recipient_mrn', 8910)->orderBy('id')->get()->getResultArray();
+
+        // Nothing to archive until there has been a pair.
+        $this->assertStringNotContainsString('Pairing history', $this->get('recipients/8910')->getBody());
+
+        $this->post('recipients/8910/donors/' . $rows[0]['id'] . '/pair');
+        $this->post('recipients/8910/donors/' . $rows[1]['id'] . '/pair');
+
+        $html = $this->get('recipients/8910')->getBody();
+
+        $this->assertStringContainsString('Pairing history', $html);
+        $this->assertStringContainsString('2 pairs', $html);
+        // Newest first: who it is now, then who it was.
+        $this->assertLessThan(
+            strpos($html, 'Was Paired'),
+            strpos($html, 'Is Paired'),
+            'the current pair comes before the one it replaced'
+        );
+        $this->assertStringContainsString('Current pair', $html);
+        $this->assertStringContainsString('Switched to Is Paired.', $html);
+    }
+
     /** Somebody already on the register can be considered without re-entering them. */
     public function testAnExistingDonorCanBeAddedAsACandidate(): void
     {

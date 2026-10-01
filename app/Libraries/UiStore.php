@@ -977,9 +977,16 @@ final class UiStore
                 'bloodType'   => (string) ($row['donor_blood_group'] ?? ''),
                 'status'      => (string) $row['status'],
                 'donorStatus' => (string) ($row['donor_status'] ?? ''),
+                'asideReason' => (string) ($row['aside_reason'] ?? ''),
                 // Set aside: the tab stays, as a record of who was looked at,
-                // and nothing on it can be pressed.
+                // and their details cannot be edited from it.
                 'delinked'    => $declined,
+                // But set aside for two different reasons. Somebody passed
+                // over when another candidate was paired had nothing decided
+                // about them, so the pair can be switched back here; somebody
+                // delinked by hand was decided about, and stays decided.
+                'switchable'  => ! $declined
+                    || (string) ($row['aside_reason'] ?? '') === PotentialDonorModel::SUPERSEDED,
                 // The pair this candidate became, if one was made from them.
                 'pairId'      => (string) ($row['pair_id'] ?? ''),
             ];
@@ -1035,7 +1042,10 @@ final class UiStore
             return 'That potential donor has already been set aside.';
         }
 
-        $this->candidates->update((int) $row['id'], ['status' => PotentialDonorModel::DECLINED]);
+        $this->candidates->update((int) $row['id'], [
+            'status'       => PotentialDonorModel::DECLINED,
+            'aside_reason' => PotentialDonorModel::DELINKED,
+        ]);
         $this->closePairBetween($recipientMrn, (string) $row['donor_mrn'], $reason);
 
         return '';
@@ -1081,7 +1091,10 @@ final class UiStore
             return ['', 'That potential donor could not be found.'];
         }
 
-        if ($row['status'] === PotentialDonorModel::DECLINED) {
+        // Delinked by hand is a decision; being passed over when somebody else
+        // was paired is not, so that one can still be switched to.
+        if ($row['status'] === PotentialDonorModel::DECLINED
+            && $row['aside_reason'] !== PotentialDonorModel::SUPERSEDED) {
             return ['', 'That potential donor has been set aside.'];
         }
 
@@ -1096,15 +1109,23 @@ final class UiStore
             return ['', 'That donor is already in an open pair.'];
         }
 
-        // One recipient, one donor, one pair: whatever else was open for this
-        // recipient closes along with the rest of the list.
+        // One recipient, one donor, one pair. Whoever was the pair before
+        // closes — with a reason naming the person who replaced them, so the
+        // archive says what happened rather than only that it did.
         foreach ($this->candidates->forRecipient($recipientMrn) as $other) {
             if ((int) $other['id'] !== (int) $row['id']) {
-                $this->closePairBetween($recipientMrn, (string) $other['donor_mrn']);
+                $this->closePairBetween(
+                    $recipientMrn,
+                    (string) $other['donor_mrn'],
+                    'Switched to ' . ($this->donors->find((int) $donorMrn)['name'] ?? 'MRN ' . $donorMrn) . '.'
+                );
             }
         }
 
         $this->candidates->declineOthers($recipientMrn, (int) $row['id']);
+
+        // Back in play: the one being paired is active again whatever it was.
+        $this->candidates->update((int) $row['id'], ['status' => 'active', 'aside_reason' => null]);
 
         $pairId = (string) $this->pairs->link((int) $recipientMrn, (int) $donorMrn, [
             'status'       => 'active',
@@ -1116,6 +1137,37 @@ final class UiStore
         $this->donors->update((int) $donorMrn, ['is_listed' => 1]);
 
         return [$pairId, ''];
+    }
+
+    /**
+     * Every pair this recipient has had, newest first.
+     *
+     * Built from the pairs themselves rather than from a log, because the
+     * pairs *are* the log: one row per link ever made, with when it was made,
+     * when it ended and why. Switching from one donor to another closes a pair
+     * and opens another, so a switch is two rows here — which is exactly what
+     * somebody opening the archive wants to see.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function pairingHistory(int|string $recipientMrn): array
+    {
+        $rows = array_reverse($this->pairs->pairsForRecipient($recipientMrn));
+
+        return array_map(static fn (array $row): array => [
+            'id'        => (string) $row['id'],
+            'donorId'   => (string) $row['donor_mrn'],
+            'donorName' => (string) ($row['donor_name'] ?? ''),
+            'open'      => $row['status'] !== PairModel::CLOSED,
+            'status'    => (string) $row['status'],
+            'pairedOn'  => substr((string) $row['created_at'], 0, 10),
+            // A closed pair's last change is when it closed; an open one has
+            // not ended, so it has no ending to show.
+            'endedOn'   => $row['status'] === PairModel::CLOSED
+                ? substr((string) $row['updated_at'], 0, 10)
+                : '',
+            'reason'    => (string) ($row['closed_reason'] ?? ''),
+        ], $rows);
     }
 
     /** Closes the open pair between these two, if there is one. */

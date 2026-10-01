@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Libraries\UiStore;
 use CodeIgniter\Model;
 
 /**
@@ -85,9 +86,9 @@ class ReportModel extends Model
             ->select("GROUP_CONCAT(DISTINCT p.relationship SEPARATOR ', ') AS pair_relationship", false);
 
         if ($isRecipient) {
-            $builder->select('t.entry_date, t.dialysis_start, NULL AS donation_type, NULL AS own_relationship', false);
+            $builder->select('t.entry_date, t.dialysis_type, t.dialysis_start, NULL AS donation_type, NULL AS own_relationship', false);
         } else {
-            $builder->select('t.registered_on AS entry_date, NULL AS dialysis_start, t.donation_type, t.relationship AS own_relationship', false);
+            $builder->select('t.registered_on AS entry_date, NULL AS dialysis_type, NULL AS dialysis_start, t.donation_type, t.relationship AS own_relationship', false);
         }
 
         $this->narrow($builder, $f, $isRecipient ? 't.entry_date' : 't.registered_on', $type);
@@ -160,9 +161,7 @@ class ReportModel extends Model
             'coordinator'    => (string) ($row['coordinator_name'] ?? ''),
             'gender'         => (string) $row['gender'],
             'phone'          => (string) $row['phone'],
-            // Nothing stores what kind of dialysis somebody is on, so the
-            // column the report asks for has nothing to print yet.
-            'dialysisType'   => '',
+            'dialysisType'   => UiStore::DIALYSIS_TYPES[$row['dialysis_type'] ?? ''] ?? '',
             'firstDialysis'  => (string) ($row['dialysis_start'] ?? ''),
             'entryDate'      => (string) ($row['entry_date'] ?? ''),
             'donationType'   => (string) ($row['donation_type'] ?? ''),

@@ -31,6 +31,14 @@ $fixedIs = static fn (string $side): bool => $fixedSide === $side;
 foreach ($v as $field => $value) {
     $v[$field] = old($field, $value);
 }
+
+// The age is the date of birth read out rather than a second answer, as on the
+// record screens; the pair holds two people, so the same note serves both.
+$ageNote = static function (string $birthDate, string $storedAge): string {
+    $age = $birthDate === '' ? $storedAge : (string) UiStore::ageFrom($birthDate);
+
+    return $age === '' || $age === '0' ? '' : 'Age ' . $age;
+};
 ?>
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
@@ -72,7 +80,7 @@ foreach ($v as $field => $value) {
                           // not created in one state and then moved to the one
                           // it was always in. ?>
                     <label class="field-label" for="f-status">Status</label>
-                    <select id="f-status" name="pairStatus" class="input" data-reveal="closed-reason" data-reveal-when="closed" data-pair-status>
+                    <select id="f-status" name="pairStatus" class="input" data-reveal="closed-reason" data-reveal-when="closed">
                         <?php foreach (UiStore::PAIR_STATUS_OPTIONS as $value => $label): ?>
                             <option value="<?= esc($value) ?>"<?= $v['pairStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
                         <?php endforeach; ?>
@@ -134,8 +142,12 @@ foreach ($v as $field => $value) {
                         </select>
                     </div>
                     <div>
-                        <label class="field-label" for="f-r-age">Recipient Age</label>
-                        <input type="number" id="f-r-age" name="rAge" class="input" value="<?= esc($v['rAge']) ?>" placeholder="Age">
+                        <label class="field-label" for="f-r-birth">
+                            Date of Birth
+                            <span class="field-note" data-age-note="f-r-birth"><?= esc($ageNote($v['rBirthDate'], $v['rAge'])) ?></span>
+                        </label>
+                        <input type="hidden" name="rAge" value="<?= esc($v['rAge']) ?>">
+                        <?= view('ui/partials/date_field', ['id' => 'f-r-birth', 'name' => 'rBirthDate', 'value' => $v['rBirthDate'], 'past' => true], ['saveData' => false]) ?>
                     </div>
                     <div>
                         <label class="field-label" for="f-r-blood">Blood Group</label>
@@ -162,12 +174,30 @@ foreach ($v as $field => $value) {
 
                 <div class="form-grid-5">
                     <div>
+                        <?php // Before the date, because it decides whether there
+                              // is a date to give: pre-emptive means a transplant
+                              // before dialysis ever starts. ?>
+                        <label class="field-label" for="f-r-dialysis-type">Type Dialysis</label>
+                        <select id="f-r-dialysis-type" name="rDialysisType" class="input" data-closes="f-r-dialysis" data-closes-when="<?= UiStore::DIALYSIS_PREEMPTIVE ?>">
+                            <option value="">Not recorded</option>
+                            <?php foreach (UiStore::DIALYSIS_TYPES as $value => $label): ?>
+                                <option value="<?= esc($value) ?>"<?= $v['rDialysisType'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
                         <label class="field-label" for="f-r-dialysis">First Dialysis</label>
-                        <?= view('ui/partials/date_field', ['id' => 'f-r-dialysis', 'name' => 'rFirstDialysis', 'value' => $v['rFirstDialysis']], ['saveData' => false]) ?>
+                        <?= view('ui/partials/date_field', [
+                            'id'       => 'f-r-dialysis',
+                            'name'     => 'rFirstDialysis',
+                            'value'    => $v['rFirstDialysis'],
+                            'past'     => true,
+                            'disabled' => $v['rDialysisType'] === UiStore::DIALYSIS_PREEMPTIVE,
+                        ], ['saveData' => false]) ?>
                     </div>
                     <div>
                         <label class="field-label" for="f-r-entry">Entry Date</label>
-                        <?= view('ui/partials/date_field', ['id' => 'f-r-entry', 'name' => null, 'value' => UiStore::isoToDMY($entryDate)], ['saveData' => false]) ?>
+                        <?= view('ui/partials/date_field', ['id' => 'f-r-entry', 'name' => 'rEntryDate', 'value' => UiStore::isoToDMY($entryDate), 'past' => true], ['saveData' => false]) ?>
                     </div>
                     <div>
                         <label class="field-label" for="f-r-urgent">Urgent?</label>
@@ -183,7 +213,7 @@ foreach ($v as $field => $value) {
                               // fact — the store keeps them in step — so
                               // ui.js moves each to follow the other. ?>
                         <label class="field-label" for="f-r-status">Recipient Status</label>
-                        <select id="f-r-status" name="rStatus" class="input" data-person-status>
+                        <select id="f-r-status" name="rStatus" class="input">
                             <?php foreach (UiStore::PERSON_STATUS_OPTIONS as $value => $label): ?>
                                 <option value="<?= esc($value) ?>"<?= $v['rStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
                             <?php endforeach; ?>
@@ -253,8 +283,12 @@ foreach ($v as $field => $value) {
 
                 <div class="form-grid-5">
                     <div>
-                        <label class="field-label" for="f-d-age">Donor Age</label>
-                        <input type="number" id="f-d-age" name="dAge" class="input" value="<?= esc($v['dAge']) ?>" placeholder="Age">
+                        <label class="field-label" for="f-d-birth">
+                            Date of Birth
+                            <span class="field-note" data-age-note="f-d-birth"><?= esc($ageNote($v['dBirthDate'], $v['dAge'])) ?></span>
+                        </label>
+                        <input type="hidden" name="dAge" value="<?= esc($v['dAge']) ?>">
+                        <?= view('ui/partials/date_field', ['id' => 'f-d-birth', 'name' => 'dBirthDate', 'value' => $v['dBirthDate'], 'past' => true], ['saveData' => false]) ?>
                     </div>
                     <div>
                         <label class="field-label" for="f-d-blood">Donor Blood Group</label>

@@ -108,6 +108,23 @@ final class UiStore
      * kept in step — setting one sets the other — which is why these three are
      * exactly a subset rather than a separate vocabulary.
      */
+    /**
+     * What kind of dialysis a recipient is on.
+     *
+     * Pre-emptive is the odd one: it means a transplant before dialysis ever
+     * starts, so a pre-emptive recipient has no first dialysis date — not one
+     * nobody has filled in yet, but none there can be. The screens close that
+     * field when it is chosen, and `recipientToRow` clears it.
+     */
+    public const DIALYSIS_TYPES = [
+        'hemo'       => 'Hemodialysis',
+        'peritoneal' => 'Peritoneal dialysis',
+        'preemptive' => 'Preemptive dialysis',
+    ];
+
+    /** The one that means there is no dialysis to date. */
+    public const DIALYSIS_PREEMPTIVE = 'preemptive';
+
     public const PERSON_STATUS_OPTIONS = [
         'on_hold'  => 'On Hold',
         'active'   => 'Active',
@@ -658,14 +675,18 @@ final class UiStore
     /** @param array<string, mixed> $recipient */
     public function addRecipient(array $recipient): void
     {
-        $this->recipients->insert($this->recipientToRow($recipient) + ['mrn' => (int) $recipient['id']]);
+        $this->recipients->insert(
+            $this->recipientToRow($recipient) + ['mrn' => (int) $recipient['id'], 'entry_date' => date('Y-m-d')]
+        );
         $this->saveLabTests((int) $recipient['id'], 'recipient', $recipient['labTests'] ?? []);
     }
 
     /** @param array<string, mixed> $donor */
     public function addDonor(array $donor): void
     {
-        $this->donors->insert($this->donorToRow($donor) + ['mrn' => (int) $donor['id']]);
+        $this->donors->insert(
+            $this->donorToRow($donor) + ['mrn' => (int) $donor['id'], 'registered_on' => date('Y-m-d')]
+        );
         $this->saveLabTests((int) $donor['id'], 'donor', $donor['labTests'] ?? []);
     }
 
@@ -726,7 +747,15 @@ final class UiStore
             return;
         }
 
-        $this->recipients->update((int) $id, $this->recipientToRow($changes));
+        // A card that owns no column of its own — the workup, the notes —
+        // leaves nothing for the row, and `update()` refuses an empty one.
+        // It used to be saved from that by an entry_date default that also
+        // moved the record's entry date to the day of every edit.
+        $row = $this->recipientToRow($changes);
+
+        if ($row !== []) {
+            $this->recipients->update((int) $id, $row);
+        }
 
         if (isset($changes['labTests'])) {
             $this->saveLabTests((int) $id, 'recipient', $changes['labTests']);
@@ -746,7 +775,11 @@ final class UiStore
             return;
         }
 
-        $this->donors->update((int) $id, $this->donorToRow($changes));
+        $row = $this->donorToRow($changes);
+
+        if ($row !== []) {
+            $this->donors->update((int) $id, $row);
+        }
 
         if (isset($changes['labTests'])) {
             $this->saveLabTests((int) $id, 'donor', $changes['labTests']);
@@ -874,7 +907,12 @@ final class UiStore
             'type'           => 'recipient',
             'organ'          => $row['organ_code'],
             'name'           => $row['name'],
+            // Stored and derived, in that order: a record entered before
+            // birth dates were collected has a number and no date, and one
+            // entered since has both — with the number rewritten from the
+            // date every time it is saved, so the two cannot disagree.
             'age'            => (int) $row['age'],
+            'birthDate'      => $row['birth_date'] === null ? '' : self::isoToDMY($row['birth_date']),
             'bloodType'      => $row['blood_group'],
             'gender'         => $this->genderToUi($row['gender']),
             'phone'          => (string) $row['phone'],
@@ -882,6 +920,7 @@ final class UiStore
             'urgent'         => (bool) $row['is_urgent'],
             'status'         => $row['status'],
             'dateRegistered' => (string) $row['entry_date'],
+            'dialysisType'   => (string) ($row['dialysis_type'] ?? ''),
             'firstDialysis'  => $row['dialysis_start'] === null ? '' : self::isoToDMY($row['dialysis_start']),
             'selectedMrp'    => (string) ($row['mrp_id'] ?? ''),
             'coordinator'    => $this->coordinatorName($row['coordinator_id'] ?? null),
@@ -971,6 +1010,7 @@ final class UiStore
             'organ'             => $row['organ_code'],
             'name'              => $row['name'],
             'age'               => (int) $row['age'],
+            'birthDate'         => $row['birth_date'] === null ? '' : self::isoToDMY($row['birth_date']),
             'bloodType'         => $row['blood_group'],
             'donorGender'       => $this->genderToUi($row['gender']),
             'phone'             => (string) $row['phone'],
@@ -980,6 +1020,7 @@ final class UiStore
             'donorStatus'       => $this->statusToUi($row['status']),
             'donorMrp'          => (string) ($row['mrp_id'] ?? ''),
             'donorCoordinator'  => (string) ($this->coordinatorName($row['coordinator_id'] ?? null)),
+            'dateRegistered'    => (string) $row['registered_on'],
             'notes'             => (string) $row['notes'],
             'labTests'          => $this->labTestsFor($row['mrn'], 'donor', $row['organ_code']),
             'pairedRecipientId' => $pair === null ? '' : (string) $pair['recipient_mrn'],
@@ -1019,12 +1060,27 @@ final class UiStore
             'phone' => 'phone', 'address' => 'city', 'notes' => 'notes',
             'organ' => 'organ_code', 'selectedMrp' => 'mrp_id',
             'dateRegistered' => 'entry_date', 'firstDialysis' => 'dialysis_start',
+            'birthDate' => 'birth_date',
         ];
 
         $row = $this->mapFields($ui, $map);
 
         if (($ui['gender'] ?? '') !== '') {
             $row['gender'] = $this->genderToRow($ui['gender']);
+        }
+
+        $this->ageFromBirthDate($ui, $row);
+
+        // Pre-emptive means a transplant before dialysis begins, so there is
+        // no first dialysis to record — and a date left behind from before the
+        // answer changed would be a date for something that never happened.
+        if (array_key_exists('dialysisType', $ui)) {
+            $type                  = (string) $ui['dialysisType'];
+            $row['dialysis_type']  = isset(self::DIALYSIS_TYPES[$type]) ? $type : null;
+
+            if ($type === self::DIALYSIS_PREEMPTIVE) {
+                $row['dialysis_start'] = null;
+            }
         }
 
         // A checkbox is absent from the post when it is unticked, so the card
@@ -1041,14 +1097,16 @@ final class UiStore
             $row['status'] = $ui['status'];
         }
 
-        foreach (['entry_date', 'dialysis_start'] as $dateColumn) {
-            if (array_key_exists($dateColumn, $row)) {
+        foreach (['entry_date', 'dialysis_start', 'birth_date'] as $dateColumn) {
+            if (array_key_exists($dateColumn, $row) && $row[$dateColumn] !== null) {
                 $row[$dateColumn] = $this->toDate($row[$dateColumn]);
             }
         }
 
-        $row['entry_date'] ??= date('Y-m-d');
-
+        // No `entry_date` default here. This builds a partial row for an
+        // update as well as for an insert, and defaulting it meant every edit
+        // of any card moved the record's entry date to the day of the edit.
+        // `addRecipient` sets it, because that is where it is a new record.
         return $row;
     }
 
@@ -1063,7 +1121,8 @@ final class UiStore
             'name' => 'name', 'age' => 'age', 'bloodType' => 'blood_group',
             'phone' => 'phone', 'address' => 'city',
             'notes' => 'notes', 'organ' => 'organ_code', 'donorMrp' => 'mrp_id',
-            'relationship' => 'relationship',
+            'relationship' => 'relationship', 'birthDate' => 'birth_date',
+            'dateRegistered' => 'registered_on',
         ];
 
         $row = $this->mapFields($ui, $map);
@@ -1071,6 +1130,8 @@ final class UiStore
         if (($ui['donorGender'] ?? '') !== '') {
             $row['gender'] = $this->genderToRow($ui['donorGender']);
         }
+
+        $this->ageFromBirthDate($ui, $row);
 
         if ($this->donationTypeKey((string) ($ui['donationType'] ?? '')) !== '') {
             $row['donation_type'] = $ui['donationType'];
@@ -1087,9 +1148,46 @@ final class UiStore
             $row['coordinator_id'] = $this->coordinatorId((string) $ui['donorCoordinator']);
         }
 
-        $row['registered_on'] ??= date('Y-m-d');
+        foreach (['registered_on', 'birth_date'] as $dateColumn) {
+            if (array_key_exists($dateColumn, $row) && $row[$dateColumn] !== null) {
+                $row[$dateColumn] = $this->toDate($row[$dateColumn]);
+            }
+        }
 
+        // As on the recipients' side: `addDonor` dates a new record, and an
+        // edit leaves the date the record already has alone.
         return $row;
+    }
+
+    /**
+     * Keeps the stored age in step with the stored birth date.
+     *
+     * The screens collect the date and work the age out from it; this is what
+     * puts that number in the column every list, filter and report reads. A
+     * record with no birth date — one entered before they were collected —
+     * keeps whatever age it was given, which is why the number is still a
+     * column and not a calculation.
+     *
+     * @param array<string, mixed> $ui
+     * @param array<string, mixed> $row
+     */
+    private function ageFromBirthDate(array $ui, array &$row): void
+    {
+        if (! array_key_exists('birthDate', $ui)) {
+            return;
+        }
+
+        $birth = trim((string) $ui['birthDate']);
+
+        if ($birth === '') {
+            // Cleared: the date goes, and the age stays whatever was typed
+            // beside it rather than dropping to zero.
+            $row['birth_date'] = null;
+
+            return;
+        }
+
+        $row['age'] = self::ageFrom($birth);
     }
 
     /**
@@ -1419,6 +1517,43 @@ final class UiStore
     public static function isoToDMY(string $iso): string
     {
         return implode('/', array_reverse(explode('-', $iso)));
+    }
+
+    /**
+     * Somebody's age today, from the date they were born.
+     *
+     * Whole years, counted the way a birthday is: you are 40 until the day
+     * comes round again. 0 for anything that is not a date, or a date in the
+     * future — neither of which can be an age.
+     */
+    public static function ageFrom(string $value): int
+    {
+        $iso = self::dmyToIso($value);
+
+        if ($iso === '') {
+            return 0;
+        }
+
+        $born  = new \DateTimeImmutable($iso);
+        $today = new \DateTimeImmutable('today');
+
+        return $born > $today ? 0 : (int) $born->diff($today)->y;
+    }
+
+    /**
+     * Whether a date the screens collect is still to come.
+     *
+     * Everything the personal details ask for has already happened — when
+     * somebody was born, when their dialysis began, the day they joined the
+     * register — so a date after today is a typing mistake, and the forms say
+     * so rather than storing it. Anything that is not a date is not a future
+     * one: the field's own rules decide what to do about that.
+     */
+    public static function isFutureDate(string $value): bool
+    {
+        $iso = self::dmyToIso($value);
+
+        return $iso !== '' && $iso > date('Y-m-d');
     }
 
     /** The other way, for a date typed into a filter. '' when it is neither. */

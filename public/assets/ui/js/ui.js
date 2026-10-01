@@ -8,7 +8,9 @@
      - the mobile sidebar and its backdrop        (was js/app.js)
      - whole-row links in the tables              (was the list pages)
      - the lab test cards: status, editor, totals (was js/lab-section.js)
-     - keeping "Urgency" and "Urgent?" in step    (was person-form / add-pair)
+     - the date boxes: typing, the picker, no future dates, the age a date of
+       birth comes to, and the field another field closes
+     - the Reports filter menus and their counts
 
    Nothing here is required to read a page: every screen renders, navigates and
    submits with scripting switched off.
@@ -233,6 +235,57 @@
     return out;
   }
 
+  /** "12/03/2024" -> "2024-03-12", or "" if it is not a whole date yet. */
+  function isoOf(value) {
+    var parts = value.split("/");
+    if (parts.length !== 3 || parts[2].length !== 4) return "";
+    return parts[2] + "-" + parts[1] + "-" + parts[0];
+  }
+
+  function today() {
+    var d = new Date();
+    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+
+  /* Whole years, counted the way a birthday is: you are 40 until the day comes
+     round again. The same sum as `UiStore::ageFrom`, which is what the server
+     stores; this only shows it before the form is sent. */
+  function ageFrom(iso) {
+    var born = iso.split("-");
+    var now = today().split("-");
+    var age = Number(now[0]) - Number(born[0]);
+
+    if (now[1] < born[1] || (now[1] === born[1] && now[2] < born[2])) age -= 1;
+    return age;
+  }
+
+  /* The age that goes with a date of birth, written beside the field's label.
+     There is no second box to fill: it is the same answer read out, so it
+     follows the date as it is typed. */
+  function updateAgeNote(input) {
+    var note = document.querySelector('[data-age-note="' + input.id + '"]');
+    if (!note) return;
+
+    var iso = isoOf(input.value);
+    var age = iso === "" || iso > today() ? -1 : ageFrom(iso);
+
+    note.textContent = age < 0 ? "" : "Age " + age;
+  }
+
+  /* Everything the personal details ask for has already happened, so a date
+     after today is a slip. The picker will not offer one; this is for a date
+     typed straight in. The server checks a third time, because neither of
+     these is on it. */
+  function markFutureDate(input) {
+    var field = input.closest("[data-date-past]");
+    if (!field) return;
+
+    var iso = isoOf(input.value);
+    input.setCustomValidity(iso !== "" && iso > today() ? "This date is in the future." : "");
+    field.classList.toggle("is-future", iso !== "" && iso > today());
+  }
+
   function bindDateText(input) {
     input.addEventListener("input", function () {
       var digits = input.value.replace(/\D/g, "").slice(0, 8);
@@ -242,7 +295,12 @@
       // Only chase the caret to the end when it was already there, so editing
       // the middle of a date does not throw you to the end of it.
       if (atEnd) input.setSelectionRange(input.value.length, input.value.length);
+
+      updateAgeNote(input);
+      markFutureDate(input);
     });
+
+    markFutureDate(input);
   }
 
   function bindDatePicker(field) {
@@ -270,6 +328,44 @@
       if (!native.value) return;
       var iso = native.value.split("-");
       text.value = iso[2] + "/" + iso[1] + "/" + iso[0];
+
+      updateAgeNote(text);
+      markFutureDate(text);
+    });
+  }
+
+  /* ---- A field another field closes --------------------------------------
+
+     Pre-emptive dialysis means a transplant before dialysis ever begins, so a
+     recipient on it has no first dialysis date — not one nobody has filled in,
+     but none there can be. The select says which field that is and on which
+     answer, and the date closes and empties itself.
+
+     With this file absent the field stays open and the server clears it on
+     save, which is the honest fallback: the record ends up right either way. */
+  function initClosers() {
+    document.querySelectorAll("[data-closes]").forEach(function (select) {
+      var text = document.getElementById(select.getAttribute("data-closes"));
+      var when = select.getAttribute("data-closes-when");
+      if (!text) return;
+
+      var field = text.closest("[data-date-field]");
+      var button = field ? field.querySelector("[data-date-open]") : null;
+
+      function sync() {
+        var closed = select.value === when;
+
+        // Still posted, and posted empty, so saving clears a date left behind
+        // from before the answer changed.
+        if (closed) text.value = "";
+        text.readOnly = closed;
+        text.placeholder = closed ? "Not applicable" : "DD/MM/YYYY";
+        if (button) button.disabled = closed;
+        if (field) field.classList.toggle("is-closed", closed);
+      }
+
+      select.addEventListener("change", sync);
+      sync();
     });
   }
 
@@ -397,32 +493,6 @@
     });
   }
 
-  /* Add Pair asks for the pair's status and the recipient's in one form, and
-     where the two lists share a word they are one fact — the store keeps them
-     in step whichever screen sets it. So each select follows the other while
-     it can: a pair moved to Transplanted, Paired Exchange or Closed says
-     nothing about the person, and leaves their own status where it was.
-
-     Without this file the server still decides, and the pair's card wins,
-     because it is applied last. This only makes that visible before saving. */
-  function initPairedStatuses() {
-    var pair = document.querySelector("[data-pair-status]");
-    var person = document.querySelector("[data-person-status]");
-    if (!pair || !person) return;
-
-    function offers(select, value) {
-      return Array.prototype.some.call(select.options, function (o) { return o.value === value; });
-    }
-
-    pair.addEventListener("change", function () {
-      if (offers(person, pair.value)) person.value = pair.value;
-    });
-
-    person.addEventListener("change", function () {
-      if (offers(pair, person.value)) pair.value = person.value;
-    });
-  }
-
   document.addEventListener("DOMContentLoaded", function () {
     initSidebar();
     initRowLinks();
@@ -433,7 +503,7 @@
     initConfirmDelete();
     initAutoSubmit();
     initDialogClosers();
-    initPairedStatuses();
+    initClosers();
     initConfirmButtons();
     initReveals();
   });

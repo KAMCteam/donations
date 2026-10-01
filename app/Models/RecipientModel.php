@@ -15,7 +15,7 @@ class RecipientModel extends Model
     protected $useTimestamps = true;
     protected $allowedFields = [
         'mrn', 'name', 'organ_code', 'blood_group', 'gender', 'age', 'city', 'phone',
-        'entry_date', 'dialysis_start', 'is_urgent', 'status',
+        'birth_date', 'entry_date', 'dialysis_type', 'dialysis_start', 'is_urgent', 'status',
         'mrp_id', 'coordinator_id', 'notes',
     ];
 

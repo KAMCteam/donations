@@ -27,7 +27,7 @@ use App\Libraries\UiStore;
 $headers = [
     'Pair #', 'MRN', 'Name', 'Age', 'Type', 'Relationship',
     'Blood Group', 'MRP', 'Gender', 'Phone Number',
-    'Dialysis', 'Entry Date', 'Status', 'Date of Crossmatch', 'Note',
+    'Type Dialysis', 'Dialysis', 'Entry Date', 'Status', 'Date of Crossmatch', 'Note',
 ];
 
 $dash = '—';
@@ -110,6 +110,7 @@ $mrpName = static function (string $id) use ($mrps): string {
                         <td><?= esc($mrpName($recipient['selectedMrp'] ?? '')) ?></td>
                         <td><?= esc($recipient['gender'] ?? $dash) ?></td>
                         <td class="c-mono"><?= esc($recipient['phone'] ?? $dash) ?></td>
+                        <td><?= esc(UiStore::DIALYSIS_TYPES[$recipient['dialysisType'] ?? ''] ?? $dash) ?></td>
                         <td class="c-mono"><?= esc($orDash($recipient['firstDialysis'] ?? '')) ?></td>
                         <td class="c-mono"><?= esc($entry($recipient['dateRegistered'] ?? '')) ?></td>
                         <td rowspan="2" class="c-span"><?= esc($statusLabel) ?></td>
@@ -126,6 +127,7 @@ $mrpName = static function (string $id) use ($mrps): string {
                         <td><?= esc($donor['donorGender'] ?? $dash) ?></td>
                         <td class="c-mono"><?= esc($donor['phone'] ?? $dash) ?></td>
                         <?php // Spelled out, as on the screen. ?>
+                        <td>Not applicable</td>
                         <td>Not applicable</td>
                         <td>Not applicable</td>
                         <td class="c-mono"><?= esc($orDash((string) ($pair['scheduledDate'] ?? ''))) ?></td>

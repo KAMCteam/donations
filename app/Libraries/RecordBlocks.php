@@ -48,6 +48,7 @@ class RecordBlocks
             'fields' => [
                 ['label' => 'Recipient MRN', 'value' => (string) $recipient['id'], 'mono' => true],
                 ['label' => 'Recipient Name', 'value' => (string) ($recipient['name'] ?? ''), 'wide' => true, 'strong' => true],
+                ['label' => 'Date of Birth', 'value' => (string) ($recipient['birthDate'] ?? ''), 'mono' => true],
                 ['label' => 'Age', 'value' => isset($recipient['age']) ? (string) $recipient['age'] : ''],
                 ['label' => 'Gender', 'value' => (string) ($recipient['gender'] ?? '')],
                 ['label' => 'Blood Group', 'value' => (string) ($recipient['bloodType'] ?? ''), 'mono' => true, 'strong' => true],
@@ -55,6 +56,7 @@ class RecordBlocks
                 ['label' => 'City', 'value' => (string) ($recipient['address'] ?? '')],
                 ['label' => 'Recipient MRP', 'value' => $this->mrpName((string) ($recipient['selectedMrp'] ?? ''))],
                 ['label' => 'Coordinator', 'value' => (string) ($recipient['coordinator'] ?? '')],
+                ['label' => 'Type Dialysis', 'value' => UiStore::DIALYSIS_TYPES[$recipient['dialysisType'] ?? ''] ?? ''],
                 ['label' => 'First Dialysis', 'value' => (string) ($recipient['firstDialysis'] ?? ''), 'mono' => true],
                 ['label' => 'Entry Date', 'value' => UiStore::isoToDMY((string) ($recipient['dateRegistered'] ?? '')), 'mono' => true],
                 ['label' => 'Urgent', 'value' => ($recipient['urgent'] ?? false) ? 'Yes' : 'No'],
@@ -107,6 +109,7 @@ class RecordBlocks
             'fields' => [
                 ['label' => 'Donor MRN', 'value' => (string) $donor['id'], 'mono' => true],
                 ['label' => 'Donor Name', 'value' => (string) ($donor['name'] ?? ''), 'wide' => true, 'strong' => true],
+                ['label' => 'Date of Birth', 'value' => (string) ($donor['birthDate'] ?? ''), 'mono' => true],
                 ['label' => 'Age', 'value' => isset($donor['age']) ? (string) $donor['age'] : ''],
                 ['label' => 'Gender', 'value' => (string) ($donor['donorGender'] ?? '')],
                 ['label' => 'Blood Group', 'value' => (string) ($donor['bloodType'] ?? ''), 'mono' => true, 'strong' => true],

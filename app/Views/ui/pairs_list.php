@@ -22,7 +22,7 @@ use App\Libraries\UiStore;
 $headers = [
     'Pair #', 'MRN', 'Name', 'Age', 'Type', 'Relationship',
     'Blood Group', 'MRP', 'Gender', 'Phone Number',
-    'Dialysis', 'Entry Date', 'Status', 'Date of Crossmatch', '',
+    'Type Dialysis', 'Dialysis', 'Entry Date', 'Status', 'Date of Crossmatch', '',
 ];
 
 $dash = '—';
@@ -132,6 +132,9 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                             <td class="t-600"><?= esc($mrpName($recipient['selectedMrp'] ?? '')) ?></td>
                             <td class="t-600"><?= esc($recipient['gender'] ?? $dash) ?></td>
                             <td class="t-mono t-600 cell-phone"><?= esc($recipient['phone'] ?? $dash) ?></td>
+                            <?php // Which kind, then when it began. Pre-emptive
+                                  // has no when: the transplant comes first. ?>
+                            <td class="t-500"><?= esc(UiStore::DIALYSIS_TYPES[$recipient['dialysisType'] ?? ''] ?? $dash) ?></td>
                             <td class="t-mono t-500"><?= esc($orDash($recipient['firstDialysis'] ?? '')) ?></td>
                             <td class="t-mono t-500"><?= esc($entry($recipient['dateRegistered'] ?? '')) ?></td>
                             <td rowspan="2" class="cell-span">
@@ -164,6 +167,7 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
                             <?php // Dialysis and Entry Date are the recipient's
                                   // questions; a donor has no answer to give,
                                   // which is not the same as having none yet. ?>
+                            <td class="t-500 cell-na">Not applicable</td>
                             <td class="t-500 cell-na">Not applicable</td>
                             <td class="t-500 cell-na">Not applicable</td>
                             <td class="t-mono t-500 cell-last"><?= esc(($pair['scheduledDate'] ?? '') !== '' ? $pair['scheduledDate'] : $dash) ?></td>

@@ -991,7 +991,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
      * Each date is a text box holding DD/MM/YYYY plus a picker that posts
      * nothing. The picker used to inherit the previous field's name, because
      * CodeIgniter carries view data between `view()` calls — which made the
-     * read-only Entry Date post as First Dialysis and move it on every save.
+     * Entry Date post as First Dialysis and move it on every save.
      */
     public function testEachDateFieldCarriesItsOwnNameAndAPickerThatPostsNothing(): void
     {
@@ -1005,9 +1005,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         $html = $this->get('recipients/3003?edit=personal')->getBody();
 
-        $this->assertSame(1, substr_count($html, 'name="firstDialysis"'), 'only the dialysis box carries that name');
-        // Entry Date renders read-only, with no name and no picker.
-        $this->assertMatchesRegularExpression('/id="f-entry"(?![^>]*name=)/', $html);
+        foreach (['birthDate', 'firstDialysis', 'dateRegistered'] as $field) {
+            $this->assertSame(1, substr_count($html, 'name="' . $field . '"'), 'exactly one box carries ' . $field);
+        }
+
         // The picker is unnamed, so it posts nothing.
         $this->assertStringNotContainsString('<input type="date" name', $html);
     }

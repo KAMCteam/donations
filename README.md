@@ -191,6 +191,10 @@ if it is new.
 column was only ever filled from the recipient form's Hospital box, so with
 that gone nothing could write it and nothing showed it.
 
+Added since: `birth_date` on both registers, `dialysis_type` on recipients, and
+an Entry Date the screens collect rather than only show. The three sections
+below say what each is for.
+
 ### Donor type
 
 What kind of donation this is, asked with the list the screen can actually
@@ -251,31 +255,70 @@ Red marks the answer somebody has to act on — Positive, Abnormal, Not cleared
 
 The sheet names no organ, so both programmes carry both lists.
 
-### Status is one value, on two screens
+### Status: three facts, not one
 
-A recipient's status and the Match Status of the pair they are in are the same
-fact about the same case, so they are one list and one value:
+A recipient's status, a donor's, and the Match Status of a pair were once one
+value shared between screens — setting it on either set the other. They are
+three separate facts now, and nothing carries one to another:
 
-| | |
+| Where | What it says |
 | --- | --- |
-| Pending | Confirmed |
-| Closed | Completed |
-| Paired Exchange | On Hold |
-| Active | Declined |
+| **Recipient Status**, on the record and on the pair's recipient card | Is this person on the programme |
+| **Donor Status**, on the record and on the pair's donor card | Is this person still being worked up |
+| **Match Status**, on the pair's own card | What became of this link |
 
-`UiStore::STATUS_OPTIONS` is the only place that list exists — the recipient
-screen's **Recipient Status**, the pair profile's **Match Status**, the Pairs
-List's filter chips and its badge all read it, and both columns are that same
-ENUM. Setting it on either screen sets the other, and a new pair starts both
-sides at the same value, so the two can never disagree. A recipient with no
-pair simply keeps their own.
+What broke the old arrangement was a recipient being allowed more than one
+donor: with three links open, there is no saying which of them a Declined on
+the person was about. So closing a pair no longer closes the recipient,
+declining a recipient no longer declines their donors, and each of the three
+selects is saved by the card it sits on and no other.
 
-One of them means more than its label: **Closed** is what "open pair" is
-defined against, so closing a pair — from either screen — puts both sides back
-on their lists. The rest are descriptive.
+`UiStore::STATUS_OPTIONS` still holds every word any of them can take, so a
+value stored before this reads correctly wherever it appears. What each screen
+*offers* is narrower: `PERSON_STATUS_OPTIONS` and `DONOR_STATUS_OPTIONS` are On
+Hold / Active / Declined, and `PAIR_STATUS_OPTIONS` adds the three that are a
+pair's alone.
 
-A donor still has its own separate status (On Hold / Active / Completed /
-Cancelled), which is not tied to the pair.
+One of those means more than its label: **Closed** is what "open pair" is
+defined against, so closing a pair puts both sides back on their lists. That is
+the link's doing, not a change to either person's own status.
+
+### Age is a date of birth
+
+Age used to be typed as a number, which is a fact with a shelf life: right on
+the day it was entered and quietly wrong every year after, with nothing in the
+system to ask again. The field collects a **date of birth** now, and the age it
+comes to today is written beside the field's own label — not a second box to
+fill, the same answer read out. It updates as the date is typed, and the server
+works out the same number when it saves.
+
+`age` is still a column, because every list, filter and report reads it and
+because the records entered before `birth_date` existed have nothing else. It
+is rewritten from the birth date whenever one is saved, so the two cannot
+disagree; a record with no birth date keeps the number it was given.
+
+### Dialysis: which kind, and whether there is a date at all
+
+`dialysis_type` says which: **Hemodialysis**, **Peritoneal dialysis** or
+**Preemptive dialysis**. It is asked before First Dialysis because it decides
+whether that question has an answer — pre-emptive means a transplant before
+dialysis ever begins, so there is no first one. Choosing it closes the date
+field on the screen and clears the column on save, and the Pairs List and both
+reports carry the kind in a column of its own.
+
+### No date in the future
+
+Everything the personal details collect has already happened: when somebody was
+born, when their dialysis began, the day they joined the register. So those
+fields will not take a later date. The calendar stops at today, `ui.js` marks a
+later one typed straight in, and the controller refuses the save — three
+guards, because the first two are in the browser and the browser is not where
+the record is kept.
+
+**Entry Date** is one of them, and is now a field rather than a read-out: a new
+record opens on today, which is almost always right, and somebody entering a
+patient who arrived last week can say so. Nothing else moves it — editing any
+other card used to re-date the record to the day of the edit.
 
 ### Reports
 
@@ -308,12 +351,6 @@ Type Dialysis, First Dialysis, Entry Date, Relationship, Date of Crossmatch —
 and all five start on. The rest are what a row *is*, and a table without them
 could not be read. A column the chosen record type does not have stays off
 whether or not it is ticked: there is nothing to show.
-
-**Type Dialysis has no column behind it.** Nothing in the schema records what
-kind of dialysis somebody is on — `recipients` holds `dialysis_start` and
-nothing else — so that column renders for every row and is empty for every row.
-It is here because the report asks for it; filling it needs a field on
-`recipients` and a control on the recipient form.
 
 Related Donor/Recipient is a list, not a single name: a recipient may hold
 several donors, and the cell names each one with their MRN.
@@ -438,8 +475,9 @@ writes.
 | `lab_results` | One row per person per test: status, value, date |
 
 Two tables rather than one for people, because a recipient and a donor are not
-the same record. A recipient has `entry_date`, `dialysis_start`, `urgency` and
-`diagnosis`; a donor has `donation_type` and `relationship`. Sharing one table
+the same record. A recipient has `entry_date`, `dialysis_type`,
+`dialysis_start` and `is_urgent`; a donor has `donation_type` and
+`relationship`. Sharing one table
 means four columns that are always NULL on one side. The same person can hold a
 row in both under one MRN — they may donate on one programme and be listed on
 another.

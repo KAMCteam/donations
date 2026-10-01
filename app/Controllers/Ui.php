@@ -48,8 +48,9 @@ class Ui extends BaseController
      */
     private const PERSON_SECTIONS = [
         'personal' => [
-            'name', 'age', 'bloodType', 'phone', 'address',
-            'urgent', 'coordinator', 'status', 'gender', 'selectedMrp', 'firstDialysis',
+            'name', 'age', 'birthDate', 'bloodType', 'phone', 'address',
+            'urgent', 'coordinator', 'status', 'gender', 'selectedMrp',
+            'dialysisType', 'firstDialysis', 'dateRegistered',
             'donationType', 'relationship', 'donorGender', 'donorMrp', 'donorStatus',
             'donorCoordinator',
         ],
@@ -306,6 +307,7 @@ class Ui extends BaseController
                 'mrn'              => $person['id'] ?? '',
                 'name'             => $person['name'] ?? '',
                 'age'              => isset($person['age']) ? (string) $person['age'] : '',
+                'birthDate'        => $person['birthDate'] ?? '',
                 'bloodType'        => $person['bloodType'] ?? 'O',
                 'phone'            => $person['phone'] ?? '',
                 'address'          => $person['address'] ?? '',
@@ -313,7 +315,11 @@ class Ui extends BaseController
                 'urgent'           => (bool) ($person['urgent'] ?? false),
                 'coordinator'      => $person['coordinator'] ?? '',
                 'status'           => $person['status'] ?? 'pending',
+                // A new record is dated today, which is almost always right and
+                // is the one date somebody can correct without having to know
+                // it was there. A saved one shows the day it was entered.
                 'dateRegistered'   => $person['dateRegistered'] ?? date('Y-m-d'),
+                'dialysisType'     => $person['dialysisType'] ?? '',
                 // A saved record shows what was saved; only a blank form falls
                 // back to a default. These used to be hard-coded, which meant
                 // reopening a record and pressing Save reassigned its MRP to
@@ -336,9 +342,19 @@ class Ui extends BaseController
     {
         $isRecipient = $personType === 'recipient';
 
+        $error = $this->futureDateError(['birthDate', 'firstDialysis', 'dateRegistered']);
+
+        if ($error !== '') {
+            return redirect()->back()->withInput()->with('ui_error', $error);
+        }
+
         $base = [
             'name'      => (string) $this->request->getPost('name'),
+            // The form asks for the date of birth; the age is worked out from
+            // it. The number still travels, for the records entered before
+            // there was a date to work it out from.
             'age'       => (int) $this->request->getPost('age'),
+            'birthDate' => (string) $this->request->getPost('birthDate'),
             'bloodType' => (string) $this->request->getPost('bloodType'),
             'phone'     => (string) $this->request->getPost('phone'),
             'address'   => (string) $this->request->getPost('address'),
@@ -353,11 +369,15 @@ class Ui extends BaseController
                 'urgent'         => (bool) $this->request->getPost('urgent'),
                 'coordinator'    => (string) $this->request->getPost('coordinator'),
                 'status'         => (string) $this->request->getPost('status'),
-                'dateRegistered' => $person['dateRegistered'] ?? date('Y-m-d'),
+                // Collected now rather than carried over: the screen offers the
+                // date and defaults it to today, so what comes back is what is
+                // stored.
+                'dateRegistered' => (string) $this->request->getPost('dateRegistered'),
                 // The form has always posted these; nothing read them until
                 // there were columns to put them in.
                 'gender'         => (string) $this->request->getPost('gender'),
                 'selectedMrp'    => (string) $this->request->getPost('selectedMrp'),
+                'dialysisType'   => (string) $this->request->getPost('dialysisType'),
                 'firstDialysis'  => (string) $this->request->getPost('firstDialysis'),
             ]);
 
@@ -381,6 +401,7 @@ class Ui extends BaseController
 
         $fields = array_merge($base, [
             'type'             => 'donor',
+            'dateRegistered'   => (string) $this->request->getPost('dateRegistered'),
             'donationType'     => (string) $this->request->getPost('donationType'),
             'relationship'     => $person['relationship'] ?? '',
             'donorGender'      => (string) $this->request->getPost('donorGender'),
@@ -1043,12 +1064,14 @@ class Ui extends BaseController
                 'rMrn'           => '',
                 'rName'          => '',
                 'rAge'           => '',
+                'rBirthDate'     => '',
                 'rBloodType'     => 'O',
                 'rPhone'         => '',
                 'rCity'          => '',
                 'rUrgent'        => false,
                 'rCoordinator'   => '',
                 'rGender'        => 'Male',
+                'rDialysisType'  => '',
                 'rFirstDialysis' => '',
                 'rMrp'           => $mrps[0]['id'] ?? '',
                 'rNotes'         => '',
@@ -1056,6 +1079,7 @@ class Ui extends BaseController
                 'dType'          => 'living_related',
                 'dName'          => '',
                 'dAge'           => '',
+                'dBirthDate'     => '',
                 'dBloodType'     => 'O',
                 'dPhone'         => '',
                 'dCity'          => '',
@@ -1099,6 +1123,7 @@ class Ui extends BaseController
             $prefix . 'Mrn'       => (string) $person['id'],
             $prefix . 'Name'      => (string) $person['name'],
             $prefix . 'Age'       => (string) $person['age'],
+            $prefix . 'BirthDate' => (string) ($person['birthDate'] ?? ''),
             $prefix . 'BloodType' => (string) $person['bloodType'],
             $prefix . 'Phone'     => (string) $person['phone'],
             $prefix . 'City'      => (string) $person['address'],
@@ -1108,6 +1133,7 @@ class Ui extends BaseController
         ] + ($isRecipient ? [
             'rUrgent'        => (bool) $person['urgent'],
             'rCoordinator'   => (string) $person['coordinator'],
+            'rDialysisType'  => (string) ($person['dialysisType'] ?? ''),
             'rFirstDialysis' => (string) $person['firstDialysis'],
         ] : [
             'dType'        => (string) $person['donationType'],
@@ -1143,7 +1169,8 @@ class Ui extends BaseController
         $recipientId = trim((string) $this->request->getPost('rMrn'));
         $donorId     = trim((string) $this->request->getPost('dMrn'));
 
-        $error = $fixedSide === 'recipient' ? '' : $this->mrnError($recipientId, 'recipient', 'Recipient MRN');
+        $error = $this->futureDateError(['rBirthDate', 'dBirthDate', 'rFirstDialysis', 'rEntryDate']);
+        $error = $error ?: ($fixedSide === 'recipient' ? '' : $this->mrnError($recipientId, 'recipient', 'Recipient MRN'));
         $error = $error ?: ($fixedSide === 'donor' ? '' : $this->mrnError($donorId, 'donor', 'Donor MRN'));
 
         // Separate registers, so the same number on both sides is accepted by
@@ -1176,6 +1203,7 @@ class Ui extends BaseController
                 'organ'          => $organ,
                 'name'           => (string) $this->request->getPost('rName'),
                 'age'            => (int) $this->request->getPost('rAge'),
+                'birthDate'      => (string) $this->request->getPost('rBirthDate'),
                 'bloodType'      => (string) $this->request->getPost('rBloodType'),
                 'phone'          => (string) $this->request->getPost('rPhone'),
                 'address'        => (string) $this->request->getPost('rCity'),
@@ -1183,9 +1211,10 @@ class Ui extends BaseController
                 'coordinator'    => (string) $this->request->getPost('rCoordinator'),
                 'gender'         => (string) $this->request->getPost('rGender'),
                 'selectedMrp'    => (string) $this->request->getPost('rMrp'),
+                'dialysisType'   => (string) $this->request->getPost('rDialysisType'),
                 'firstDialysis'  => (string) $this->request->getPost('rFirstDialysis'),
                 'status'         => (string) $this->request->getPost('rStatus'),
-                'dateRegistered' => $entryDate,
+                'dateRegistered' => (string) ($this->request->getPost('rEntryDate') ?: $entryDate),
                 'notes'          => (string) $this->request->getPost('rNotes'),
                 'labTests'       => $this->postedLabTests('rLabs'),
             ]);
@@ -1198,6 +1227,7 @@ class Ui extends BaseController
                 'organ'            => $organ,
                 'name'             => (string) $this->request->getPost('dName'),
                 'age'              => (int) $this->request->getPost('dAge'),
+                'birthDate'        => (string) $this->request->getPost('dBirthDate'),
                 'bloodType'        => (string) $this->request->getPost('dBloodType'),
                 'phone'            => (string) $this->request->getPost('dPhone'),
                 'address'          => (string) $this->request->getPost('dCity'),
@@ -1280,6 +1310,7 @@ class Ui extends BaseController
                 'closedReason'   => $pair['closedReason'] ?? '',
                 'rName'          => $recipient['name'] ?? '',
                 'rAge'           => isset($recipient['age']) ? (string) $recipient['age'] : '',
+                'rBirthDate'     => $recipient['birthDate'] ?? '',
                 'rBloodType'     => $recipient['bloodType'] ?? 'O',
                 'rPhone'         => $recipient['phone'] ?? '',
                 'rCity'          => $recipient['address'] ?? '',
@@ -1287,11 +1318,13 @@ class Ui extends BaseController
                 'rCoordinator'   => $recipient['coordinator'] ?? '',
                 'rGender'        => $recipient['gender'] ?? 'Male',
                 'rMrp'           => $recipient['selectedMrp'] ?? '',
+                'rDialysisType'  => $recipient['dialysisType'] ?? '',
                 'rFirstDialysis' => $recipient['firstDialysis'] ?? '',
                 'rStatus'        => $recipient['status'] ?? UiStore::PAIRS_DEFAULT_STATUS,
                 'rNotes'         => $recipient['notes'] ?? '',
                 'dName'          => $donor['name'] ?? '',
                 'dAge'           => isset($donor['age']) ? (string) $donor['age'] : '',
+                'dBirthDate'     => $donor['birthDate'] ?? '',
                 'dBloodType'     => $donor['bloodType'] ?? 'O',
                 'dPhone'         => $donor['phone'] ?? '',
                 'dCity'          => $donor['address'] ?? '',
@@ -1353,9 +1386,16 @@ class Ui extends BaseController
         }
 
         if ($recipient !== null && $section === 'recipient') {
+            $error = $this->futureDateError(['rBirthDate', 'rFirstDialysis', 'rEntryDate']);
+
+            if ($error !== '') {
+                return redirect()->back()->withInput()->with('ui_error', $error);
+            }
+
             $this->store->updateRecipient($recipient['id'], [
                 'name'          => $post('rName'),
                 'age'           => (int) $post('rAge') ?: $recipient['age'],
+                'birthDate'     => $post('rBirthDate'),
                 'bloodType'     => $post('rBloodType'),
                 'phone'         => $post('rPhone'),
                 'address'       => $post('rCity'),
@@ -1363,7 +1403,11 @@ class Ui extends BaseController
                 'coordinator'   => $post('rCoordinator'),
                 'gender'        => $post('rGender'),
                 'selectedMrp'   => $post('rMrp'),
+                'dialysisType'  => $post('rDialysisType'),
                 'firstDialysis' => $post('rFirstDialysis'),
+                'dateRegistered' => $post('rEntryDate'),
+                // The recipient's own, and nobody else's: the pair's card sets
+                // the pair's status and the donor's card sets the donor's.
                 'status'        => $post('rStatus'),
             ]);
         }
@@ -1377,9 +1421,16 @@ class Ui extends BaseController
         }
 
         if ($donor !== null && $section === 'donor') {
+            $error = $this->futureDateError(['dBirthDate']);
+
+            if ($error !== '') {
+                return redirect()->back()->withInput()->with('ui_error', $error);
+            }
+
             $this->store->updateDonor($donor['id'], [
                 'name'             => $post('dName'),
                 'age'              => (int) $post('dAge') ?: $donor['age'],
+                'birthDate'        => $post('dBirthDate'),
                 'bloodType'        => $post('dBloodType'),
                 'phone'            => $post('dPhone'),
                 'address'          => $post('dCity'),
@@ -1688,6 +1739,31 @@ class Ui extends BaseController
             $fields,
             array_flip([...$owned, 'type', 'organ'])
         );
+    }
+
+    /**
+     * Refuses a date that has not happened yet.
+     *
+     * Everything the personal details collect is in the past — when somebody
+     * was born, when their dialysis began, the day they joined the register —
+     * so a later date is a typing slip. The screens stop it twice over, in the
+     * picker and in `ui.js`, and neither of those is on the server.
+     *
+     * A field the open card did not post is not checked: it was not asked.
+     *
+     * @param list<string> $fields
+     */
+    private function futureDateError(array $fields): string
+    {
+        foreach ($fields as $field) {
+            $value = $this->request->getPost($field);
+
+            if (is_string($value) && UiStore::isFutureDate($value)) {
+                return 'A date cannot be in the future.';
+            }
+        }
+
+        return '';
     }
 
     /**

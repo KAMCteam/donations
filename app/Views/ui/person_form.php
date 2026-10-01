@@ -47,6 +47,17 @@ $eyebrow = $mode === 'add' ? 'New' : ($person['id'] ?? '');
 // form and the screen still works with JavaScript off. A new record has
 // nothing to read yet, so every card starts editable and one Save at the foot
 // of the form commits the lot — below the fields it saves, not above them.
+// The age is not asked for any more: the date of birth is, and the age is
+// what that comes to today. It is shown beside the field's own label rather
+// than in a box of its own, because it is not a second answer — it is the
+// same answer, read out. A record entered before birth dates were collected
+// has only the number, and that is what shows.
+$ageNote = static function (string $birthDate, string $storedAge): string {
+    $age = $birthDate === '' ? $storedAge : (string) UiStore::ageFrom($birthDate);
+
+    return $age === '' || $age === '0' ? '' : 'Age ' . $age;
+};
+
 $viewUrl  = $mode === 'add' ? null : site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id']));
 $editable = static fn (string $section): bool => $mode === 'add' || $editing === $section;
 $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $section;
@@ -140,8 +151,15 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                             </select>
                         </div>
                         <div>
-                            <label class="field-label" for="f-age">Recipient Age</label>
-                            <input type="number" id="f-age" name="age" class="input" value="<?= esc($v['age']) ?>" placeholder="Age">
+                            <label class="field-label" for="f-birth">
+                                Date of Birth
+                                <span class="field-note" data-age-note="f-birth"><?= esc($ageNote($v['birthDate'], $v['age'])) ?></span>
+                            </label>
+                            <?php // The number still travels, so a record saved
+                                  // without a birth date keeps the age it was
+                                  // entered with instead of dropping to zero. ?>
+                            <input type="hidden" name="age" value="<?= esc($v['age']) ?>">
+                            <?= view('ui/partials/date_field', ['id' => 'f-birth', 'name' => 'birthDate', 'value' => $v['birthDate'], 'past' => true], ['saveData' => false]) ?>
                         </div>
                         <div>
                             <label class="field-label" for="f-blood">Blood Group</label>
@@ -168,12 +186,37 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
                     <div class="form-grid-5">
                         <div>
+                            <?php // Before the date, because it decides whether
+                                  // there is a date to give at all. ?>
+                            <label class="field-label" for="f-dialysis-type">Type Dialysis</label>
+                            <select id="f-dialysis-type" name="dialysisType" class="input" data-closes="f-dialysis" data-closes-when="<?= UiStore::DIALYSIS_PREEMPTIVE ?>">
+                                <option value="">Not recorded</option>
+                                <?php foreach (UiStore::DIALYSIS_TYPES as $value => $label): ?>
+                                    <option value="<?= esc($value) ?>"<?= $v['dialysisType'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div>
                             <label class="field-label" for="f-dialysis">First Dialysis</label>
-                            <?= view('ui/partials/date_field', ['id' => 'f-dialysis', 'name' => 'firstDialysis', 'value' => $v['firstDialysis']], ['saveData' => false]) ?>
+                            <?php // Pre-emptive means a transplant before
+                                  // dialysis ever starts, so there is no first
+                                  // one: the field closes rather than waiting
+                                  // for a date that cannot exist. ?>
+                            <?= view('ui/partials/date_field', [
+                                'id'       => 'f-dialysis',
+                                'name'     => 'firstDialysis',
+                                'value'    => $v['firstDialysis'],
+                                'past'     => true,
+                                'disabled' => $v['dialysisType'] === UiStore::DIALYSIS_PREEMPTIVE,
+                            ], ['saveData' => false]) ?>
                         </div>
                         <div>
                             <label class="field-label" for="f-entry">Entry Date</label>
-                            <?= view('ui/partials/date_field', ['id' => 'f-entry', 'name' => null, 'value' => UiStore::isoToDMY($v['dateRegistered'])], ['saveData' => false]) ?>
+                            <?php // Today on a new record, and still a field:
+                                  // somebody entering a patient who arrived
+                                  // last week should not have to leave it
+                                  // saying they arrived now. ?>
+                            <?= view('ui/partials/date_field', ['id' => 'f-entry', 'name' => 'dateRegistered', 'value' => UiStore::isoToDMY($v['dateRegistered']), 'past' => true], ['saveData' => false]) ?>
                         </div>
                         <div>
                             <?php // The whole of it is one yes/no; there is no
@@ -188,8 +231,14 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                             </label>
                         </div>
                         <div>
-                            <?php // The same list, and the same value, as the pair's
-                                  // Match Status: setting either sets the other. ?>
+                            <?php // The person's own, and nobody else's. It used
+                                  // to be the same value as the pair's Match
+                                  // Status, and setting either set the other;
+                                  // it cannot be, now that a recipient may hold
+                                  // several donors — there would be no saying
+                                  // which of them Declined meant. The pair's
+                                  // status and the donor's are each their own
+                                  // too, on their own cards. ?>
                             <label class="field-label" for="f-status">Recipient Status</label>
                             <select id="f-status" name="status" class="input">
                                 <?php foreach (UiStore::PERSON_STATUS_OPTIONS as $value => $label): ?>
@@ -234,8 +283,12 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
                     <div class="form-grid-5">
                         <div>
-                            <label class="field-label" for="f-age">Donor Age</label>
-                            <input type="number" id="f-age" name="age" class="input" value="<?= esc($v['age']) ?>" placeholder="Age">
+                            <label class="field-label" for="f-birth">
+                                Date of Birth
+                                <span class="field-note" data-age-note="f-birth"><?= esc($ageNote($v['birthDate'], $v['age'])) ?></span>
+                            </label>
+                            <input type="hidden" name="age" value="<?= esc($v['age']) ?>">
+                            <?= view('ui/partials/date_field', ['id' => 'f-birth', 'name' => 'birthDate', 'value' => $v['birthDate'], 'past' => true], ['saveData' => false]) ?>
                         </div>
                         <div>
                             <label class="field-label" for="f-blood">Donor Blood Group</label>
@@ -272,12 +325,25 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                             </select>
                         </div>
                         <div>
+                            <?php // The donor's own. A pair's status and the
+                                  // recipient's are theirs, on their own cards;
+                                  // none of the three follows another. ?>
                             <label class="field-label" for="f-donor-status">Donor Status</label>
                             <select id="f-donor-status" name="donorStatus" class="input">
                                 <?php foreach (UiStore::DONOR_STATUS_OPTIONS as $value => $label): ?>
                                     <option value="<?= esc($value) ?>"<?= $v['donorStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
                                 <?php endforeach; ?>
                             </select>
+                        </div>
+                    </div>
+
+                    <div class="form-grid-5">
+                        <div>
+                            <?php // The register has always dated a donor; this
+                                  // is the first screen to show it, and to let
+                                  // it be corrected. ?>
+                            <label class="field-label" for="f-entry">Entry Date</label>
+                            <?= view('ui/partials/date_field', ['id' => 'f-entry', 'name' => 'dateRegistered', 'value' => UiStore::isoToDMY($v['dateRegistered']), 'past' => true], ['saveData' => false]) ?>
                         </div>
                     </div>
                 </div>

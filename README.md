@@ -76,7 +76,7 @@ alias to `public/` rather than the old `.htaccess` rewrite.
 | `/exchange` | Paired exchange: the chains, and the builder; filterable by the recipient's blood type |
 | `/reports` | Both registers read across, under nine filters |
 | `/reports/export/{general\|internal}` | The filtered report as a printable sheet |
-| `/mrp` | Register a Medical Responsible Person |
+| `/mrp` | Register users: physicians and coordinators |
 
 Auto-routing is off, so `app/Config/Routes.php` lists every reachable endpoint.
 The programme is chosen once per session on `/organ` and kept in the `ui_organ`
@@ -472,6 +472,40 @@ followed by each of its rows opened out — the whole record and the whole
 workup, one per page — built from `App\Libraries\RecordBlocks`, the same
 blocks a single record's own printed sheet is made of, so the two sheets cannot
 drift apart.
+
+### Add MRP is where users are made
+
+It is the one screen that creates somebody a record can be assigned to, and a
+transplant programme assigns two kinds. The form asks which — **Doctor** or
+**Coordinator** — before it asks the name, because that is what the name is
+being entered as. `mrp.kind` holds it, and everybody registered before the
+column existed is a physician, which is all the screen could make.
+
+A record's **MRP** field offers physicians only: it asks for the responsible
+physician, and a coordinator there would be an answer the question does not
+take. A coordinator registered here also gets a row in `coordinators`, which is
+what `recipients.coordinator_id` and `donors.coordinator_id` point at — without
+both, somebody registered here could not be assigned to anybody.
+
+**Search**, beside the MRP ID, is the hospital directory. A user is not
+invented on this screen: they already exist in the directory with an ID, and
+the right way to add one is to look them up by it. The directory is not
+connected yet, so the button is a real control with nothing behind it — it
+comes back saying so, carries the ID that was searched for into the form, and
+leaves the name to be typed meanwhile. When it is wired, what changes is what
+fills `ui_mrp_lookup`, not this screen.
+
+It will fill a name and an ID. It will not fill a password into this database:
+a copied credential is a credential in two places, and the point of looking
+somebody up in the directory is that the directory is where their sign-in is
+checked. There is no password field on this screen for that reason.
+
+**Registered MRPs** under it is a table — Name, MRP ID, Type, Status, and the
+two controls. **Edit** turns the row into a form where the row is, as a
+record's card does. **Deactivate** is never a delete: the records they are on
+still name them, and a physician who has left is part of what those records
+say. A deactivated user stays on the list, greyed, with **Reactivate**, and
+stops being offered on new records.
 
 ### Dates
 

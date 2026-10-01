@@ -2018,23 +2018,81 @@ class Ui extends BaseController
             'title'   => 'Add MRP',
             'navPage' => 'add-mrp',
             'organ'   => $this->store->organ(),
-            'mrps'    => $this->store->mrps(),
-            'saved'   => (bool) $this->session->getFlashdata('ui_mrp_saved'),
+            'users'   => $this->store->mrpRegister(),
+            // Its own keys, not the layout's: this screen has a banner of its
+            // own, and `ui_notice` would be shown twice.
+            'saved'   => (string) ($this->session->getFlashdata('ui_mrp_saved') ?? ''),
+            'error'   => (string) ($this->session->getFlashdata('ui_mrp_error') ?? ''),
+            // Which row the register opened for editing, and what the
+            // directory lookup last came back with.
+            'editing' => (string) ($this->request->getGet('edit') ?? ''),
+            'lookup'  => (array) ($this->session->getFlashdata('ui_mrp_lookup') ?? []),
         ]);
     }
 
     public function addMrp(): RedirectResponse
     {
-        $id   = trim((string) $this->request->getPost('id'));
-        $name = trim((string) $this->request->getPost('name'));
+        $error = $this->store->addMrp(
+            (string) $this->request->getPost('id'),
+            (string) $this->request->getPost('name'),
+            (string) $this->request->getPost('kind')
+        );
 
-        // Both required, silently as in the source: it just did not submit.
-        if ($id !== '' && $name !== '') {
-            $this->store->addMrp($id, $name);
-            $this->session->setFlashdata('ui_mrp_saved', true);
-        }
+        return redirect()->to(site_url('mrp'))->with(
+            $error === '' ? 'ui_mrp_saved' : 'ui_mrp_error',
+            $error === '' ? 'User added successfully.' : $error
+        );
+    }
 
-        return redirect()->to(site_url('mrp'));
+    /**
+     * Looks a user up in the hospital directory.
+     *
+     * The directory itself is not connected yet, so this is the screen the
+     * search will drive and nothing behind it: it comes back saying so, with
+     * the ID that was searched for carried into the form, so the user can be
+     * entered by hand meanwhile. When the directory is wired, what changes is
+     * what fills `ui_mrp_lookup` — not this screen.
+     */
+    public function lookupMrp(): RedirectResponse
+    {
+        $code = trim((string) $this->request->getPost('id'));
+
+        return redirect()->to(site_url('mrp'))->with('ui_mrp_lookup', [
+            'code'   => $code,
+            'kind'   => (string) $this->request->getPost('kind'),
+            'found'  => false,
+            'reason' => $code === ''
+                ? 'Enter the ID to search for.'
+                : 'The hospital directory is not connected yet, so nothing could be looked up. Enter the name below and the user will be registered against this ID.',
+        ]);
+    }
+
+    /** Changes a registered user's ID, name or kind. */
+    public function updateMrp(string $id): RedirectResponse
+    {
+        $error = $this->store->updateMrp(
+            $id,
+            (string) $this->request->getPost('id'),
+            (string) $this->request->getPost('name'),
+            (string) $this->request->getPost('kind')
+        );
+
+        return redirect()->to(site_url('mrp') . ($error === '' ? '' : '?edit=' . rawurlencode($id)))->with(
+            $error === '' ? 'ui_mrp_saved' : 'ui_mrp_error',
+            $error === '' ? 'User updated.' : $error
+        );
+    }
+
+    /** Takes a registered user out of service, or puts them back. */
+    public function setMrpActive(string $id): RedirectResponse
+    {
+        $active = (string) $this->request->getPost('active') === '1';
+        $error  = $this->store->setMrpActive($id, $active);
+
+        return redirect()->to(site_url('mrp'))->with(
+            $error === '' ? 'ui_mrp_saved' : 'ui_mrp_error',
+            $error === '' ? ($active ? 'User reactivated.' : 'User deactivated.') : $error
+        );
     }
 
     // ---- Shared ------------------------------------------------------------

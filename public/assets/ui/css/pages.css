@@ -647,7 +647,140 @@
 /* =========================================================
    Add MRP  (src/pages/AddMRP.tsx)
    ========================================================= */
-.mrp-wrap { max-width: 28rem; }
+/* The form stays a column — it asks three short questions — but the register
+   under it is a five-column table and needs the page. */
+.mrp-wrap { max-width: 60rem; }
+
+.mrp-form { max-width: 28rem; }
+
+/* The ID and the button that looks it up, on one line: they are one action
+   with two halves, and a button under the box reads as a second question. */
+.mrp-search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mrp-search-row .input { flex: 1 1 auto; }
+
+.mrp-hint {
+  margin-top: 0.375rem;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--slate-500);
+}
+
+/* What the directory came back with. Grey while it is not connected; the
+   `is-found` state is what a real answer will look like. */
+.mrp-lookup {
+  padding: 0.875rem 1rem;
+  border: 1px dashed var(--slate-300);
+  border-radius: var(--radius-xl);
+  background-color: var(--slate-50);
+}
+
+.mrp-lookup.is-found {
+  border-style: solid;
+  border-color: var(--emerald-200);
+  background-color: var(--emerald-50);
+}
+
+.mrp-lookup-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--slate-700);
+}
+
+.mrp-lookup-note,
+.mrp-lookup-foot {
+  margin-top: 0.375rem;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--slate-500);
+}
+
+.mrp-lookup-foot { font-style: italic; }
+
+.mrp-lookup-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.625rem;
+  margin: 0.75rem 0 0;
+}
+
+.mrp-lookup-fields dt {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--slate-500);
+}
+
+.mrp-lookup-fields dd {
+  margin: 0.125rem 0 0;
+  font-size: var(--text-sm);
+  color: var(--slate-800);
+}
+
+/* Physician or coordinator, asked as two buttons rather than a select: there
+   are two answers and the choice decides what the name below means. */
+.mrp-kinds {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mrp-kind {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-xl);
+  font-size: var(--text-sm);
+  color: var(--slate-700);
+  cursor: pointer;
+}
+
+.mrp-kind input { accent-color: var(--primary); }
+
+.mrp-kind:has(input:checked) {
+  border-color: var(--primary);
+  background-color: var(--primary-light);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* ---- The register ----------------------------------------------------- */
+
+.mrp-table td.cell-action {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Out of service: on the list, and plainly not in use. */
+.mrp-table tr.is-inactive .cell-name,
+.mrp-table tr.is-inactive td.mono { color: var(--slate-400); }
+
+/* The row becomes the form, so it needs the room a row does not have. */
+.mrp-edit-cell { background-color: var(--slate-50); }
+
+.mrp-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.mrp-edit > div { flex: 1 1 10rem; }
+
+.mrp-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
 
 .mrp-success {
   margin-bottom: 1.25rem;

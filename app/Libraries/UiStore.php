@@ -754,9 +754,104 @@ final class UiStore
         return $row === null ? null : $this->findPair((string) $row['id']);
     }
 
-    public function addMrp(string $code, string $name): void
+    /**
+     * Registers a user — a physician or a coordinator.
+     *
+     * A coordinator also gets a row in `coordinators`, which is what the
+     * record screens point at: the MRP register is where people are made, and
+     * that table is where a record's coordinator lives. Without both, somebody
+     * registered here could not be assigned to anybody.
+     *
+     * @return string '' on success, or why not
+     */
+    public function addMrp(string $code, string $name, string $kind = MrpModel::DOCTOR): string
     {
-        $this->mrp->insert(['code' => $code, 'name' => $name]);
+        $code = trim($code);
+        $name = trim($name);
+        $kind = isset(MrpModel::KINDS[$kind]) ? $kind : MrpModel::DOCTOR;
+
+        if ($code === '' || $name === '') {
+            return 'A user needs both an ID and a name.';
+        }
+
+        if ($this->mrp->byCode($code) !== null) {
+            return 'That ID is already registered.';
+        }
+
+        $this->mrp->insert(['code' => $code, 'name' => $name, 'kind' => $kind]);
+
+        if ($kind === MrpModel::COORDINATOR) {
+            $this->coordinatorId($name);
+        }
+
+        return '';
+    }
+
+    /**
+     * Everybody the MRP screen has registered, for its own list.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function mrpRegister(): array
+    {
+        return array_map(static fn (array $row): array => [
+            'id'     => (string) $row['id'],
+            'code'   => (string) $row['code'],
+            'name'   => (string) $row['name'],
+            'kind'   => (string) $row['kind'],
+            'active' => (int) $row['is_active'] === 1,
+        ], $this->mrp->register());
+    }
+
+    /** Changes a registered user's ID, name or kind. '' on success. */
+    public function updateMrp(string $id, string $code, string $name, string $kind): string
+    {
+        $row = $this->mrp->find((int) $id);
+
+        if ($row === null) {
+            return 'That user could not be found.';
+        }
+
+        $code = trim($code);
+        $name = trim($name);
+        $kind = isset(MrpModel::KINDS[$kind]) ? $kind : (string) $row['kind'];
+
+        if ($code === '' || $name === '') {
+            return 'A user needs both an ID and a name.';
+        }
+
+        $clash = $this->mrp->byCode($code);
+
+        if ($clash !== null && (int) $clash['id'] !== (int) $row['id']) {
+            return 'That ID is already registered.';
+        }
+
+        $this->mrp->update((int) $row['id'], ['code' => $code, 'name' => $name, 'kind' => $kind]);
+
+        if ($kind === MrpModel::COORDINATOR) {
+            $this->coordinatorId($name);
+        }
+
+        return '';
+    }
+
+    /**
+     * Takes a registered user out of service, or puts them back.
+     *
+     * Never a delete: the records they are on still name them, and a physician
+     * who has left is part of what those records say.
+     */
+    public function setMrpActive(string $id, bool $active): string
+    {
+        $row = $this->mrp->find((int) $id);
+
+        if ($row === null) {
+            return 'That user could not be found.';
+        }
+
+        $this->mrp->update((int) $row['id'], ['is_active' => $active ? 1 : 0]);
+
+        return '';
     }
 
     /** @param array<string, mixed> $changes */

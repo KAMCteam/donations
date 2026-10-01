@@ -37,12 +37,15 @@ class AddCandidateAsideReason extends Migration
             . " SET aside_reason = 'delinked' WHERE status = 'declined'");
     }
 
-    /** Dropping it loses only why, not that. */
+    /**
+     * Irreversible by design.
+     *
+     * Dropping it loses why each candidate was set aside, which is the
+     * difference between one who can be switched back to and one who cannot.
+     * The table's own migration still drops the table.
+     */
     public function down(): void
     {
-        if ($this->hasColumn('potential_donors', 'aside_reason')) {
-            $this->forge->dropColumn('potential_donors', 'aside_reason');
-        }
     }
 
     private function table(string $name): string

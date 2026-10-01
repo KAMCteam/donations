@@ -86,5 +86,11 @@ $routes->get('exchange/review', 'Exchange::review');
 $routes->get('reports', 'Reports::index');
 $routes->get('reports/export/(:segment)', 'Reports::export/$1');
 
+// The one screen that makes users — physicians and coordinators both. The
+// lookup route is the hospital directory's, and comes back saying it is not
+// connected yet until it is.
 $routes->get('mrp', 'Ui::mrp');
 $routes->post('mrp', 'Ui::addMrp');
+$routes->post('mrp/lookup', 'Ui::lookupMrp');
+$routes->post('mrp/(:num)/active', 'Ui::setMrpActive/$1');
+$routes->post('mrp/(:num)', 'Ui::updateMrp/$1');

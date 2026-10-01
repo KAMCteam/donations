@@ -21,6 +21,7 @@ use App\Libraries\UiStore;
  * @var array<string, mixed>|null  $linked      The paired counterpart, if any
  * @var list<array<string, mixed>> $labTests
  * @var list<array<string, mixed>> $openDonorLabs  The open tab's workup
+ * @var array<string, mixed>       $donorValues    The open tab's fields, d-prefixed
  * @var list<array<string, mixed>> $candidates     Donors the dialog can offer
  * @var string                     $forRecipient   Whose potential donor this is
  * @var list<array{id: string, name: string}> $mrps
@@ -105,16 +106,6 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
     <?php if ($error !== ''): ?>
         <div class="form-error" role="alert"><?= esc($error) ?></div>
-    <?php endif; ?>
-
-    <?php if ($isRecipient && $mode === 'view' && $donorTabs !== []): ?>
-        <?= view('ui/partials/donor_tabs', [
-            'mrn'      => $person['id'],
-            'tabs'     => $donorTabs,
-            'openTab'  => $openTab,
-            'donor'    => $openDonor,
-            'labTests' => $openDonorLabs,
-        ], ['saveData' => false]) ?>
     <?php endif; ?>
 
     <form id="person-form" class="stack-5" method="post" action="<?= current_url() ?>">
@@ -424,6 +415,24 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             </div>
         <?php endif; ?>
     </form>
+
+    <?php // The record reads top to bottom: who they are, their workup, their
+          // notes — and then the donors being considered for them. The donors
+          // come last because they are about this record rather than part of
+          // it, and because reading one means having read the other first. ?>
+    <?php if ($isRecipient && $mode === 'view' && $donorTabs !== []): ?>
+        <?= view('ui/partials/donor_tabs', [
+            'mrn'      => $person['id'],
+            'tabs'     => $donorTabs,
+            'openTab'  => $openTab,
+            'donor'    => $openDonor,
+            'v'        => $donorValues,
+            'labTests' => $openDonorLabs,
+            'editing'  => $editing,
+            'mrps'     => $mrps,
+            'ageNote'  => $ageNote,
+        ], ['saveData' => false]) ?>
+    <?php endif; ?>
 
     <?php if ($mode === 'view' && ($isRecipient || $linked === null)): ?>
         <dialog id="link-choice" class="dialog">

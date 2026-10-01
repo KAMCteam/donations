@@ -2146,6 +2146,92 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringNotContainsString('Pair up', $html);
     }
 
+    /**
+     * A potential donor reads the way everything else on the record does.
+     *
+     * The recipient first — who they are, their workup, their notes — and the
+     * donors under them, each as the same three cards the pair screen uses
+     * rather than a block of read-only text.
+     */
+    public function testAPotentialDonorIsShownAsCardsBelowTheRecord(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8870', 'name' => 'Cards Test', 'age' => '44', 'bloodType' => 'A']);
+        $this->post('donors/new?for=8870', ['for' => '8870', 'mrn' => '8871', 'name' => 'Candidate', 'age' => '33', 'bloodType' => 'A']);
+
+        $html = $this->get('recipients/8870')->getBody();
+
+        $titles = [
+            'Personal Information',
+            'Required Lab Tests',
+            'Clinical Notes',
+            'Potential Donors',
+            'Donor &mdash; Personal Information',
+            'Donor &mdash; Required Lab Tests',
+            'Donor &mdash; Clinical Notes',
+        ];
+
+        $at = -1;
+
+        foreach ($titles as $title) {
+            $next = strpos($html, '>' . $title . '</h2>');
+            $this->assertIsInt($next, $title . ' is on the screen');
+            $this->assertGreaterThan($at, $next, $title . ' comes after the card before it');
+            $at = $next;
+        }
+
+        // The donor's own record is reached through their cards, not a button.
+        $this->assertStringNotContainsString('Open donor record', $html);
+    }
+
+    /** And each of those cards is edited and saved on its own. */
+    public function testEachOfAPotentialDonorsCardsSavesOnItsOwn(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8880', 'name' => 'Edit Test', 'age' => '44', 'bloodType' => 'A']);
+        $this->post('donors/new?for=8880', ['for' => '8880', 'mrn' => '8881', 'name' => 'Candidate', 'age' => '33', 'bloodType' => 'A']);
+
+        $id = (int) $this->db->table('potential_donors')->get()->getRowArray()['id'];
+
+        // Closed until a card is opened, and opened one at a time.
+        $this->assertStringContainsString('edit=pd' . $id . '-personal', $this->get('recipients/8880')->getBody());
+
+        $open = $this->get('recipients/8880?donor=1&edit=pd' . $id . '-personal')->getBody();
+        $this->assertStringContainsString('name="section" value="pd' . $id . '-personal"', $open);
+        $this->assertStringContainsString('name="dName"', $open);
+
+        $this->post('recipients/8880', [
+            'section' => 'pd' . $id . '-personal',
+            'dName'   => 'Renamed', 'dCity' => 'Jeddah', 'dBloodType' => 'B',
+            'dRelationship' => 'Brother', 'dStatus' => 'Active', 'dType' => 'living_related',
+        ])->assertRedirectTo(site_url('recipients/8880') . '?donor=1');
+
+        $this->seeInDatabase('donors', [
+            'mrn' => 8881, 'name' => 'Renamed', 'city' => 'Jeddah',
+            'blood_group' => 'B', 'relationship' => 'Brother',
+        ]);
+
+        // The notes card writes only the notes.
+        $this->post('recipients/8880', ['section' => 'pd' . $id . '-notes', 'dNotes' => 'Seen in clinic.']);
+        $this->seeInDatabase('donors', ['mrn' => 8881, 'name' => 'Renamed', 'notes' => 'Seen in clinic.']);
+    }
+
+    /** A candidate who was set aside is shown, and not edited. */
+    public function testASetAsidePotentialDonorHasNoEditLinks(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8890', 'name' => 'Frozen', 'age' => '44', 'bloodType' => 'A']);
+        $this->post('donors/new?for=8890', ['for' => '8890', 'mrn' => '8891', 'name' => 'Candidate', 'age' => '33', 'bloodType' => 'A']);
+
+        $id = (int) $this->db->table('potential_donors')->get()->getRowArray()['id'];
+        $this->post('recipients/8890/donors/' . $id . '/delink');
+
+        $html = $this->get('recipients/8890?donor=1')->getBody();
+        $this->assertStringContainsString('Donor &mdash; Personal Information', $html);
+        $this->assertStringNotContainsString('edit=pd' . $id . '-', $html);
+
+        // And a post naming one of its cards changes nothing.
+        $this->post('recipients/8890', ['section' => 'pd' . $id . '-notes', 'dNotes' => 'Should not land.']);
+        $this->dontSeeInDatabase('donors', ['mrn' => 8891, 'notes' => 'Should not land.']);
+    }
+
     /** The status beside a tab's name is a word, and only a word. */
     public function testATabsStatusIsPlainText(): void
     {

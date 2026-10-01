@@ -58,6 +58,14 @@ class Ui extends BaseController
         'notes' => ['notes'],
     ];
 
+    /**
+     * The cards a potential donor has on a recipient's screen.
+     *
+     * One set per candidate, so the section a save names says which of several
+     * donors it is about: `pd12-personal`, `pd12-labs`, `pd12-notes`.
+     */
+    private const CANDIDATE_SECTIONS = ['personal', 'labs', 'notes'];
+
     /** The pair screen's cards: the pair itself, then each person's three. */
     private const PAIR_SECTIONS = ['pair', 'recipient', 'rlabs', 'rnotes', 'donor', 'dlabs', 'dnotes'];
 
@@ -259,6 +267,14 @@ class Ui extends BaseController
         $mrps        = $this->store->mrps();
 
         if ($this->request->is('post')) {
+            // A card belonging to one of this recipient's potential donors,
+            // rather than to the recipient themselves.
+            $card = $this->candidateCard((string) $this->request->getPost('section'));
+
+            if ($isRecipient && $person !== null && $card !== null) {
+                return $this->saveCandidateCard($person, $card[0], $card[1]);
+            }
+
             return $this->savePerson($personType, $person);
         }
 
@@ -275,6 +291,16 @@ class Ui extends BaseController
         $openTab   = (int) ($this->request->getGet('donor') ?? 1);
         $openTab   = $openTab >= 1 && $openTab <= count($donorTabs) ? $openTab : ($donorTabs === [] ? 0 : 1);
         $openDonor = $openTab === 0 ? null : $this->store->findDonor($donorTabs[$openTab - 1]['donorId']);
+
+        // The cards on this screen are the record's own plus one set for each
+        // potential donor, so which card is open is decided against both.
+        $sections = array_keys(self::PERSON_SECTIONS);
+
+        foreach ($donorTabs as $tab) {
+            foreach (self::CANDIDATE_SECTIONS as $card) {
+                $sections[] = 'pd' . $tab['id'] . '-' . $card;
+            }
+        }
 
         // Whose candidate this new donor is being entered as, if the screen
         // was opened from a recipient's own. Nothing on the Add Donor screen
@@ -294,7 +320,7 @@ class Ui extends BaseController
             'error'      => (string) ($this->session->getFlashdata('ui_error') ?? ''),
             // Which card the Edit link opened. A new record has no view mode,
             // so every card on it is editable regardless.
-            'editing'    => $this->openSection(array_keys(self::PERSON_SECTIONS)),
+            'editing'    => $this->openSection($sections),
             // The prototype highlighted a nav item only on the five top-level
             // screens; a record or pair sub-screen left the sidebar unhighlighted.
             'navPage'    => '',
@@ -306,8 +332,11 @@ class Ui extends BaseController
             'donorTabs'  => $donorTabs,
             'openTab'    => $openTab,
             'openDonor'  => $openDonor,
-            // The open tab's workup, shown in full on the recipient's screen.
+            // The open tab's donor, in the shape their cards expect: the
+            // same d-prefixed fields the pair screen collects, because they
+            // are the same cards.
             'openDonorLabs' => $openDonor['labTests'] ?? [],
+            'donorValues'   => $openDonor === null ? [] : $this->donorValues($openDonor),
             'forRecipient'  => $forRecipient,
             // Who the choice dialog can offer: everybody on the register this
             // recipient is not already considering.
@@ -735,6 +764,55 @@ class Ui extends BaseController
 
         return redirect()->to(site_url('pairs/' . rawurlencode($pairId)))
             ->with('ui_notice', $recipient['name'] . ' and ' . $tab['name'] . ' are now a pair.');
+    }
+
+    /**
+     * Adds a blank test to a candidate's workup, without leaving the screen it
+     * is read on.
+     */
+    public function addCandidateLab(string $mrn, string $id): RedirectResponse
+    {
+        [$recipient, $tab, $back] = $this->candidate($mrn, $id);
+
+        if ($recipient === null) {
+            return redirect()->to(site_url('recipients'));
+        }
+
+        if ($tab === null || $tab['delinked']) {
+            return redirect()->to($back);
+        }
+
+        $back .= '&edit=pd' . $tab['id'] . '-labs';
+
+        $this->keepWhatWasTyped('donor', $tab['donorId'], 'dLabs');
+
+        if ($this->store->addCustomLab($tab['donorId'], 'donor') === 0) {
+            $this->session->setFlashdata('ui_error', 'That test could not be added.');
+        }
+
+        return redirect()->to($back);
+    }
+
+    /** And takes one away again, asking first. */
+    public function removeCandidateLab(string $mrn, string $id, string $labId): string|RedirectResponse
+    {
+        [$recipient, $tab, $back] = $this->candidate($mrn, $id);
+
+        if ($recipient === null) {
+            return redirect()->to(site_url('recipients'));
+        }
+
+        if ($tab === null || $tab['delinked']) {
+            return redirect()->to($back);
+        }
+
+        return $this->confirmRemoveLab(
+            'donor',
+            $tab['donorId'],
+            (int) $labId,
+            'recipients/' . rawurlencode($mrn) . '/donors/' . rawurlencode($id) . '/labs/' . rawurlencode($labId) . '/delete',
+            $back . '&edit=pd' . $tab['id'] . '-labs'
+        );
     }
 
     /**
@@ -1778,6 +1856,105 @@ class Ui extends BaseController
      *
      * @return array{newUrl: string, existingUrl: string, backUrl: string}
      */
+    /**
+     * A candidate's card, from the section a save names, or null.
+     *
+     * @return array{0: string, 1: string}|null The candidate's id, and the card
+     */
+    private function candidateCard(string $section): ?array
+    {
+        if (preg_match('/^pd(\d+)-([a-z]+)$/', $section, $m) !== 1) {
+            return null;
+        }
+
+        return in_array($m[2], self::CANDIDATE_SECTIONS, true) ? [$m[1], $m[2]] : null;
+    }
+
+    /**
+     * One card of one potential donor, saved from the recipient's screen.
+     *
+     * The donor's own record is what is written — these are the same cards
+     * their record has, shown where they are being compared — so a change here
+     * is a change there, and the other way round.
+     *
+     * @param array<string, mixed> $recipient
+     */
+    private function saveCandidateCard(array $recipient, string $candidateId, string $card): RedirectResponse
+    {
+        [, $tab, $back] = $this->candidate($recipient['id'], $candidateId);
+
+        if ($tab === null || $tab['delinked']) {
+            return redirect()->to($back);
+        }
+
+        $post = fn (string $field): string => (string) $this->request->getPost($field);
+
+        if ($card === 'labs') {
+            $this->store->updateDonor($tab['donorId'], ['labTests' => $this->postedLabTests('dLabs')]);
+
+            return redirect()->to($back);
+        }
+
+        if ($card === 'notes') {
+            $this->store->updateDonor($tab['donorId'], ['notes' => $post('dNotes')]);
+
+            return redirect()->to($back);
+        }
+
+        $error = $this->futureDateError(['dBirthDate', 'dEntryDate']);
+
+        if ($error !== '') {
+            return redirect()->back()->withInput()->with('ui_error', $error);
+        }
+
+        $this->store->updateDonor($tab['donorId'], [
+            'name'             => $post('dName'),
+            'age'              => (int) $post('dAge') ?: null,
+            'birthDate'        => $post('dBirthDate'),
+            'bloodType'        => $post('dBloodType'),
+            'phone'            => $post('dPhone'),
+            'address'          => $post('dCity'),
+            'donorGender'      => $post('dGender'),
+            'donationType'     => $post('dType'),
+            'relationship'     => $post('dRelationship'),
+            'donorMrp'         => $post('dMrp'),
+            'donorStatus'      => $post('dStatus'),
+            'donorCoordinator' => $post('dCoordinator'),
+            'dateRegistered'   => $post('dEntryDate'),
+        ]);
+
+        return redirect()->to($back);
+    }
+
+    /**
+     * A donor as the cards on a recipient's screen read them.
+     *
+     * @param array<string, mixed> $donor
+     *
+     * @return array<string, string>
+     */
+    private function donorValues(array $donor): array
+    {
+        return [
+            'dName'         => (string) ($donor['name'] ?? ''),
+            'dAge'          => isset($donor['age']) ? (string) $donor['age'] : '',
+            'dBirthDate'    => (string) ($donor['birthDate'] ?? ''),
+            'dBloodType'    => (string) ($donor['bloodType'] ?? 'O'),
+            'dPhone'        => (string) ($donor['phone'] ?? ''),
+            'dCity'         => (string) ($donor['address'] ?? ''),
+            'dGender'       => (string) ($donor['donorGender'] ?? 'Male'),
+            'dType'         => (string) ($donor['donationType'] ?? 'living_related'),
+            'dRelationship' => (string) ($donor['relationship'] ?? ''),
+            'dMrp'          => (string) ($donor['donorMrp'] ?? ''),
+            'dCoordinator'  => (string) ($donor['donorCoordinator'] ?? ''),
+            'dStatus'       => (string) ($donor['donorStatus'] ?? 'On Hold'),
+            'dEntryDate'    => ($donor['dateRegistered'] ?? '') === ''
+                ? ''
+                : UiStore::isoToDMY((string) $donor['dateRegistered']),
+            'dNotes'        => (string) ($donor['notes'] ?? ''),
+        ];
+    }
+
     /**
      * The donors a recipient could be given as candidates.
      *

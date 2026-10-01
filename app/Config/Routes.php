@@ -46,6 +46,10 @@ $routes->post('recipients/(:segment)/donors', 'Ui::considerDonor/$1');
 $routes->match(['get', 'post'], 'recipients/(:segment)/donors/(:num)/delink', 'Ui::delinkDonor/$1/$2');
 $routes->post('recipients/(:segment)/donors/(:num)/status', 'Ui::candidateStatus/$1/$2');
 $routes->post('recipients/(:segment)/donors/(:num)/pair', 'Ui::pairUp/$1/$2');
+// A candidate's workup is edited where it is read, so adding and removing a
+// test they added for themselves comes back to the recipient's screen too.
+$routes->post('recipients/(:segment)/donors/(:num)/labs', 'Ui::addCandidateLab/$1/$2');
+$routes->match(['get', 'post'], 'recipients/(:segment)/donors/(:num)/labs/(:num)/delete', 'Ui::removeCandidateLab/$1/$2/$3');
 $routes->post('recipients/(:segment)/labs', 'Ui::addLab/recipient/$1');
 $routes->match(['get', 'post'], 'recipients/(:segment)/labs/(:num)/delete', 'Ui::removeLab/recipient/$1/$2');
 $routes->get('recipients/(:segment)/print', 'Ui::printRecipient/$1');

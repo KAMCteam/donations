@@ -23,6 +23,7 @@ use App\Libraries\UiStore;
  * @var string|null                $editUrl    Where the card's Edit goes; null hides it.
  * @var string|null                $viewUrl    Where Cancel goes.
  * @var string|null                $section    Which card a save is for.
+ * @var string                     $labsTitle  The heading, where more than one workup is on the screen.
  */
 $animated = $animated ?? false;
 // The add screens have nothing to view yet, so they default to editable with
@@ -35,6 +36,11 @@ $removeLabUrl = $removeLabUrl ?? null;
 $editUrl  = $editUrl ?? null;
 $viewUrl  = $viewUrl ?? null;
 $section  = $section ?? null;
+// A screen that shows more than one person's workup has to say whose. Named
+// `labsTitle` rather than `title`, because CodeIgniter keeps view data between
+// `view()` calls and the page's own `$title` would otherwise land here — which
+// it did, and the recipient's workup was headed with the recipient's name.
+$labsTitle = $labsTitle ?? 'Required Lab Tests';
 $progress = UiStore::labProgress($tests);
 
 // The check list's own groups, in its own order. The index has to keep
@@ -58,7 +64,7 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
     <div class="card-head">
         <div class="lab-head">
             <div>
-                <h2 class="card-title">Required Lab Tests</h2>
+                <h2 class="card-title"><?= $labsTitle ?></h2>
                 <p class="lab-count" data-lab-count><?= $progress['done'] ?> of <?= $progress['total'] ?> completed</p>
             </div>
             <div class="lab-progress">

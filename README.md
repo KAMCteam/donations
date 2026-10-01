@@ -178,12 +178,25 @@ Neither makes a pair. The button has no limit: a recipient can collect as many
 candidates as the case calls for. With JavaScript off the button is a plain
 link to Add Donor, which is the commoner of the two.
 
+The section sits at the foot of the record, after the recipient's own
+Personal Information, Required Lab Tests and Clinical Notes. The record reads
+top to bottom and the donors are about it rather than part of it, so reading
+one means having read the other first.
+
 Each candidate is a tab — **donor-1**, **donor-2**, in the order they were
 added — with its status beside the name as a plain word, in no colour: *active*,
 *on hold*, *declined* are three ordinary answers, and a colour here would be
-read as a warning. Opening a tab shows that donor in full on the same page:
-their details, and their whole workup. The point of the screen is comparing
-them, and comparing means not leaving the record to see one.
+read as a warning.
+
+Opening a tab shows that donor as the same three cards the pair profile uses —
+**Donor — Personal Information**, **Donor — Required Lab Tests**, **Donor —
+Clinical Notes** — each opened for editing on its own and each saving on its
+own, exactly as every other record screen behaves. The section a card posts
+names the candidate as well as the card (`pd12-personal`), because a recipient
+may have several donors on the screen and the server has to know which one a
+save is about. They write the donor's own record, so a change here is a change
+there. A candidate who was set aside is shown and not edited: no Edit links,
+and a post naming one of their cards does nothing.
 
 Two buttons end a candidacy, and they are opposites:
 

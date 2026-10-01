@@ -23,10 +23,12 @@ class MultiDonorDemoRemover extends Seeder
         $from = MultiDonorDemoSeeder::MRN_FROM;
         $to   = MultiDonorDemoSeeder::MRN_TO;
 
-        $this->db->table('pairs')
-            ->groupStart()->where('recipient_mrn >=', $from)->where('recipient_mrn <=', $to)->groupEnd()
-            ->orGroupStart()->where('donor_mrn >=', $from)->where('donor_mrn <=', $to)->groupEnd()
-            ->delete();
+        foreach (['pairs', 'potential_donors'] as $table) {
+            $this->db->table($table)
+                ->groupStart()->where('recipient_mrn >=', $from)->where('recipient_mrn <=', $to)->groupEnd()
+                ->orGroupStart()->where('donor_mrn >=', $from)->where('donor_mrn <=', $to)->groupEnd()
+                ->delete();
+        }
 
         // Their own tests go with them; lab_results follows through the
         // foreign key on lab_id.

@@ -11,6 +11,7 @@ use App\Models\LabResultModel;
 use App\Models\MrpModel;
 use App\Models\OrganProgramModel;
 use App\Models\PairModel;
+use App\Models\PotentialDonorModel;
 use App\Models\RecipientModel;
 use CodeIgniter\Model;
 use CodeIgniter\Session\Session;
@@ -337,6 +338,7 @@ final class UiStore
     private RecipientModel $recipients;
     private DonorModel $donors;
     private PairModel $pairs;
+    private PotentialDonorModel $candidates;
     private MrpModel $mrp;
     private CoordinatorModel $coordinators;
     private LabModel $labs;
@@ -349,6 +351,7 @@ final class UiStore
         $this->recipients   = model(RecipientModel::class);
         $this->donors       = model(DonorModel::class);
         $this->pairs        = model(PairModel::class);
+        $this->candidates   = model(PotentialDonorModel::class);
         $this->mrp          = model(MrpModel::class);
         $this->coordinators = model(CoordinatorModel::class);
         $this->labs         = model(LabModel::class);
@@ -467,7 +470,11 @@ final class UiStore
 
     public function donors(?string $organ = null): array
     {
-        $rows = $this->donors->where('organ_code', $organ ?? $this->organ())->orderBy('mrn')->findAll();
+        $rows = $this->donors
+            ->where('organ_code', $organ ?? $this->organ())
+            ->where('is_listed', 1)
+            ->orderBy('mrn')
+            ->findAll();
 
         return array_map(fn (array $row): array => $this->donorToUi($row), $rows);
     }
@@ -685,7 +692,14 @@ final class UiStore
     public function addDonor(array $donor): void
     {
         $this->donors->insert(
-            $this->donorToRow($donor) + ['mrn' => (int) $donor['id'], 'registered_on' => date('Y-m-d')]
+            $this->donorToRow($donor) + [
+                'mrn'           => (int) $donor['id'],
+                'registered_on' => date('Y-m-d'),
+                // Somebody entered from a recipient's screen is that
+                // recipient's candidate, not yet one of the programme's
+                // donors. They join the register when a pair is made.
+                'is_listed'     => ($donor['listed'] ?? true) ? 1 : 0,
+            ]
         );
         $this->saveLabTests((int) $donor['id'], 'donor', $donor['labTests'] ?? []);
     }
@@ -708,6 +722,11 @@ final class UiStore
             'crossmatch_date' => $this->toDate($pair['scheduledDate'] ?? null),
             'notes'           => $pair['notes'] ?? null,
         ]);
+
+        // However a pair came about — Add Pair, a donor's own screen, Pair up
+        // — the two were considered together, so the recipient's screen says
+        // so. Without this, a pair made by any other door would have no tab.
+        $this->candidates->consider((int) $pair['recipientId'], (int) $pair['donorId']);
 
         return $id;
     }
@@ -934,11 +953,12 @@ final class UiStore
     }
 
     /**
-     * A recipient's donors, one entry per link, in the order they were made.
+     * A recipient's potential donors, one entry per candidate, in the order
+     * they were added.
      *
-     * Each is a tab on their screen: the number it is, whose link it is, and
-     * what became of it. A closed pair is a link that was undone — it stays
-     * on the record, read-only.
+     * Each is a tab on their screen: the number it is, who it is, and how that
+     * candidacy is going. None of them is a pair — a pair is made from one of
+     * them, by hand, and the rest are set aside at the same moment.
      *
      * @return list<array<string, mixed>>
      */
@@ -946,23 +966,22 @@ final class UiStore
     {
         $tabs = [];
 
-        foreach ($this->pairs->pairsForRecipient($mrn) as $i => $pair) {
-            $delinked = $pair['status'] === PairModel::CLOSED;
+        foreach ($this->candidates->forRecipient($mrn) as $i => $row) {
+            $declined = $row['status'] === PotentialDonorModel::DECLINED;
 
             $tabs[] = [
-                'number'       => $i + 1,
-                'pairId'       => (string) $pair['id'],
-                'donorId'      => (string) $pair['donor_mrn'],
-                'name'         => (string) ($pair['donor_name'] ?? ''),
-                'bloodType'    => (string) ($pair['donor_blood_group'] ?? ''),
-                // The link's own status is what the tab shows. A delinked one
-                // reads Declined whatever the pair row says, because that is
-                // what delinking means.
-                'status'       => $delinked ? 'declined' : (string) $pair['status'],
-                'donorStatus'  => (string) ($pair['donor_status'] ?? ''),
-                'relationship' => (string) ($pair['relationship'] ?? ''),
-                'delinked'     => $delinked,
-                'closedReason' => (string) ($pair['closed_reason'] ?? ''),
+                'number'      => $i + 1,
+                'id'          => (string) $row['id'],
+                'donorId'     => (string) $row['donor_mrn'],
+                'name'        => (string) ($row['donor_name'] ?? ''),
+                'bloodType'   => (string) ($row['donor_blood_group'] ?? ''),
+                'status'      => (string) $row['status'],
+                'donorStatus' => (string) ($row['donor_status'] ?? ''),
+                // Set aside: the tab stays, as a record of who was looked at,
+                // and nothing on it can be pressed.
+                'delinked'    => $declined,
+                // The pair this candidate became, if one was made from them.
+                'pairId'      => (string) ($row['pair_id'] ?? ''),
             ];
         }
 
@@ -970,33 +989,146 @@ final class UiStore
     }
 
     /**
-     * Undoes one of a recipient's links.
+     * Adds somebody to a recipient's list of candidates.
      *
-     * The pair closes and the donor is Declined — they were looked at for
-     * this recipient and are not going ahead. Nothing is deleted: the tab
-     * stays on the record, greyed, because a donor who was considered and
-     * set aside is part of what happened.
+     * No pair, and no place on the Donors List: this says only that the two
+     * are being looked at together. The donor record itself has to exist —
+     * they have a workup of their own to fill in — but a donor entered for
+     * this reason is unlisted until a pair is made from them.
      */
-    public function delinkDonor(string $recipientMrn, string $pairId, string $reason = ''): string
+    public function considerDonor(string $recipientMrn, string $donorMrn): string
     {
-        $pair = $this->findPair($pairId);
-
-        if ($pair === null || (string) $pair['recipientId'] !== $recipientMrn) {
-            return 'That link could not be found.';
+        if (! $this->isMrn($recipientMrn) || ! $this->isMrn($donorMrn)) {
+            return 'That record could not be found.';
         }
 
-        if ($pair['status'] === PairModel::CLOSED) {
-            return 'That link has already been undone.';
+        if ($this->findRecipient($recipientMrn) === null || $this->findDonor($donorMrn) === null) {
+            return 'That record could not be found.';
         }
 
-        $this->pairs->update((int) $pair['id'], [
-            'status'        => PairModel::CLOSED,
-            'closed_reason' => trim($reason) === '' ? 'Delinked from the recipient.' : trim($reason),
-        ]);
+        if ($this->pairs->openPairForDonor($donorMrn) !== null) {
+            return 'That donor is already in an open pair.';
+        }
 
-        $this->donors->update((int) $pair['donorId'], ['status' => 'declined']);
+        $this->candidates->consider($recipientMrn, $donorMrn);
 
         return '';
+    }
+
+    /**
+     * Sets a candidate aside.
+     *
+     * They were considered for this recipient and are not going ahead. Nothing
+     * is deleted: the tab stays on the record, read-only, because a donor who
+     * was looked at and set aside is part of what happened. If a pair had
+     * already been made from them, it closes with them.
+     */
+    public function declineCandidate(string $recipientMrn, string $id, string $reason = ''): string
+    {
+        $row = $this->candidates->forRecipientById($recipientMrn, $id);
+
+        if ($row === null) {
+            return 'That potential donor could not be found.';
+        }
+
+        if ($row['status'] === PotentialDonorModel::DECLINED) {
+            return 'That potential donor has already been set aside.';
+        }
+
+        $this->candidates->update((int) $row['id'], ['status' => PotentialDonorModel::DECLINED]);
+        $this->closePairBetween($recipientMrn, (string) $row['donor_mrn'], $reason);
+
+        return '';
+    }
+
+    /** Moves a candidate between Active and On Hold. Setting aside has its own door. */
+    public function setCandidateStatus(string $recipientMrn, string $id, string $status): string
+    {
+        $row = $this->candidates->forRecipientById($recipientMrn, $id);
+
+        if ($row === null) {
+            return 'That potential donor could not be found.';
+        }
+
+        if ($row['status'] === PotentialDonorModel::DECLINED) {
+            return 'That potential donor has been set aside and cannot be changed.';
+        }
+
+        if (! in_array($status, PotentialDonorModel::STATUSES, true) || $status === PotentialDonorModel::DECLINED) {
+            return 'That is not a status a potential donor can be moved to.';
+        }
+
+        $this->candidates->update((int) $row['id'], ['status' => $status]);
+
+        return '';
+    }
+
+    /**
+     * Makes the pair, from one candidate out of the list.
+     *
+     * This is the decision the whole list was leading to, so it is the moment
+     * everything else settles: the pair is created, every other candidate is
+     * set aside, and the donor joins the register — until now they may have
+     * been somebody entered for this recipient alone.
+     *
+     * @return array{0: string, 1: string} The pair's id, or '' and why not.
+     */
+    public function pairUpCandidate(string $recipientMrn, string $id): array
+    {
+        $row = $this->candidates->forRecipientById($recipientMrn, $id);
+
+        if ($row === null) {
+            return ['', 'That potential donor could not be found.'];
+        }
+
+        if ($row['status'] === PotentialDonorModel::DECLINED) {
+            return ['', 'That potential donor has been set aside.'];
+        }
+
+        $donorMrn = (string) $row['donor_mrn'];
+        $existing = $this->pairs->openPairFor($recipientMrn, $donorMrn);
+
+        if ($existing !== null) {
+            return [(string) $existing['id'], ''];
+        }
+
+        if ($this->pairs->openPairForDonor($donorMrn) !== null) {
+            return ['', 'That donor is already in an open pair.'];
+        }
+
+        // One recipient, one donor, one pair: whatever else was open for this
+        // recipient closes along with the rest of the list.
+        foreach ($this->candidates->forRecipient($recipientMrn) as $other) {
+            if ((int) $other['id'] !== (int) $row['id']) {
+                $this->closePairBetween($recipientMrn, (string) $other['donor_mrn']);
+            }
+        }
+
+        $this->candidates->declineOthers($recipientMrn, (int) $row['id']);
+
+        $pairId = (string) $this->pairs->link((int) $recipientMrn, (int) $donorMrn, [
+            'status'       => 'active',
+            'relationship' => $this->donors->find((int) $donorMrn)['relationship'] ?? null,
+        ]);
+
+        // On the register now: the Donors List is who the programme has, and a
+        // donor in a pair is one of them.
+        $this->donors->update((int) $donorMrn, ['is_listed' => 1]);
+
+        return [$pairId, ''];
+    }
+
+    /** Closes the open pair between these two, if there is one. */
+    private function closePairBetween(string $recipientMrn, string $donorMrn, string $reason = ''): void
+    {
+        $pair = $this->pairs->openPairFor($recipientMrn, $donorMrn);
+
+        if ($pair !== null) {
+            $this->pairs->close(
+                (int) $pair['id'],
+                trim($reason) === '' ? 'The potential donor was set aside.' : trim($reason)
+            );
+        }
     }
 
     /** @param array<string, mixed> $row */

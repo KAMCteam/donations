@@ -157,26 +157,68 @@ blanking one is a slip rather than an instruction.
 The add screens are unchanged: a new record has nothing to read yet, so it
 stays one open form with a single Save.
 
-### Pairing somebody from their own record
+### Potential donors, and the pair at the end of them
 
-"Link with Donor" (and its mirror on a donor) used to drop you on the donors
-list, which said nothing about what to do once you were there. It opens the
-two real choices now:
+A recipient is worked up against several donors at once — they are collected,
+tested, and set aside one by one — and only at the end is one of them the pair.
+Linking used to be one step, so every candidate *was* a pair, which is not what
+a pair means. There is a middle state now, and all of it lives on the
+recipient's own record. No separate page: the tabs are the record.
 
-- **Link with a new donor** — Add Pair, with this record already filled in and
-  shown read-only, and only the other person to enter. Saving writes just that
-  new person and the pair; the known half is not touched or re-validated as a
-  new MRN.
-- **Link with an existing donor** — the donors on this programme who are not
-  already paired, one form: the relationship and crossmatch date are entered
-  once at the top and each row's Link button carries that person's MRN.
+**Add Potential Donor** opens a `<dialog>` with the two ways in:
 
-The choice is a `<dialog>` on the record, opened by `ui.js`. The button under
-it is a real link to `…/link`, the same choice at its own URL, so with
-JavaScript off (or without `<dialog>` support) it is simply followed. Someone
-already in an open pair is sent to that pair rather than offered a second one,
-and a person who holds a row in both registers under one MRN is not offered as
-their own counterpart.
+- **A new donor** — Add Donor, opened with `?for=<recipient MRN>`. The record
+  is stored with `is_listed = 0`, so they are not on the Donors List, and Save
+  comes back to the recipient with their tab open.
+- **A donor already registered** — a select of the donors on this programme who
+  are free, posted straight back to the recipient. Nobody is re-entered and
+  nothing about them changes.
+
+Neither makes a pair. The button has no limit: a recipient can collect as many
+candidates as the case calls for. With JavaScript off the button is a plain
+link to Add Donor, which is the commoner of the two.
+
+Each candidate is a tab — **donor-1**, **donor-2**, in the order they were
+added — with its status beside the name as a plain word, in no colour: *active*,
+*on hold*, *declined* are three ordinary answers, and a colour here would be
+read as a warning. Opening a tab shows that donor in full on the same page:
+their details, and their whole workup. The point of the screen is comparing
+them, and comparing means not leaving the record to see one.
+
+Two buttons end a candidacy, and they are opposites:
+
+- **Delink** sets this one aside. The status becomes declined, the tab goes
+  grey and read-only, and nothing is deleted — a donor who was looked at and
+  declined is part of what happened.
+- **Pair up** chooses this one. The pair is made from this recipient and this
+  donor, every other candidate is set aside with it, the donor joins the
+  register, and the pair's own screen opens. No step in between.
+
+One recipient, one donor, one pair — which is why Pair up closes everything
+else rather than leaving the list half-decided.
+
+`potential_donors` holds the middle state: one row per pairing considered, with
+its own status. The row stays after a pair is made, so the tabs still say who
+else was looked at. A pair made by any other door — Add Pair, or a donor's own
+screen — writes its candidate row too, so the recipient's tabs are the same
+whichever way the pair came about.
+
+### Pairing a donor from their own record
+
+A donor goes the other way and still pairs in one step, because a donor has one
+recipient. "Link with Recipient" opens the same kind of choice:
+
+- **Link with a new recipient** — Add Pair, with this record already filled in
+  and shown read-only, and only the other person to enter.
+- **Link with an existing recipient** — the recipients on this programme who
+  are not already paired, one form: the relationship and crossmatch date are
+  entered once at the top and each row's Link button carries that person's MRN.
+
+The choice is a `<dialog>` on the record, opened by `ui.js`. The button under it
+is a real link to `donors/{id}/link`, the same choice at its own URL, so with
+JavaScript off it is simply followed. A donor already in an open pair is sent to
+that pair rather than offered a second one, and a person who holds a row in both
+registers under one MRN is not offered as their own counterpart.
 
 ### What a recipient record holds
 
@@ -458,7 +500,7 @@ not undo edits made through the screens.
 
 ### The tables, and why each one is there
 
-Ten tables, arrived at by walking the screens and asking what each reads and
+Eleven tables, arrived at by walking the screens and asking what each reads and
 writes.
 
 | Table | Exists because |
@@ -471,6 +513,7 @@ writes.
 | `labs` | The catalogue: which tests a workup is made of, per programme and side |
 | `recipients` | The waiting list, and the two dates the score is computed from |
 | `donors` | The donor register |
+| `potential_donors` | Who is being considered for a recipient, before any pair exists |
 | `pairs` | The link between a recipient and a donor, and its history |
 | `lab_results` | One row per person per test: status, value, date |
 

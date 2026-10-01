@@ -276,6 +276,17 @@ class Ui extends BaseController
         $openTab   = $openTab >= 1 && $openTab <= count($donorTabs) ? $openTab : ($donorTabs === [] ? 0 : 1);
         $openDonor = $openTab === 0 ? null : $this->store->findDonor($donorTabs[$openTab - 1]['donorId']);
 
+        // Whose candidate this new donor is being entered as, if the screen
+        // was opened from a recipient's own. Nothing on the Add Donor screen
+        // changes — only where the record goes when it is saved.
+        $forRecipient = $person === null && ! $isRecipient
+            ? trim((string) ($this->request->getGet('for') ?? ''))
+            : '';
+
+        if ($forRecipient !== '' && $this->store->findRecipient($forRecipient) === null) {
+            $forRecipient = '';
+        }
+
         return view('ui/person_form', [
             'title'      => $person !== null ? $person['name'] : ($isRecipient ? 'Add Recipient' : 'Add Donor'),
             // Set when a save bounced back; the fields themselves come from
@@ -295,6 +306,14 @@ class Ui extends BaseController
             'donorTabs'  => $donorTabs,
             'openTab'    => $openTab,
             'openDonor'  => $openDonor,
+            // The open tab's workup, shown in full on the recipient's screen.
+            'openDonorLabs' => $openDonor['labTests'] ?? [],
+            'forRecipient'  => $forRecipient,
+            // Who the choice dialog can offer: everybody on the register this
+            // recipient is not already considering.
+            'candidates' => $isRecipient && $person !== null
+                ? $this->offerableDonors($person['id'], $donorTabs)
+                : [],
             'labTests'   => $labTests,
             'mrps'       => $mrps,
             // "Link with …" is a link to the choice at its own URL; the
@@ -416,6 +435,23 @@ class Ui extends BaseController
 
             if ($error !== '') {
                 return redirect()->back()->withInput()->with('ui_error', $error);
+            }
+
+            // Entered from a recipient's screen: this donor is that
+            // recipient's candidate, so they are stored off the register and
+            // the screen that asked is the one that comes back.
+            $forRecipient = trim((string) $this->request->getPost('for'));
+
+            if ($forRecipient !== '' && $this->store->findRecipient($forRecipient) !== null) {
+                $this->store->addDonor(array_merge($fields, ['id' => $mrn, 'listed' => false]));
+                $this->store->considerDonor($forRecipient, $mrn);
+
+                $recipient = $this->store->findRecipient($forRecipient);
+
+                return redirect()
+                    ->to(site_url('recipients/' . rawurlencode($forRecipient))
+                        . '?donor=' . count($recipient['donors'] ?? []))
+                    ->with('ui_notice', $fields['name'] . ' has been added as a potential donor.');
             }
 
             $this->store->addDonor(array_merge($fields, ['id' => $mrn]));
@@ -582,27 +618,45 @@ class Ui extends BaseController
     // ---- A recipient's donors -----------------------------------------------
 
     /**
-     * Undoes one of a recipient's links, after asking.
+     * Adds somebody already on the register to a recipient's candidates.
      *
-     * The pair closes and the donor is Declined. Nothing is deleted: the tab
-     * stays on the record, greyed and read-only, because a donor who was
-     * considered and set aside is part of what happened.
+     * Posted from the choice dialog on the recipient's own screen. No pair is
+     * made and nothing moves on the Donors List: this says only that the two
+     * are being looked at together.
      */
-    public function delinkDonor(string $mrn, string $pairId): string|RedirectResponse
+    public function considerDonor(string $mrn): RedirectResponse
     {
-        $recipient = $this->store->findRecipient($mrn);
-        $back      = site_url('recipients/' . rawurlencode($mrn));
+        $back = site_url('recipients/' . rawurlencode($mrn));
 
-        if ($recipient === null) {
+        if ($this->store->findRecipient($mrn) === null) {
             return redirect()->to(site_url('recipients'));
         }
 
-        $tab = null;
+        $error = $this->store->considerDonor($mrn, trim((string) $this->request->getPost('donorMrn')));
 
-        foreach ($recipient['donors'] ?? [] as $candidate) {
-            if ($candidate['pairId'] === $pairId) {
-                $tab = $candidate;
-            }
+        if ($error !== '') {
+            return redirect()->to($back)->with('ui_error', $error);
+        }
+
+        $recipient = $this->store->findRecipient($mrn);
+
+        return redirect()->to($back . '?donor=' . count($recipient['donors'] ?? []))
+            ->with('ui_notice', 'Added as a potential donor.');
+    }
+
+    /**
+     * Sets one of a recipient's candidates aside.
+     *
+     * The tab stays, read-only: a donor who was looked at and set aside is
+     * part of what happened, and taking the tab away would lose that. The
+     * question is asked first, because it cannot be pressed again afterwards.
+     */
+    public function delinkDonor(string $mrn, string $id): string|RedirectResponse
+    {
+        [$recipient, $tab, $back] = $this->candidate($mrn, $id);
+
+        if ($recipient === null) {
+            return redirect()->to(site_url('recipients'));
         }
 
         if ($tab === null || $tab['delinked']) {
@@ -615,24 +669,95 @@ class Ui extends BaseController
                 'navPage' => '',
                 'organ'   => $this->store->organ(),
                 'name'    => $tab['name'],
-                'kind'    => 'link',
-                'detail'  => 'This donor will be set to Declined and the link with '
-                    . $recipient['name'] . ' undone. Both records stay on the register, with their '
-                    . 'workups, and the donor keeps their place on this screen — shown as declined, '
-                    . 'and no longer editable from it.',
-                'action'  => site_url('recipients/' . rawurlencode($mrn) . '/donors/' . rawurlencode($pairId) . '/delink'),
-                'backUrl' => $back . '?donor=' . (int) $tab['number'],
+                'kind'    => 'potential donor',
+                'verb'    => 'Delink',
+                'detail'  => 'This potential donor will be set to Declined for '
+                    . $recipient['name'] . '. Their record stays on the system with its workup, '
+                    . 'and they keep their place on this screen — shown as declined, and no longer '
+                    . 'editable from it.',
+                'action'  => site_url('recipients/' . rawurlencode($mrn) . '/donors/' . rawurlencode($id) . '/delink'),
+                'backUrl' => $back,
             ]);
         }
 
-        $error = $this->store->delinkDonor($mrn, $pairId);
+        $error = $this->store->declineCandidate($mrn, $id);
 
-        $this->session->setFlashdata(
+        return redirect()->to($back)->with(
             $error === '' ? 'ui_notice' : 'ui_error',
-            $error === '' ? $tab['name'] . ' has been delinked and set to Declined.' : $error
+            $error === '' ? $tab['name'] . ' has been set to Declined.' : $error
         );
+    }
 
-        return redirect()->to($back . '?donor=' . (int) $tab['number']);
+    /** Moves a candidate between Active and On Hold, from their own tab. */
+    public function candidateStatus(string $mrn, string $id): RedirectResponse
+    {
+        [$recipient, $tab, $back] = $this->candidate($mrn, $id);
+
+        if ($recipient === null) {
+            return redirect()->to(site_url('recipients'));
+        }
+
+        if ($tab === null) {
+            return redirect()->to($back);
+        }
+
+        $error = $this->store->setCandidateStatus($mrn, $id, (string) $this->request->getPost('status'));
+
+        return $error === ''
+            ? redirect()->to($back)
+            : redirect()->to($back)->with('ui_error', $error);
+    }
+
+    /**
+     * Makes the pair, from the candidate whose tab is open.
+     *
+     * The decision the list was leading to: one of them is the donor, the rest
+     * are set aside, and the screen that opens is the pair's own. No step in
+     * between — everything the pair needs is already on both records.
+     */
+    public function pairUp(string $mrn, string $id): RedirectResponse
+    {
+        [$recipient, $tab, $back] = $this->candidate($mrn, $id);
+
+        if ($recipient === null) {
+            return redirect()->to(site_url('recipients'));
+        }
+
+        if ($tab === null) {
+            return redirect()->to($back);
+        }
+
+        [$pairId, $error] = $this->store->pairUpCandidate($mrn, $id);
+
+        if ($error !== '') {
+            return redirect()->to($back)->with('ui_error', $error);
+        }
+
+        return redirect()->to(site_url('pairs/' . rawurlencode($pairId)))
+            ->with('ui_notice', $recipient['name'] . ' and ' . $tab['name'] . ' are now a pair.');
+    }
+
+    /**
+     * One recipient, one of their candidates, and where to go back to.
+     *
+     * @return array{0: array<string, mixed>|null, 1: array<string, mixed>|null, 2: string}
+     */
+    private function candidate(string $mrn, string $id): array
+    {
+        $recipient = $this->store->findRecipient($mrn);
+        $back      = site_url('recipients/' . rawurlencode($mrn));
+
+        if ($recipient === null) {
+            return [null, null, $back];
+        }
+
+        foreach ($recipient['donors'] ?? [] as $tab) {
+            if ((string) $tab['id'] === (string) $id) {
+                return [$recipient, $tab, $back . '?donor=' . (int) $tab['number']];
+            }
+        }
+
+        return [$recipient, null, $back];
     }
 
     // ---- Tests a record adds for itself ------------------------------------
@@ -1455,19 +1580,9 @@ class Ui extends BaseController
 
     // ---- Linking a person to a counterpart ---------------------------------
 
-    public function linkRecipient(string $id): string|RedirectResponse
-    {
-        return $this->linkChoice('recipient', $id);
-    }
-
     public function linkDonor(string $id): string|RedirectResponse
     {
         return $this->linkChoice('donor', $id);
-    }
-
-    public function linkRecipientExisting(string $id): string|RedirectResponse
-    {
-        return $this->linkExisting('recipient', $id);
     }
 
     public function linkDonorExisting(string $id): string|RedirectResponse
@@ -1663,14 +1778,41 @@ class Ui extends BaseController
      *
      * @return array{newUrl: string, existingUrl: string, backUrl: string}
      */
+    /**
+     * The donors a recipient could be given as candidates.
+     *
+     * Everybody on the register who is not in an open pair, less this
+     * recipient's own candidates — adding somebody twice is adding them once,
+     * so there is nothing to offer — and less anyone holding this recipient's
+     * own MRN on the other register.
+     *
+     * @param list<array<string, mixed>> $tabs
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function offerableDonors(string $recipientMrn, array $tabs): array
+    {
+        $already = array_map(static fn (array $tab): string => (string) $tab['donorId'], $tabs);
+
+        return array_values(array_filter(
+            $this->store->availableDonors(),
+            static fn (array $donor): bool => (string) $donor['id'] !== $recipientMrn
+                && ! in_array((string) $donor['id'], $already, true)
+        ));
+    }
+
     private function linkUrls(string $personType, string $id): array
     {
         $base = ($personType === 'recipient' ? 'recipients/' : 'donors/') . rawurlencode($id);
 
         return [
-            // Add Pair with this person already filled in; the form collects
-            // the other one.
-            'newUrl'      => site_url('pairs/new') . '?' . $personType . '=' . rawurlencode($id),
+            // A recipient collects candidates rather than making a pair, so
+            // theirs goes to Add Donor; the pair comes later, from a tab. A
+            // donor's still goes to Add Pair, which is the only direction that
+            // still makes one in a single step.
+            'newUrl'      => $personType === 'recipient'
+                ? site_url('donors/new') . '?for=' . rawurlencode($id)
+                : site_url('pairs/new') . '?' . $personType . '=' . rawurlencode($id),
             'existingUrl' => site_url($base . '/link/existing'),
             'backUrl'     => site_url($base),
         ];

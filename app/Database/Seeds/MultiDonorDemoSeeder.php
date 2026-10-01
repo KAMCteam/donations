@@ -88,6 +88,19 @@ class MultiDonorDemoSeeder extends Seeder
 
                 $this->donor($dMrn, $dName, $dGroup, $organ, $relationship, $donorStatus);
 
+                // The candidate row is what the recipient's tabs are built
+                // from; the pair is what one of them became. A closed pair is
+                // a candidate who was set aside.
+                if ($this->db->table('potential_donors')->getWhere(['donor_mrn' => $dMrn])->getRowArray() === null) {
+                    $this->db->table('potential_donors')->insert([
+                        'recipient_mrn' => $rMrn,
+                        'donor_mrn'     => $dMrn,
+                        'status'        => $status === 'closed' || $status === 'declined' ? 'declined' : 'active',
+                        'created_at'    => date('Y-m-d H:i:s'),
+                        'updated_at'    => date('Y-m-d H:i:s'),
+                    ]);
+                }
+
                 if ($this->db->table('pairs')->getWhere(['donor_mrn' => $dMrn])->getRowArray() !== null) {
                     continue;
                 }

@@ -35,16 +35,21 @@ $routes->get('dashboard', 'Ui::dashboard');
 
 $routes->get('recipients', 'Ui::recipients');
 $routes->match(['get', 'post'], 'recipients/new', 'Ui::addRecipient');
-// Both link routes come before the record route: `(:segment)` stops at a
-// slash, so they cannot be confused, but reading them in this order makes
-// that obvious.
+// These come before the record route: `(:segment)` stops at a slash, so they
+// cannot be confused, but reading them in this order makes that obvious.
+//
+// A recipient's potential donors are all worked from the recipient's own
+// screen — added, set aside, and finally paired — so each of these posts and
+// comes straight back to it. There is no page of their own: the tabs are on
+// the record.
+$routes->post('recipients/(:segment)/donors', 'Ui::considerDonor/$1');
 $routes->match(['get', 'post'], 'recipients/(:segment)/donors/(:num)/delink', 'Ui::delinkDonor/$1/$2');
+$routes->post('recipients/(:segment)/donors/(:num)/status', 'Ui::candidateStatus/$1/$2');
+$routes->post('recipients/(:segment)/donors/(:num)/pair', 'Ui::pairUp/$1/$2');
 $routes->post('recipients/(:segment)/labs', 'Ui::addLab/recipient/$1');
 $routes->match(['get', 'post'], 'recipients/(:segment)/labs/(:num)/delete', 'Ui::removeLab/recipient/$1/$2');
 $routes->get('recipients/(:segment)/print', 'Ui::printRecipient/$1');
 $routes->match(['get', 'post'], 'recipients/(:segment)/delete', 'Ui::deleteRecipient/$1');
-$routes->get('recipients/(:segment)/link', 'Ui::linkRecipient/$1');
-$routes->match(['get', 'post'], 'recipients/(:segment)/link/existing', 'Ui::linkRecipientExisting/$1');
 $routes->match(['get', 'post'], 'recipients/(:segment)', 'Ui::recipient/$1');
 
 $routes->get('donors', 'Ui::donors');

@@ -15,7 +15,7 @@ class DonorModel extends Model
     protected $useTimestamps = true;
     protected $allowedFields = [
         'mrn', 'name', 'organ_code', 'blood_group', 'gender', 'age', 'city', 'phone',
-        'birth_date', 'donation_type', 'relationship', 'status', 'mrp_id',
+        'birth_date', 'donation_type', 'relationship', 'status', 'is_listed', 'mrp_id',
         'coordinator_id', 'registered_on', 'notes',
     ];
 
@@ -29,6 +29,10 @@ class DonorModel extends Model
     public function register(?string $organCode = null, bool $unmatchedOnly = false, ?string $bloodGroup = null): array
     {
         $builder = $this->db->table('donors d')
+            // Somebody entered as one recipient's potential donor is not on
+            // the register: the list is who the programme has, not who is
+            // being thought about. They join it when a pair is made.
+            ->where('d.is_listed', 1)
             ->select('d.*, op.label AS program_label, m.name AS mrp_name, c.name AS coordinator_name')
             ->select('(SELECT COUNT(*) FROM lab_results lr WHERE lr.person_mrn = d.mrn AND lr.person_type = \'donor\') AS labs_total', false)
             ->select('(SELECT COUNT(*) FROM lab_results lr WHERE lr.person_mrn = d.mrn AND lr.person_type = \'donor\' AND lr.status = \'completed\') AS labs_completed', false)

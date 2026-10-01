@@ -67,8 +67,10 @@ alias to `public/` rather than the old `.htaccess` rewrite.
 | `/organ` | Programme picker (kidney / liver) |
 | `/dashboard` | Programme statistics and high-priority waitlist |
 | `/recipients` | Recipient waitlist, filterable by blood type and status |
+| `/recipients/print` | The filtered waitlist as a printable sheet |
 | `/recipients/new`, `/recipients/{id}` | Add / open a recipient |
 | `/donors` | Donor registry, filterable by blood type and status |
+| `/donors/print` | The filtered registry as a printable sheet |
 | `/donors/new`, `/donors/{id}` | Add / open a donor |
 | `/pairs` | Pairs register, filterable by blood type and status |
 | `/pairs/export` | The filtered pairs as CSV |
@@ -271,6 +273,12 @@ Pairs List does — **Blood type** and **Status** — and they narrow together: 
 chip rebuilds the address keeping the other filter, so `?bt=A&status=on_hold`
 is one list rather than two that overwrite each other. A filter on `all` drops
 out of the URL, so a plain list has a plain address.
+
+Both carry an **Export PDF** beside their Add button, and it exports what is on
+the screen: the filtered rows, in the columns the list shows, with the filters
+named on the letterhead so a printout says what it is a printout of. The two
+sheets are one view — `ui/register_print` — because they are the same document
+with different columns, and the caller hands the cells over already formatted.
 
 Paired Exchange has a blood-type row too, labelled **Recipient blood type**,
 and it asks a different question from the others': the Pairs List's matches a

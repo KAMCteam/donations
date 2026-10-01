@@ -36,6 +36,17 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
 
     return site_url('donors') . ($query === [] ? '' : '?' . http_build_query($query));
 };
+
+// The same two as a bare query string, for the sheet: it is another address
+// under this one, not a replacement for it.
+$filterQuery = static function () use ($btFilter, $statusFilter): string {
+    $query = array_filter(
+        ['bt' => $btFilter, 'status' => $statusFilter],
+        static fn (string $v): bool => $v !== 'all'
+    );
+
+    return $query === [] ? '' : '?' . http_build_query($query);
+};
 ?>
 <div class="page">
     <div class="page-header page-header--center">
@@ -44,7 +55,12 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
             <h1 class="page-title">Donors List</h1>
             <p class="page-subtitle"><?= esc(ui_plural(count($donors), 'unmatched donor')) ?></p>
         </div>
-        <a class="btn-primary" href="<?= site_url('donors/new') ?>"><?= ui_icon('plus') ?>Add Donor</a>
+        <?php // The filtered list as a printable sheet, as the Pairs List
+              // has: what is on the screen is what comes out. ?>
+        <div class="header-actions">
+            <a class="btn-outline" href="<?= site_url('donors/print') . $filterQuery() ?>" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
+            <a class="btn-primary" href="<?= site_url('donors/new') ?>"><?= ui_icon('plus') ?>Add Donor</a>
+        </div>
     </div>
 
     <?php // Narrowed in SQL, as the waitlist's are: the chips are links, so the

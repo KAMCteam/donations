@@ -34,6 +34,8 @@ $routes->get('organ/(:segment)', 'Ui::chooseOrgan/$1');
 $routes->get('dashboard', 'Ui::dashboard');
 
 $routes->get('recipients', 'Ui::recipients');
+// Before the record route, which would otherwise read `print` as an MRN.
+$routes->get('recipients/print', 'Ui::printRecipients');
 $routes->match(['get', 'post'], 'recipients/new', 'Ui::addRecipient');
 // These come before the record route: `(:segment)` stops at a slash, so they
 // cannot be confused, but reading them in this order makes that obvious.
@@ -57,6 +59,7 @@ $routes->match(['get', 'post'], 'recipients/(:segment)/delete', 'Ui::deleteRecip
 $routes->match(['get', 'post'], 'recipients/(:segment)', 'Ui::recipient/$1');
 
 $routes->get('donors', 'Ui::donors');
+$routes->get('donors/print', 'Ui::printDonors');
 $routes->match(['get', 'post'], 'donors/new', 'Ui::addDonor');
 $routes->post('donors/(:segment)/labs', 'Ui::addLab/donor/$1');
 $routes->match(['get', 'post'], 'donors/(:segment)/labs/(:num)/delete', 'Ui::removeLab/donor/$1/$2');

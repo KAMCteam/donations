@@ -208,6 +208,46 @@ class Ui extends BaseController
         ]);
     }
 
+    /**
+     * The waitlist as a printed sheet, under whatever the chips were set to.
+     *
+     * The filtered rows and no others, in the columns the screen shows — the
+     * delete button aside, which is not a column so much as a control.
+     */
+    public function printRecipients(): string
+    {
+        $filter = $this->bloodTypeFilter();
+        $status = $this->personStatusFilter();
+        $rows   = $this->store->waitingList(
+            $filter === 'all' ? null : $filter,
+            $status === 'all' ? null : $status
+        );
+
+        $score = static fn (?float $value): string => $value === null ? '' : number_format($value, 1);
+
+        return view('ui/register_print', [
+            'sheetTitle' => 'Recipient Waitlist',
+            'organLabel' => $this->store->organLabel(),
+            'count'      => ui_plural(count($rows), 'unmatched recipient'),
+            'filters'    => $this->registerFilterSummary($filter, $status),
+            'printedOn'  => date('d/m/Y'),
+            'headers'    => ['#', 'Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Score', 'Urgent'],
+            'rows'       => array_map(static fn (int $i, array $r): array => [
+                [(string) ($i + 1), 'c-pairno'],
+                [(string) $r['name'], 'c-name'],
+                [(string) $r['id'], 'c-mono'],
+                [(string) $r['age'], ''],
+                [(string) $r['gender'], ''],
+                [(string) $r['bloodType'], 'c-mono'],
+                [$score($r['score'] ?? null), 'c-mono'],
+                [$r['urgent'] ? 'Urgent' : 'Not Urgent', ''],
+            ], array_keys($rows), $rows),
+            'empty'      => 'No recipients match these filters.',
+            'backUrl'    => site_url('recipients') . $this->registerFilterQuery($filter, $status),
+            'backLabel'  => 'Back to Recipient Waitlist',
+        ]);
+    }
+
     public function addRecipient(): string|RedirectResponse
     {
         return $this->personScreen('recipient', null);
@@ -243,6 +283,42 @@ class Ui extends BaseController
             ),
             'btFilter'     => $filter,
             'statusFilter' => $status,
+        ]);
+    }
+
+    /** The donor register as a printed sheet, under its own chips. */
+    public function printDonors(): string
+    {
+        $filter = $this->bloodTypeFilter();
+        $status = $this->personStatusFilter();
+        $rows   = $this->store->availableDonors(
+            $filter === 'all' ? null : $filter,
+            $status === 'all' ? null : $status
+        );
+
+        return view('ui/register_print', [
+            'sheetTitle' => 'Donors List',
+            'organLabel' => $this->store->organLabel(),
+            'count'      => ui_plural(count($rows), 'unmatched donor'),
+            'filters'    => $this->registerFilterSummary($filter, $status),
+            'printedOn'  => date('d/m/Y'),
+            'headers'    => ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs'],
+            'rows'       => array_map(static function (array $d): array {
+                $progress = UiStore::labProgress($d['labTests']);
+
+                return [
+                    [(string) $d['name'], 'c-name'],
+                    [(string) $d['id'], 'c-mono'],
+                    [(string) $d['age'], ''],
+                    [(string) $d['donorGender'], ''],
+                    [(string) $d['bloodType'], 'c-mono'],
+                    [UiStore::DONATION_TYPES[$d['donationType']] ?? (string) $d['donationType'], ''],
+                    [$progress['done'] . '/' . $progress['total'], 'c-mono'],
+                ];
+            }, $rows),
+            'empty'      => 'No unmatched donors match these filters.',
+            'backUrl'    => site_url('donors') . $this->registerFilterQuery($filter, $status),
+            'backLabel'  => 'Back to Donors List',
         ]);
     }
 
@@ -2195,6 +2271,33 @@ class Ui extends BaseController
         $filter = (string) ($this->request->getGet('bt') ?? 'all');
 
         return in_array($filter, UiStore::BLOOD_TYPES, true) ? $filter : 'all';
+    }
+
+    /** What the two registers' chips were narrowed to, for the sheet's meta line. */
+    private function registerFilterSummary(string $bloodType, string $status): string
+    {
+        $applied = [];
+
+        if ($bloodType !== 'all') {
+            $applied[] = 'Blood type ' . $bloodType;
+        }
+
+        if ($status !== 'all') {
+            $applied[] = UiStore::PERSON_STATUS_OPTIONS[$status] ?? $status;
+        }
+
+        return $applied === [] ? 'No filters applied' : implode(' · ', $applied);
+    }
+
+    /** The same two as a query string, so Back returns to the same list. */
+    private function registerFilterQuery(string $bloodType, string $status): string
+    {
+        $query = array_filter(
+            ['bt' => $bloodType, 'status' => $status],
+            static fn (string $value): bool => $value !== 'all'
+        );
+
+        return $query === [] ? '' : '?' . http_build_query($query);
     }
 
     /**

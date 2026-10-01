@@ -1998,6 +1998,45 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         }
     }
 
+    /**
+     * Both registers export what is on the screen, not the whole table.
+     *
+     * The same sheet as the Pairs List's: the filtered rows, the columns the
+     * screen shows, and the filters named on the letterhead so a printout says
+     * what it is a printout of.
+     */
+    public function testBothRegistersExportTheFilteredList(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9401', 'name' => 'Type A Listed', 'age' => '40', 'bloodType' => 'A']);
+        $this->post('recipients/new', ['mrn' => '9402', 'name' => 'Type B Listed', 'age' => '41', 'bloodType' => 'B']);
+        $this->post('donors/new', ['mrn' => '9403', 'name' => 'Type A Donor', 'age' => '30', 'bloodType' => 'A']);
+        $this->post('donors/new', ['mrn' => '9404', 'name' => 'Type B Donor', 'age' => '31', 'bloodType' => 'B']);
+
+        foreach ([
+            'recipients' => ['Recipient Waitlist', 'Type A Listed', 'Type B Listed'],
+            'donors'     => ['Donors List', 'Type A Donor', 'Type B Donor'],
+        ] as $screen => [$title, $kept, $dropped]) {
+            // The button is on the screen, carrying the filters with it.
+            $list = $this->get($screen . '?bt=A')->getBody();
+            $this->assertStringContainsString(site_url($screen . '/print') . '?bt=A', $list);
+            $this->assertStringContainsString('Export PDF', $list);
+
+            $sheet = $this->get($screen . '/print?bt=A')->getBody();
+            $this->assertStringContainsString($title . ' &mdash; ', $sheet);
+            $this->assertStringContainsString('Blood type A', $sheet);
+            $this->assertStringContainsString($kept, $sheet);
+            $this->assertStringNotContainsString($dropped, $sheet);
+
+            // Unfiltered, the letterhead says so rather than naming nothing.
+            $this->assertStringContainsString('No filters applied', $this->get($screen . '/print')->getBody());
+
+            // And an empty sheet is a sentence, not an empty table.
+            $none = $this->get($screen . '/print?bt=AB')->getBody();
+            $this->assertStringContainsString('match these filters', $none);
+            $this->assertStringNotContainsString('<table', $none);
+        }
+    }
+
     /** A status nobody can choose is read as no filter at all. */
     public function testAnUnknownStatusIsNotAFilter(): void
     {

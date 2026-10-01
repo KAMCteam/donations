@@ -523,13 +523,24 @@ final class ExchangeDraft
      *
      * @return list<array<string, mixed>>
      */
-    public function exchangeablePairs(string $organ, string $query = ''): array
+    public function exchangeablePairs(string $organ, string $query = '', string $bloodGroup = ''): array
     {
-        // No status and no blood group: being on this list is already a status,
-        // and an exchange matches blood groups to one another rather than
-        // reading one of them at a time.
+        // No status filter: being on this list is already a status, and the
+        // few a pair can hold here are all true of every row on it.
         $rows = $this->pairs->overview($organ);
         $rows = array_filter($rows, static fn (array $r): bool => self::isExchangeable($r));
+
+        // The recipient's blood group, and only theirs. An exchange exists
+        // because a donor cannot give to their own recipient, so matching on
+        // either side would hide the very pairs that make one work — what
+        // somebody narrowing this list is asking is "who needs a group I can
+        // place", which is a question about the recipients.
+        if ($bloodGroup !== '') {
+            $rows = array_filter(
+                $rows,
+                static fn (array $r): bool => (string) $r['r_blood_group'] === $bloodGroup
+            );
+        }
 
         if ($query !== '') {
             $rows = array_filter($rows, static function (array $r) use ($query): bool {

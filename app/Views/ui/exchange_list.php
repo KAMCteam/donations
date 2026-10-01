@@ -13,18 +13,36 @@ use App\Libraries\UiStore;
  * that button is the filter; the list is short by construction, so the file
  * number is all it asks for.
  *
- * It carried the Pairs List's blood-type and status chips as well. Neither
- * belonged here: a blood group narrows a register you are reading, but an
- * exchange is built by matching groups to each other, so hiding all but one of
- * them hides exactly what the screen is for. And a pair is on this list only
- * while its status is one an exchange can move, which left a status filter
- * choosing between two or three words that were all already true.
+ * It carried the Pairs List's status chips as well, which did not belong: a
+ * pair is on this list only while its status is one an exchange can move, so
+ * the filter chose between two or three words that were all already true.
+ *
+ * The blood-type row came back, but asking a different question. The Pairs
+ * List's matched a pair when either side had the group; here it is the
+ * **recipient's** group alone. An exchange exists because a donor cannot give
+ * to their own recipient, so matching on either side would hide the very pairs
+ * that make one work — what somebody narrowing this list wants is the
+ * recipients who need a group they have somewhere to place.
  *
  * @var list<array<string, mixed>> $rows      Joined pairs, already filtered
  * @var string                     $query
+ * @var string                     $btFilter  The recipient blood group, or "all"
  * @var bool                       $hasDraft  An exchange already part-built
  * @var string                     $error
  */
+/**
+ * Rebuilds the address with the blood type swapped, keeping the search.
+ *
+ * A filter on its own default drops out, so a plain list has a plain address.
+ */
+$filterUrl = static function (string $value) use ($query): string {
+    $params = array_filter(
+        ['bt' => $value === 'all' ? '' : $value, 'q' => $query],
+        static fn (string $v): bool => $v !== ''
+    );
+
+    return site_url('exchange') . ($params === [] ? '' : '?' . http_build_query($params));
+};
 $headers = ['Pair #', 'Recipient', 'MRN', 'Blood', 'Donor', 'MRN', 'Blood', 'Status', ''];
 ?>
 <div class="page">
@@ -44,22 +62,42 @@ $headers = ['Pair #', 'Recipient', 'MRN', 'Blood', 'Donor', 'MRN', 'Blood', 'Sta
     <?php endif; ?>
 
     <div class="filter-stack">
+        <div class="filter-row">
+            <?php // Said in the label, because this row means something else
+                  // here than it does on the Pairs List. ?>
+            <span class="filter-label filter-label--mr">Recipient blood type:</span>
+            <a class="chip<?= $btFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('all') ?>">All</a>
+            <?php foreach (UiStore::BLOOD_TYPES as $bloodType): ?>
+                <a class="chip chip--mono<?= $btFilter === $bloodType ? ' is-active' : '' ?>" href="<?= $filterUrl($bloodType) ?>"><?= esc($bloodType) ?></a>
+            <?php endforeach; ?>
+        </div>
+
         <form class="search-row" method="get" action="<?= site_url('exchange') ?>">
             <label class="filter-label filter-label--mr" for="ex-q">File number:</label>
+            <?php // The chips are links, so the search form has to carry the
+                  // blood type itself or submitting it would clear the row
+                  // above. ?>
+            <?php if ($btFilter !== 'all'): ?>
+                <input type="hidden" name="bt" value="<?= esc($btFilter) ?>">
+            <?php endif; ?>
             <input type="search" id="ex-q" name="q" class="input search-input" value="<?= esc($query) ?>" placeholder="MRN or name" inputmode="search">
             <button type="submit" class="btn-outline">Search</button>
             <?php if ($query !== ''): ?>
-                <a class="stat-link" href="<?= site_url('exchange') ?>">Clear</a>
+                <a class="stat-link" href="<?= $filterUrl($btFilter) ?>">Clear</a>
             <?php endif; ?>
         </form>
     </div>
 
     <div class="card card--scroll">
         <?php if ($rows === []): ?>
-            <?php // Empty is the normal starting state, so say what fills it. ?>
             <div class="empty-state">
-                No pairs have been put forward for exchange.<br>
-                Open a pair from the <a class="stat-link" href="<?= site_url('pairs') ?>">Pairs List</a> and press <strong>Pair Exchange</strong> to offer it here.
+                <?php if ($btFilter !== 'all' || $query !== ''): ?>
+                    No pairs on the exchange list match these filters.
+                <?php else: ?>
+                    <?php // Empty is the normal starting state, so say what fills it. ?>
+                    No pairs have been put forward for exchange.<br>
+                    Open a pair from the <a class="stat-link" href="<?= site_url('pairs') ?>">Pairs List</a> and press <strong>Pair Exchange</strong> to offer it here.
+                <?php endif; ?>
             </div>
         <?php else: ?>
             <table class="table list-table">

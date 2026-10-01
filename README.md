@@ -73,7 +73,7 @@ alias to `public/` rather than the old `.htaccess` rewrite.
 | `/pairs` | Pairs register, filterable by blood type and status |
 | `/pairs/export` | The filtered pairs as CSV |
 | `/pairs/new`, `/pairs/{id}` | Add / open a pair |
-| `/exchange` | Paired exchange: the chains, and the builder |
+| `/exchange` | Paired exchange: the chains, and the builder; filterable by the recipient's blood type |
 | `/reports` | Both registers read across, under nine filters |
 | `/reports/export/{general\|internal}` | The filtered report as a printable sheet |
 | `/mrp` | Register a Medical Responsible Person |
@@ -271,6 +271,15 @@ Pairs List does — **Blood type** and **Status** — and they narrow together: 
 chip rebuilds the address keeping the other filter, so `?bt=A&status=on_hold`
 is one list rather than two that overwrite each other. A filter on `all` drops
 out of the URL, so a plain list has a plain address.
+
+Paired Exchange has a blood-type row too, labelled **Recipient blood type**,
+and it asks a different question from the others': the Pairs List's matches a
+pair when *either* side has the group, and this one is the recipient's alone.
+An exchange exists because a donor cannot give to their own recipient, so
+matching either side would hide the very pairs that make one work. What
+somebody narrowing that list wants is the recipients needing a group they have
+somewhere to place. It has no status row — being on the list is already a
+status, and the few a pair can hold there are true of every row on it.
 
 Both are applied in SQL, not by filtering a loaded array, because the waitlist
 is ordered by a computed score and PHP cannot sort by it. Status offers the

@@ -49,12 +49,17 @@ class Exchange extends BaseController
         $organ = $this->store->organ();
         $query = trim((string) $this->request->getGet('q'));
 
+        // The recipients' groups, not the pairs': see `exchangeablePairs`.
+        $bloodType = (string) ($this->request->getGet('bt') ?? 'all');
+        $bloodType = in_array($bloodType, UiStore::BLOOD_TYPES, true) ? $bloodType : 'all';
+
         return view('ui/exchange_list', [
             'title'    => 'Paired Exchange',
             'navPage'  => 'exchange',
             'organ'    => $organ,
-            'rows'     => $this->draft->exchangeablePairs($organ, $query),
+            'rows'     => $this->draft->exchangeablePairs($organ, $query, $bloodType === 'all' ? '' : $bloodType),
             'query'    => $query,
+            'btFilter' => $bloodType,
             'hasDraft' => $this->draft->isOpen($organ),
             'error'    => (string) ($this->session->getFlashdata('ui_error') ?? ''),
         ]);

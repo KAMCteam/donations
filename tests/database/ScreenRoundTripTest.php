@@ -2007,11 +2007,15 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
-     * Paired Exchange asks for a file number and nothing else: being on the
-     * list is already a status, and an exchange matches blood groups to each
-     * other rather than reading one at a time.
+     * Paired Exchange has no status chips: being on the list is already a
+     * status, and the few a pair can hold there are all true of every row.
+     *
+     * Its blood-type row asks a different question from the Pairs List's. An
+     * exchange exists because a donor cannot give to their own recipient, so
+     * matching either side would hide the pairs that make one work. It is the
+     * recipient's group alone.
      */
-    public function testPairedExchangeHasNoBloodTypeOrStatusChips(): void
+    public function testPairedExchangeFiltersOnTheRecipientsBloodTypeOnly(): void
     {
         $this->post('pairs/new', [
             'rMrn' => '9603', 'dMrn' => '9604',
@@ -2026,18 +2030,29 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         $this->assertStringContainsString('Offered Recipient', $html);
         $this->assertStringContainsString('File number:', $html);
+        $this->assertStringContainsString('Recipient blood type:', $html);
+        $this->assertStringNotContainsString('Status:', $html);
 
         // The row opens the pair, and carries a real link for it as well.
         $this->assertStringContainsString('data-href="' . site_url('pairs/' . $pairId) . '"', $html);
         $this->assertStringContainsString('<a href="' . site_url('pairs/' . $pairId) . '">' . $pairId . '</a>', $html);
-        $this->assertStringNotContainsString('Blood type:', $html);
-        $this->assertStringNotContainsString('Status:', $html);
 
-        // The search still works, and a blood-type parameter is simply ignored
-        // rather than hiding a pair the screen is meant to show.
-        $this->assertStringContainsString('Offered Recipient', $this->get('exchange?q=9603')->getBody());
-        $this->assertStringContainsString('Offered Recipient', $this->get('exchange?bt=AB')->getBody());
-        $this->assertStringNotContainsString('Offered Recipient', $this->get('exchange?q=1234')->getBody());
+        // The recipient's group keeps the pair; the donor's does not bring it
+        // back, which is the whole of the difference.
+        $this->assertStringContainsString('Offered Recipient', $this->get('exchange?bt=A')->getBody());
+        $this->assertStringNotContainsString('Offered Recipient', $this->get('exchange?bt=B')->getBody());
+        $this->assertStringNotContainsString('Offered Recipient', $this->get('exchange?bt=AB')->getBody());
+
+        // The two filters narrow together rather than clearing each other.
+        $this->assertStringContainsString('bt=A&amp;q=9603', $this->get('exchange?bt=A&q=9603')->getBody());
+        $this->assertStringContainsString('Offered Recipient', $this->get('exchange?bt=A&q=9603')->getBody());
+        $this->assertStringNotContainsString('Offered Recipient', $this->get('exchange?bt=A&q=1234')->getBody());
+
+        // An empty list says which kind of empty it is: nobody offered, or
+        // nobody matching. The second is not a reason to explain the screen.
+        $filteredEmpty = $this->get('exchange?bt=AB')->getBody();
+        $this->assertStringContainsString('match these filters', $filteredEmpty);
+        $this->assertStringNotContainsString('put forward for exchange', $filteredEmpty);
     }
 
     /**

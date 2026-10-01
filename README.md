@@ -66,9 +66,10 @@ alias to `public/` rather than the old `.htaccess` rewrite.
 | `/login` | Staff login |
 | `/organ` | Programme picker (kidney / liver) |
 | `/dashboard` | Programme statistics and high-priority waitlist |
-| `/recipients` | Recipient waitlist, filterable by blood type |
+| `/recipients` | Recipient waitlist, filterable by blood type and status |
 | `/recipients/new`, `/recipients/{id}` | Add / open a recipient |
-| `/donors`, `/donors/new`, `/donors/{id}` | Donor registry and records |
+| `/donors` | Donor registry, filterable by blood type and status |
+| `/donors/new`, `/donors/{id}` | Add / open a donor |
 | `/pairs` | Pairs register, filterable by blood type and status |
 | `/pairs/export` | The filtered pairs as CSV |
 | `/pairs/new`, `/pairs/{id}` | Add / open a pair |
@@ -262,6 +263,21 @@ is a real link to `donors/{id}/link`, the same choice at its own URL, so with
 JavaScript off it is simply followed. A donor already in an open pair is sent to
 that pair rather than offered a second one, and a person who holds a row in both
 registers under one MRN is not offered as their own counterpart.
+
+### Filtering the two registers
+
+The Recipient Waitlist and the Donors List carry the same two chip rows the
+Pairs List does — **Blood type** and **Status** — and they narrow together: each
+chip rebuilds the address keeping the other filter, so `?bt=A&status=on_hold`
+is one list rather than two that overwrite each other. A filter on `all` drops
+out of the URL, so a plain list has a plain address.
+
+Both are applied in SQL, not by filtering a loaded array, because the waitlist
+is ordered by a computed score and PHP cannot sort by it. Status offers the
+three a record is ever set to — On Hold, Active, Declined — since the rest of
+`STATUS_OPTIONS` belongs to a pair or is retired, and offering those would be
+offering empty lists. An address naming a status nobody can choose is read as
+no filter at all.
 
 ### What a recipient record holds
 

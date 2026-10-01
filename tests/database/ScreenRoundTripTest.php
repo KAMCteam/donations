@@ -1957,10 +1957,53 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('Type A Donor', $onlyA);
         $this->assertStringNotContainsString('Type O Donor', $onlyA);
 
-        // Nothing of that type is not the same as an empty register.
+        // Nothing of that type is not the same as an empty register. The
+        // sentence covers both filters now rather than naming only one.
         $none = $this->get('donors?bt=AB')->getBody();
-        $this->assertStringContainsString('No unmatched donors with blood type AB', $none);
-        $this->assertStringContainsString('Show all blood types', $none);
+        $this->assertStringContainsString('No unmatched donors match these filters.', $none);
+        $this->assertStringNotContainsString('No unmatched donors.', $none);
+    }
+
+    /**
+     * Both registers narrow by status as well, and the two chip rows narrow
+     * together rather than each clearing the other.
+     */
+    public function testBothRegistersFilterByStatus(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9301', 'name' => 'Active R', 'age' => '40', 'bloodType' => 'A', 'status' => 'active']);
+        $this->post('recipients/new', ['mrn' => '9302', 'name' => 'Held R', 'age' => '41', 'bloodType' => 'B', 'status' => 'on_hold']);
+        $this->post('donors/new', ['mrn' => '9303', 'name' => 'Active D', 'age' => '30', 'bloodType' => 'A', 'donorStatus' => 'Active']);
+        $this->post('donors/new', ['mrn' => '9304', 'name' => 'Held D', 'age' => '31', 'bloodType' => 'B', 'donorStatus' => 'On Hold']);
+
+        foreach (['recipients' => ['Active R', 'Held R'], 'donors' => ['Active D', 'Held D']] as $screen => [$active, $held]) {
+            $all = $this->get($screen)->getBody();
+            $this->assertStringContainsString($active, $all);
+            $this->assertStringContainsString($held, $all);
+            // Every status a record can hold is offered, and nothing else.
+            $this->assertStringContainsString('Status:', $all);
+            $this->assertStringContainsString('status=on_hold', $all);
+            $this->assertStringNotContainsString('status=transplanted', $all);
+
+            $onHold = $this->get($screen . '?status=on_hold')->getBody();
+            $this->assertStringContainsString($held, $onHold);
+            $this->assertStringNotContainsString($active, $onHold);
+
+            // The two narrow together: the blood-type chips carry the status
+            // with them, and the other way round.
+            $this->assertStringContainsString('bt=B&amp;status=on_hold', $onHold);
+
+            $both = $this->get($screen . '?bt=A&status=on_hold')->getBody();
+            $this->assertStringNotContainsString($active, $both);
+            $this->assertStringNotContainsString($held, $both);
+        }
+    }
+
+    /** A status nobody can choose is read as no filter at all. */
+    public function testAnUnknownStatusIsNotAFilter(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9305', 'name' => 'Still Here', 'age' => '40', 'bloodType' => 'A']);
+
+        $this->assertStringContainsString('Still Here', $this->get('recipients?status=nonsense')->getBody());
     }
 
     /**

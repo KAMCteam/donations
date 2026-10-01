@@ -14,12 +14,31 @@ use App\Libraries\UiStore;
  *
  * @var list<array<string, mixed>> $recipients  Unpaired, urgent-first then score-sorted.
  * @var string                     $btFilter
+ * @var string                     $statusFilter
  */
 $headers = ['#', 'Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Score', 'Urgent', ''];
 // The score is a real number now: a tenth of a point per month waiting plus a
 // tenth per month on dialysis, computed by the query. It is NULL for a
 // recipient with no dialysis date, which shows as a dash rather than as zero.
 $score = static fn (?float $value): string => $value === null ? '—' : number_format($value, 1);
+
+/**
+ * Rebuilds the address with one filter swapped out.
+ *
+ * A filter sitting on its own default — `all`, for both of them — drops out of
+ * the URL, so a plain list has a plain address and the chips still say what is
+ * being asked for.
+ */
+$filterUrl = static function (string $key, string $value) use ($btFilter, $statusFilter): string {
+    $query = ['bt' => $btFilter, 'status' => $statusFilter];
+    $query[$key] = $value;
+
+    // A filter on its own default drops out, so a plain list has a plain
+    // address and the chips still say exactly what is being asked for.
+    $query = array_filter($query, static fn (string $v): bool => $v !== 'all');
+
+    return site_url('recipients') . ($query === [] ? '' : '?' . http_build_query($query));
+};
 ?>
 <div class="page">
     <div class="page-header page-header--center">
@@ -31,12 +50,26 @@ $score = static fn (?float $value): string => $value === null ? '—' : number_f
         <a class="btn-primary" href="<?= site_url('recipients/new') ?>"><?= ui_icon('plus') ?>Add Recipient</a>
     </div>
 
-    <div class="filter-row filter-row--mb">
-        <span class="filter-label filter-label--mr">Blood type:</span>
-        <a class="chip<?= $btFilter === 'all' ? ' is-active' : '' ?>" href="<?= site_url('recipients') ?>">All</a>
-        <?php foreach (UiStore::BLOOD_TYPES as $bloodType): ?>
-            <a class="chip chip--mono<?= $btFilter === $bloodType ? ' is-active' : '' ?>" href="<?= site_url('recipients') . '?bt=' . rawurlencode($bloodType) ?>"><?= esc($bloodType) ?></a>
-        <?php endforeach; ?>
+    <?php // Two rows, as the Pairs List has: each narrows on its own and the
+          // two narrow together, so the address carries both. ?>
+    <div class="filter-stack">
+        <div class="filter-row">
+            <span class="filter-label filter-label--mr">Blood type:</span>
+            <a class="chip<?= $btFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', 'all') ?>">All</a>
+            <?php foreach (UiStore::BLOOD_TYPES as $bloodType): ?>
+                <a class="chip chip--mono<?= $btFilter === $bloodType ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', $bloodType) ?>"><?= esc($bloodType) ?></a>
+            <?php endforeach; ?>
+        </div>
+        <div class="filter-row">
+            <span class="filter-label filter-label--mr">Status:</span>
+            <a class="chip<?= $statusFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('status', 'all') ?>">All</a>
+            <?php // The three a record is ever set to. The rest of
+                  // `STATUS_OPTIONS` belongs to a pair or is retired, so
+                  // offering them would be offering empty lists. ?>
+            <?php foreach (UiStore::PERSON_STATUS_OPTIONS as $value => $label): ?>
+                <a class="chip<?= $statusFilter === $value ? ' is-active' : '' ?>" href="<?= $filterUrl('status', $value) ?>"><?= esc($label) ?></a>
+            <?php endforeach; ?>
+        </div>
     </div>
 
     <div class="card card--scroll">

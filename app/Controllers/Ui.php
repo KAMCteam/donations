@@ -191,6 +191,7 @@ class Ui extends BaseController
     public function recipients(): string
     {
         $filter = $this->bloodTypeFilter();
+        $status = $this->personStatusFilter();
 
         return view('ui/recipient_waitlist', [
             'title'   => 'Recipient Waitlist',
@@ -198,8 +199,12 @@ class Ui extends BaseController
             'organ'   => $this->store->organ(),
             // Unpaired only, most urgent first and then by score — all of it in
             // SQL, because the score is computed and PHP cannot sort by it.
-            'recipients' => $this->store->waitingList($filter === 'all' ? null : $filter),
-            'btFilter'   => $filter,
+            'recipients' => $this->store->waitingList(
+                $filter === 'all' ? null : $filter,
+                $status === 'all' ? null : $status
+            ),
+            'btFilter'     => $filter,
+            'statusFilter' => $status,
         ]);
     }
 
@@ -226,13 +231,18 @@ class Ui extends BaseController
         // The same chips the waitlist has, narrowing the same way: the two
         // registers are read with the same question in mind.
         $filter = $this->bloodTypeFilter();
+        $status = $this->personStatusFilter();
 
         return view('ui/donors_list', [
             'title'    => 'Donors List',
             'navPage'  => 'donors',
             'organ'    => $this->store->organ(),
-            'donors'   => $this->store->availableDonors($filter === 'all' ? null : $filter),
-            'btFilter' => $filter,
+            'donors'   => $this->store->availableDonors(
+                $filter === 'all' ? null : $filter,
+                $status === 'all' ? null : $status
+            ),
+            'btFilter'     => $filter,
+            'statusFilter' => $status,
         ]);
     }
 
@@ -2127,6 +2137,20 @@ class Ui extends BaseController
         $filter = (string) ($this->request->getGet('bt') ?? 'all');
 
         return in_array($filter, UiStore::BLOOD_TYPES, true) ? $filter : 'all';
+    }
+
+    /**
+     * Which status the two registers are being narrowed to, or `all`.
+     *
+     * The three a record is ever set to, and `all` for anything else — a
+     * hand-edited address asking for a status nobody can choose would
+     * otherwise return an empty list and look like a bug.
+     */
+    private function personStatusFilter(): string
+    {
+        $filter = (string) ($this->request->getGet('status') ?? 'all');
+
+        return isset(UiStore::PERSON_STATUS_OPTIONS[$filter]) ? $filter : 'all';
     }
 
     /**

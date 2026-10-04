@@ -1487,6 +1487,65 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringNotContainsString('lab-fold', $this->get('recipients/8952')->getBody());
     }
 
+    // ---- Saying what is wrong, once, and before Save -----------------------
+
+    /**
+     * A refusal is printed once.
+     *
+     * The layout prints what an action that redirects left behind, and a
+     * screen with a slot of its own for the refusal reads the same flash — so
+     * both printed it, and every rejected save said everything twice.
+     */
+    public function testARefusedSaveIsSaidOnce(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4230', 'name' => 'First', 'age' => '40', 'bloodType' => 'A']);
+        $this->post('recipients/new', ['mrn' => '4230', 'name' => 'Second', 'age' => '41', 'bloodType' => 'B']);
+
+        $html    = $this->get('recipients/new')->getBody();
+        $message = 'A recipient with MRN 4230 is already registered.';
+
+        $this->assertSame(1, substr_count($html, $message), 'the reason is given once');
+        $this->assertStringContainsString('<div class="form-error" role="alert">' . $message, $html);
+    }
+
+    /**
+     * Whether a file number is free is the one thing a form cannot work out
+     * for itself, so it can ask.
+     */
+    public function testAFileNumberCanBeCheckedBeforeTheFormIsSent(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4231', 'name' => 'Taken', 'age' => '40', 'bloodType' => 'A']);
+
+        // The feature client wraps a JSON body in a page of its own, so these
+        // read the answer rather than decoding it.
+        $taken = $this->get('mrn-taken/recipient/4231')->getBody();
+        $this->assertStringContainsString('"taken": true', $taken);
+        // The same sentence the save would have given, from the same method.
+        $this->assertStringContainsString('A recipient with MRN 4231 is already registered.', $taken);
+
+        $free = $this->get('mrn-taken/recipient/4232')->getBody();
+        $this->assertStringContainsString('"taken": false', $free);
+        $this->assertStringContainsString('"message": ""', $free);
+
+        // The registers are separate, so the same number is free on the other.
+        $this->assertStringContainsString('"taken": false', $this->get('mrn-taken/donor/4231')->getBody());
+    }
+
+    /** And every box that is checked says which register it belongs to. */
+    public function testTheFormsMarkTheirFileNumberBoxes(): void
+    {
+        $this->assertStringContainsString('data-mrn="recipient"', $this->get('recipients/new')->getBody());
+        $this->assertStringContainsString('data-mrn="donor"', $this->get('donors/new')->getBody());
+
+        $pair = $this->get('pairs/new')->getBody();
+        $this->assertStringContainsString('data-mrn="recipient"', $pair);
+        $this->assertStringContainsString('data-mrn="donor"', $pair);
+
+        // A saved record's number is not editable, so there is nothing to ask.
+        $this->post('recipients/new', ['mrn' => '4233', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
+        $this->assertStringNotContainsString('data-mrn', $this->get('recipients/4233?edit=personal')->getBody());
+    }
+
     // ---- Paired exchange ---------------------------------------------------
 
     /**

@@ -189,6 +189,25 @@
   color: var(--slate-400);
 }
 
+/* What is wrong with the box above it, said while it is being filled in rather
+   than after the form has been sent back. Written by `ui.js`; a screen with
+   scripting off never shows one, and the save says the same thing. */
+.field-problem {
+  margin-top: 0.3125rem;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 500;
+  color: var(--red-600);
+}
+
+/* And the box itself says so, for anybody reading the field rather than the
+   line under it. */
+.input.is-wrong,
+.date-field-text.is-wrong {
+  border-color: #fca5a5;
+  background-color: #fef2f2;
+}
+
 .input {
   width: 100%;
   padding: 0.625rem 0.875rem;

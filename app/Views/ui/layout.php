@@ -129,8 +129,13 @@ $navItems = [
 
                     <?php // What just happened, once. Set by the actions that
                           // redirect rather than render — a delete has no screen
-                          // of its own to say it worked on. ?>
+                          // of its own to say it worked on.
+                          //
+                          // Once is the word: a screen with a slot of its own
+                          // for the refusal reads the same flash, and printing
+                          // it here as well said everything twice. ?>
                     <?php foreach (['ui_notice' => 'notice', 'ui_error' => 'notice notice--error'] as $key => $class): ?>
+                        <?php if ($key === 'ui_error' && ($error ?? '') !== '') { continue; } ?>
                         <?php if ((string) session()->getFlashdata($key) !== ''): ?>
                             <div class="<?= $class ?>" role="status"><?= esc(session()->getFlashdata($key)) ?></div>
                         <?php endif; ?>

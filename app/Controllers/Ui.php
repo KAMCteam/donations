@@ -2405,6 +2405,26 @@ class Ui extends BaseController
      * does not already hold it: the MRN is the primary key, so a second row
      * under it would be one person filed under another's identity.
      */
+    /**
+     * Whether a file number is free, as JSON, for the box being typed into.
+     *
+     * Only the server knows, so a form that waited for Save to say a number
+     * was taken was waiting for the one answer it could not work out itself.
+     * `ui.js` asks as the box is filled in and shows the same sentence the
+     * save would have shown — the same sentence, from the same method, so the
+     * two cannot word it differently.
+     *
+     * No screen of its own, and nothing written: it reads one column of one
+     * table and says yes or no.
+     */
+    public function mrnTaken(string $personType, string $mrn): ResponseInterface
+    {
+        $personType = $personType === 'donor' ? 'donor' : 'recipient';
+        $error      = $this->mrnError($mrn, $personType);
+
+        return $this->response->setJSON(['taken' => $error !== '', 'message' => $error]);
+    }
+
     private function mrnError(string $mrn, string $personType, string $label = 'MRN'): string
     {
         $mrn = trim($mrn);

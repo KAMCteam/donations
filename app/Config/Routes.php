@@ -33,6 +33,11 @@ $routes->get('organ/(:segment)', 'Ui::chooseOrgan/$1');
 
 $routes->get('dashboard', 'Ui::dashboard');
 
+// Is this file number free? The one thing the forms cannot answer themselves,
+// so `ui.js` asks it as the box is being typed into rather than leaving it to
+// the save. Reads nothing but the two registers, writes nothing.
+$routes->get('mrn-taken/(:segment)/(:num)', 'Ui::mrnTaken/$1/$2');
+
 $routes->get('recipients', 'Ui::recipients');
 // Before the record route, which would otherwise read `print` as an MRN.
 $routes->get('recipients/print', 'Ui::printRecipients');

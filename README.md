@@ -719,6 +719,36 @@ Two consequences worth knowing:
   it into `coordinator_id` on the way in and back on the way out — so a name
   chosen from the list is one the table already holds.
 
+### What is wrong with a box, said while it is being filled in
+
+A form that waits for Save to say a date is impossible has already taken
+everything else off the screen to say it. Every box that can be wrong now says
+so as it is typed into, under the box itself:
+
+| Box | What it says, and when |
+| --- | --- |
+| Any date | *The calendar has no such day* once eight digits are in and they are not one — 55/66/1111 is date-shaped and nothing more. *This date is in the future* for the dates that cannot be. Half a date is not wrong yet: nobody is told off mid-date. |
+| MRN | *MRN must be a number* as it is typed, *MRN is required* on leaving it empty, and *A recipient with MRN … is already registered* a quarter-second after typing stops. |
+
+Whether a number is free is the one thing a form cannot work out for itself, so
+it asks: `GET /mrn-taken/<recipient|donor>/<number>` answers `{taken, message}`,
+and the message is the sentence `Ui::mrnError()` would have given on save — the
+same method, so the two cannot word it differently. The box carries
+`data-mrn="recipient|donor"` to say which register it has to be free on, and a
+saved record's number is read-only, so there is nothing to ask about.
+
+The message element is made by `ui.js` beside the box rather than written into
+the markup, so every screen that collects a record gets it without being edited
+and without being able to forget one. The box is marked `aria-invalid` and
+pointed at its message, and `setCustomValidity` keeps the browser's own refusal
+in step, so a form cannot be sent with a value this has already objected to.
+
+None of it is required: with scripting off nothing appears and the save refuses
+exactly as before. It is the earlier of two answers, not the only one — and the
+refusal is now printed **once**, because the layout prints what a redirecting
+action left behind and a screen with a slot of its own was printing the same
+flash again underneath it.
+
 ### Not wired up yet
 
 One thing still stands between these screens and production use:

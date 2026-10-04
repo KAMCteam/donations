@@ -18,6 +18,12 @@
 (function () {
   "use strict";
 
+  /* Where the application lives, read off this file's own address: it is
+     served from <base>/assets/ui/js/ui.js, so everything before that is the
+     base. Nothing has to be printed into the page to tell it. */
+  var BASE = ((document.currentScript && document.currentScript.src) || "")
+    .replace(/\/assets\/ui\/js\/ui\.js.*$/, "");
+
   /* ---- Sidebar (app.js setSidebarOpen) ---------------------------------- */
 
   function initSidebar() {
@@ -319,17 +325,154 @@
     box.value = age < 0 ? "" : String(age);
   }
 
-  /* Everything the personal details ask for has already happened, so a date
-     after today is a slip. The picker will not offer one; this is for a date
-     typed straight in. The server checks a third time, because neither of
-     these is on it. */
-  function markFutureDate(input) {
-    var field = input.closest("[data-date-past]");
-    if (!field) return;
+  /* ---- Saying what is wrong with a box, while it is being filled in ------
 
-    var iso = isoOf(input.value);
-    input.setCustomValidity(iso !== "" && iso > today() ? "This date is in the future." : "");
-    field.classList.toggle("is-future", iso !== "" && iso > today());
+     A form that waits for Save to say a date is impossible has already taken
+     everything else away from the screen to say it. These write the reason
+     under the box it belongs to, as it is typed.
+
+     The element is made here rather than in the markup, so every screen that
+     collects a record gets it without being edited and without being able to
+     forget. The server still refuses the same things on save: this is the
+     earlier of two answers, not the only one. */
+
+  function problemSlot(input) {
+    var id = input.id ? "problem-" + input.id : null;
+    var holder = input.closest(".date-field") || input;
+    var slot = holder.parentNode.querySelector(":scope > .field-problem");
+
+    if (!slot) {
+      slot = document.createElement("p");
+      slot.className = "field-problem";
+      slot.hidden = true;
+      if (id) { slot.id = id; }
+      holder.parentNode.insertBefore(slot, holder.nextSibling);
+    }
+
+    return slot;
+  }
+
+  /* One place decides what a wrong box looks like: the message under it, the
+     red edge on it, and what a screen reader is told about it. */
+  function sayProblem(input, message) {
+    var slot = problemSlot(input);
+    var wrong = message !== "";
+
+    slot.textContent = message;
+    slot.hidden = !wrong;
+    input.classList.toggle("is-wrong", wrong);
+    input.setAttribute("aria-invalid", wrong ? "true" : "false");
+    if (slot.id) {
+      if (wrong) { input.setAttribute("aria-describedby", slot.id); }
+      else { input.removeAttribute("aria-describedby"); }
+    }
+
+    var field = input.closest(".date-field");
+    if (field) { field.classList.toggle("is-future", wrong); }
+
+    // Keeps the browser's own refusal in step, so a form cannot be sent with
+    // a box this has already objected to.
+    input.setCustomValidity(message);
+  }
+
+  /* Date-shaped is not a date: 55/66/1111 is four digits, two and two, and no
+     day of any year. The same check the server makes, made sooner. */
+  function realDate(iso) {
+    var p = iso.split("-").map(Number);
+    var d = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+
+    return d.getUTCFullYear() === p[0] && d.getUTCMonth() === p[1] - 1 && d.getUTCDate() === p[2];
+  }
+
+  /* Everything the personal details ask for has already happened, so a date
+     after today is a slip, and a day the calendar has not got is another. The
+     picker will not offer either; this is for a date typed straight in. */
+  function markFutureDate(input) {
+    var value = input.value.trim();
+    var whole = /^\d{2}\/\d{2}\/\d{4}$/.test(value);
+    var iso = isoOf(value);
+    var past = input.closest("[data-date-past]") !== null;
+
+    if (value === "" || !whole) {
+      // Half-typed is not wrong yet: nobody is told off mid-date.
+      sayProblem(input, "");
+
+      return;
+    }
+
+    if (!realDate(iso)) {
+      sayProblem(input, "The calendar has no such day.");
+
+      return;
+    }
+
+    sayProblem(input, past && iso > today() ? "This date is in the future." : "");
+  }
+
+  /* ---- The file number, checked as it is typed ---------------------------
+
+     Two of the three things wrong with a file number this can see for itself —
+     that there is none, and that it is not a number. The third, that somebody
+     is already filed under it, only the server knows, so it asks: one GET per
+     number, a quarter-second after typing stops, and the answer is the same
+     sentence the save would have given.
+
+     With this file absent the save says all three, as it always did. */
+
+  function mrnProblem(value) {
+    if (value === "") return "";
+    if (!/^[0-9]+$/.test(value) || Number(value) < 1) return "MRN must be a number.";
+    return "";
+  }
+
+  function bindMrn(input) {
+    var register = input.getAttribute("data-mrn");
+    var timer = null;
+    var asked = "";
+
+    function ask(value) {
+      // The same number twice is the same answer; and a box emptied again has
+      // nothing to ask about.
+      if (value === asked || value === "") return;
+      asked = value;
+
+      fetch(BASE + "/mrn-taken/" + register + "/" + encodeURIComponent(value), {
+        headers: { Accept: "application/json" },
+      })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (answer) {
+          // Only if the box still holds what was asked about: a slow answer
+          // about an old number is worse than none.
+          if (answer && input.value.trim() === value) sayProblem(input, answer.message || "");
+        })
+        .catch(function () { /* The save still refuses it; nothing to say. */ });
+    }
+
+    input.addEventListener("input", function () {
+      var value = input.value.trim();
+      var shape = mrnProblem(value);
+
+      asked = "";
+      sayProblem(input, shape);
+      window.clearTimeout(timer);
+
+      if (shape === "") timer = window.setTimeout(function () { ask(value); }, 250);
+    });
+
+    input.addEventListener("blur", function () {
+      var value = input.value.trim();
+
+      if (value === "") {
+        sayProblem(input, "MRN is required — enter the number from the hospital record.");
+      } else if (mrnProblem(value) === "") {
+        window.clearTimeout(timer);
+        ask(value);
+      }
+    });
+  }
+
+  function initMrnFields() {
+    document.querySelectorAll("input[data-mrn]").forEach(bindMrn);
   }
 
   function bindDateText(input) {
@@ -556,6 +699,7 @@
     initAutoSubmit();
     initDialogClosers();
     initClosers();
+    initMrnFields();
     initAnswerPickers();
     initConfirmButtons();
     initReveals();

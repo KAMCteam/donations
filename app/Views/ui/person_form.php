@@ -121,7 +121,10 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                         <div>
                             <label class="field-label" for="f-mrn">Recipient MRN</label>
                             <?php if ($mode === 'add'): ?>
-                                <input type="text" id="f-mrn" name="mrn" class="input input--mono" value="<?= esc($v['mrn']) ?>" inputmode="numeric" placeholder="From the hospital record" required>
+                                <?php // `data-mrn` says which register the number
+                                      // has to be free on, so `ui.js` can ask
+                                      // before the form is sent. ?>
+                                <input type="text" id="f-mrn" name="mrn" class="input input--mono" value="<?= esc($v['mrn']) ?>" inputmode="numeric" placeholder="From the hospital record" data-mrn="<?= esc($personType) ?>" required>
                             <?php else: ?>
                                 <input type="text" id="f-mrn" class="input-ro input-ro--mono" value="<?= esc($person['id']) ?>" readonly>
                             <?php endif; ?>
@@ -248,7 +251,10 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                         <div>
                             <label class="field-label" for="f-mrn">Donor MRN</label>
                             <?php if ($mode === 'add'): ?>
-                                <input type="text" id="f-mrn" name="mrn" class="input input--mono" value="<?= esc($v['mrn']) ?>" inputmode="numeric" placeholder="From the hospital record" required>
+                                <?php // `data-mrn` says which register the number
+                                      // has to be free on, so `ui.js` can ask
+                                      // before the form is sent. ?>
+                                <input type="text" id="f-mrn" name="mrn" class="input input--mono" value="<?= esc($v['mrn']) ?>" inputmode="numeric" placeholder="From the hospital record" data-mrn="<?= esc($personType) ?>" required>
                             <?php else: ?>
                                 <input type="text" id="f-mrn" class="input-ro input-ro--mono" value="<?= esc($person['id']) ?>" readonly>
                             <?php endif; ?>

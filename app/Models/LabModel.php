@@ -15,7 +15,7 @@ class LabModel extends Model
     protected $useTimestamps = true;
     protected $allowedFields = [
         'name', 'lab_parent_id', 'organ_code', 'person_type', 'person_mrn',
-        'result_type', 'sort_order', 'is_active',
+        'result_type', 'answer_set', 'sort_order', 'is_active',
     ];
 
     /**

@@ -71,10 +71,10 @@
      and choosing one is not the end of choosing. */
   function initMenus() {
     document.addEventListener("click", function (e) {
-      var open = document.querySelectorAll("details.filter[open], details.export[open]");
+      var open = document.querySelectorAll("details.filter[open], details.export[open], details.tone-picker[open]");
       if (!open.length) return;
 
-      var inside = e.target.closest("details.filter, details.export");
+      var inside = e.target.closest("details.filter, details.export, details.tone-picker");
 
       Array.prototype.forEach.call(open, function (details) {
         if (details !== inside) details.removeAttribute("open");
@@ -116,9 +116,45 @@
       if (e.key !== "Escape") return;
 
       Array.prototype.forEach.call(
-        document.querySelectorAll("details.filter[open], details.export[open]"),
+        document.querySelectorAll("details.filter[open], details.export[open], details.tone-picker[open]"),
         function (details) { details.removeAttribute("open"); }
       );
+    });
+  }
+
+  /* ---- What a test somebody added answers --------------------------------
+
+     Two things the markup cannot do for itself. Choosing a colour closes the
+     palette and paints the swatch, so the answer shows the colour it will
+     carry rather than the one it had; and ticking an answer marks its chip, so
+     what will still be on the card after saving is visible before saving.
+
+     Without this the controls still work — a `<details>` of radios and a
+     checkbox are the whole of it — they simply say less while being used. */
+  function initAnswerPickers() {
+    document.addEventListener("change", function (e) {
+      var tone = e.target.closest(".tone-option input");
+
+      if (tone) {
+        var picker = tone.closest(".tone-picker");
+        var swatch = picker.querySelector(".tone-swatch");
+        var dot = tone.parentNode.querySelector(".tone-dot");
+
+        // The swatch wears the tone's own class, so it is repainted by
+        // swapping that class rather than by knowing any colour.
+        swatch.className = "tone-swatch " + tone.value;
+        swatch.title = dot ? "Colour: " + tone.parentNode.textContent.trim() : "";
+        picker.removeAttribute("open");
+
+        // An answer of ours shows its colour on the chip beside the tick.
+        var label = picker.parentNode.querySelector(".lab-answer-label");
+        if (label) label.className = "lab-answer-label badge " + tone.value;
+
+        return;
+      }
+
+      var tick = e.target.closest('.lab-answer-tick input[type="checkbox"]');
+      if (tick) tick.closest(".lab-answer").classList.toggle("is-on", tick.checked);
     });
   }
 
@@ -504,6 +540,7 @@
     initAutoSubmit();
     initDialogClosers();
     initClosers();
+    initAnswerPickers();
     initConfirmButtons();
     initReveals();
   });

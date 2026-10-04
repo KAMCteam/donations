@@ -27,7 +27,7 @@ class LabResultModel extends Model
     public function workupFor(int|string $mrn, string $personType, string $organCode): array
     {
         return $this->db->table('labs l')
-            ->select('l.id AS lab_id, l.name AS lab_name, l.result_type, lp.name AS parent_name')
+            ->select('l.id AS lab_id, l.name AS lab_name, l.result_type, l.answer_set, lp.name AS parent_name')
             // Aliased: `lab_results` has a `person_mrn` of its own, and the
             // two mean different things — whose result it is, and whose test.
             ->select('l.person_mrn AS owner_mrn')

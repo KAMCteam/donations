@@ -413,6 +413,42 @@ Red marks the answer somebody has to act on — Positive, Abnormal, Not cleared
 
 The sheet names no organ, so both programmes carry both lists.
 
+### A test added under "Other" says what it answers
+
+The check list's tests each answer a fixed question, because the sheet they
+come from asks one. A test added with **Add lab**, under the group the sheet
+calls Other, has no sheet behind it — only the person adding it knows whether
+it says Cleared, or Seen, or something the platform has no word for at all. So
+the card asks, under **What this test answers**:
+
+- Every answer the platform has, seventeen of them, each a tick box — Not
+  done, Pending, Done, Acceptable, Abnormal, Negative, Positive, Applicable,
+  Not applicable, Cleared, Not cleared, Given, Not given, Required, Not
+  required, Seen, Not seen.
+- A box at the foot for an answer of their own: type a name, save, and it is
+  on the card with the rest. Renaming it renames the answer; rubbing the name
+  out removes it, which is the same gesture as unticking one of ours.
+- A swatch beside each, opening the colours the check list's own answers use.
+  The palette names what each colour is for — *Act on this*, *Outstanding*,
+  *Recorded* — because a colour on a medical record means something, and a
+  wheel of sixteen million would mean nothing. Each answer starts on the
+  colour the platform would have given it.
+
+Ticked answers are the buttons on the card, in the colours they were given,
+and the list itself is only on screen while the card is being edited: once it
+is saved the card shows the chosen answers and nothing else. Its own **Edit
+results**, beside the pill, opens the workup at that card with the ticks,
+the names and the colours as they were left. Until a new test is given any
+answers it offers Not done · Pending · Done, which is what most of them want.
+
+The set lives in `labs.answer_set`, JSON, on the test's own row — one set per
+test, so two tests on one record are independent, and a test on one record is
+nothing to do with the same-named test on another. A catalogue row's
+`answer_set` is NULL and its card has no list: the sheet has already said what
+those answer. Because an answer somebody invented cannot be a value in an
+ENUM, `lab_results.status` is a `VARCHAR(60)`; keys for invented answers are
+slugs prefixed `c_`, which is what keeps them from colliding with ours.
+
 ### Status: three facts, not one
 
 A recipient's status, a donor's, and the Match Status of a pair were once one

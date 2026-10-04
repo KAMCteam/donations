@@ -2934,17 +2934,27 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertSame('custom', $lab['result_type']);
         $this->assertSame('recipient', $lab['person_type']);
 
-        // Its name is typed on the card and saved with the answer.
+        // It starts on the three every test has in common, not on all
+        // seventeen: what it answers is a question only its author can answer.
+        $this->assertNull($lab['answer_set']);
+
+        // Its name, what it answers and the answer itself are all typed on the
+        // card and saved together.
         $this->post('recipients/4031', [
             'section'   => 'labs',
             'name'      => 'Ahmed Test',
             'age'       => '41',
             'bloodType' => 'O',
             'labs'      => [[
-                'id'     => $lab['id'],
-                'name'   => 'Ultrasound Doppler Hepatic Vein',
-                'status' => 'acceptable',
-                'notes'  => 'Requested.',
+                'id'      => $lab['id'],
+                'name'    => 'Ultrasound Doppler Hepatic Vein',
+                'status'  => 'acceptable',
+                'notes'   => 'Requested.',
+                'answers' => [
+                    'not_done'   => ['on' => '1'],
+                    'acceptable' => ['on' => '1', 'tone' => 'tone-emerald'],
+                    'abnormal'   => ['on' => '1', 'tone' => 'tone-red'],
+                ],
             ]],
         ]);
 
@@ -2960,11 +2970,216 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('Ultrasound Doppler Hepatic Vein', $html);
         $this->assertStringContainsString('lab-name-field', $html);
 
-        // Every answer the platform has, and nothing a catalogue test offers
-        // is missing from it.
-        foreach (UiStore::RESULT_OPTIONS['custom'] as $status) {
+        // The card offers the three it was given, and not the fourteen it was
+        // not. Every one of the seventeen is still there to tick.
+        foreach (['not_done', 'acceptable', 'abnormal'] as $status) {
             $this->assertStringContainsString('data-lab-status="' . $status . '"', $html);
         }
+
+        // What it answers is stored on the test itself, and is the three it
+        // was given rather than the seventeen it was offered.
+        $stored = json_decode(
+            (string) $this->db->table('labs')->where('id', $lab['id'])->get()->getRowArray()['answer_set'],
+            true
+        );
+        $this->assertSame(['not_done', 'acceptable', 'abnormal'], array_column($stored, 'key'));
+        $this->assertSame('tone-red', $stored[2]['tone']);
+
+        // And every one of the seventeen is still there to tick.
+        foreach (UiStore::RESULT_OPTIONS['custom'] as $status) {
+            $this->assertStringContainsString('[answers][' . $status . '][on]', $html);
+        }
+    }
+
+    /**
+     * An answer the platform has no word for.
+     *
+     * The box is one field on the card: typing a name and saving is the whole
+     * of adding an answer, because there is nothing to press before the thing
+     * you are already saving.
+     */
+    public function testATestCanBeGivenAnAnswerNobodyDefined(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4051', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('recipients/4051/labs');
+        $lab = $this->db->table('labs')->where('person_mrn', 4051)->get()->getRowArray();
+
+        $this->post('recipients/4051', [
+            'section' => 'labs',
+            'labs'    => [[
+                'id'            => $lab['id'],
+                'name'          => 'Courier sample',
+                'answers'       => ['not_done' => ['on' => '1']],
+                'newAnswer'     => 'Awaiting courier',
+                'newAnswerTone' => 'tone-amber',
+            ]],
+        ]);
+
+        $stored = json_decode(
+            (string) $this->db->table('labs')->where('id', $lab['id'])->get()->getRowArray()['answer_set'],
+            true
+        );
+
+        $this->assertSame(['not_done', 'c_awaiting_courier'], array_column($stored, 'key'));
+        $this->assertSame('Awaiting courier', $stored[1]['label']);
+        $this->assertSame('tone-amber', $stored[1]['tone']);
+
+        // It is an answer like any other: on the card, and recordable.
+        $html = $this->get('recipients/4051?edit=labs')->getBody();
+        $this->assertStringContainsString('data-lab-status="c_awaiting_courier"', $html);
+        $this->assertStringContainsString('Awaiting courier', $html);
+
+        $this->post('recipients/4051', [
+            'section' => 'labs',
+            'labs'    => [[
+                'id'      => $lab['id'],
+                'name'    => 'Courier sample',
+                'status'  => 'c_awaiting_courier',
+                'answers' => [
+                    'not_done'           => ['on' => '1'],
+                    'c_awaiting_courier' => ['on' => '1', 'label' => 'Awaiting courier', 'tone' => 'tone-amber'],
+                ],
+            ]],
+        ]);
+
+        $this->seeInDatabase('lab_results', ['lab_id' => $lab['id'], 'status' => 'c_awaiting_courier']);
+    }
+
+    /** Renaming it renames it everywhere; rubbing the name out removes it. */
+    public function testAnAnswerOfTheirOwnIsRenamedAndRemovedByItsName(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4061', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('recipients/4061/labs');
+        $lab = $this->db->table('labs')->where('person_mrn', 4061)->get()->getRowArray();
+
+        $save = function (array $answers, string $add = '') use ($lab): void {
+            $this->post('recipients/4061', [
+                'section' => 'labs',
+                'labs'    => [[
+                    'id' => $lab['id'], 'name' => 'Courier sample',
+                    'answers' => $answers, 'newAnswer' => $add,
+                ]],
+            ]);
+        };
+
+        $save(['not_done' => ['on' => '1']], 'Awaiting courier');
+
+        // Renamed.
+        $save([
+            'not_done'           => ['on' => '1'],
+            'c_awaiting_courier' => ['on' => '1', 'label' => 'With the courier', 'tone' => 'tone-amber'],
+        ]);
+
+        $stored = json_decode((string) $this->db->table('labs')->where('id', $lab['id'])->get()->getRowArray()['answer_set'], true);
+        $this->assertSame('With the courier', $stored[1]['label']);
+
+        // Rubbed out — the same gesture as removing it.
+        $save([
+            'not_done'           => ['on' => '1'],
+            'c_awaiting_courier' => ['on' => '1', 'label' => '  ', 'tone' => 'tone-amber'],
+        ]);
+
+        $stored = json_decode((string) $this->db->table('labs')->where('id', $lab['id'])->get()->getRowArray()['answer_set'], true);
+        $this->assertSame(['not_done'], array_column($stored, 'key'));
+    }
+
+    /**
+     * Each test keeps its own answers, so two tests on one record do not share
+     * a vocabulary — which is the whole of what "Other" means.
+     */
+    public function testTwoTestsOnOneRecordKeepSeparateAnswers(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4071', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('recipients/4071/labs');
+        $this->post('recipients/4071/labs');
+
+        $labs = $this->db->table('labs')->where('person_mrn', 4071)->orderBy('id')->get()->getResultArray();
+        $this->assertCount(2, $labs);
+
+        $this->post('recipients/4071', [
+            'section' => 'labs',
+            'labs'    => [
+                ['id' => $labs[0]['id'], 'name' => 'First', 'answers' => ['seen' => ['on' => '1'], 'not_seen' => ['on' => '1']]],
+                ['id' => $labs[1]['id'], 'name' => 'Second', 'answers' => ['given' => ['on' => '1']]],
+            ],
+        ]);
+
+        $rows = $this->db->table('labs')->where('person_mrn', 4071)->orderBy('id')->get()->getResultArray();
+        $this->assertSame(['seen', 'not_seen'], array_column(json_decode((string) $rows[0]['answer_set'], true), 'key'));
+        $this->assertSame(['given'], array_column(json_decode((string) $rows[1]['answer_set'], true), 'key'));
+    }
+
+    /**
+     * After a save the card shows the answers it was given and no others; the
+     * picker that chose them is only there while the card is being edited.
+     */
+    public function testASavedTestShowsOnlyTheAnswersItWasGiven(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4081', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('recipients/4081/labs');
+        $lab = $this->db->table('labs')->where('person_mrn', 4081)->get()->getRowArray();
+
+        $this->post('recipients/4081', [
+            'section' => 'labs',
+            'labs'    => [[
+                'id' => $lab['id'], 'name' => 'Courier sample',
+                'answers' => ['seen' => ['on' => '1', 'tone' => 'tone-teal'], 'not_seen' => ['on' => '1']],
+            ]],
+        ]);
+
+        // Read-only: the answers, in their colours, and no picker.
+        $view = $this->get('recipients/4081')->getBody();
+        $this->assertStringContainsString('data-lab-status="seen"', $view);
+        $this->assertStringContainsString('data-lab-tone="tone-teal"', $view);
+        $this->assertStringNotContainsString('What this test answers', $view);
+        // Every answer wears the colour it was given, not only the one
+        // recorded: being able to tell them apart is why they were chosen.
+        $this->assertStringContainsString('lab-status-btn lab-status-btn--tinted tone-teal', $view);
+        // And the saved test carries its own way back into the list.
+        $this->assertStringContainsString('recipients/4081?edit=labs#lab-' . $lab['id'] . '"', $view);
+        $this->assertStringContainsString('Edit results', $view);
+
+        // Editing brings the picker back with the choices still on it.
+        $edit = $this->get('recipients/4081?edit=labs')->getBody();
+        $this->assertStringContainsString('What this test answers', $edit);
+        // The index is wherever the custom test falls in the workup, which is
+        // after everything the check list asks for.
+        $this->assertStringContainsString('[answers][seen][on]" value="1" checked', $edit);
+        $this->assertStringContainsString('value="tone-teal" checked', $edit);
+        // The anchor the Edit link aims at is on the card it names.
+        $this->assertStringContainsString('id="lab-' . $lab['id'] . '"', $edit);
+    }
+
+    /** A date-shaped thing that is not a date is refused, not a stack trace. */
+    public function testADateTheCalendarHasNoDayForIsNotADate(): void
+    {
+        $this->assertSame('', UiStore::dmyToIso('0101-90-19'));
+        $this->assertSame('', UiStore::dmyToIso('2026-02-30'));
+        $this->assertSame('2026-02-28', UiStore::dmyToIso('2026-02-28'));
+        $this->assertSame(0, UiStore::ageFrom('0101-90-19'));
+
+        // And a form that is sent one keeps going rather than falling over:
+        // a browser whose date field was filled out of order sends exactly
+        // this, and a 500 would lose everything else typed on the screen.
+        $this->post('recipients/new', [
+            'mrn' => '4096', 'name' => 'Ahmed Test', 'birthDate' => '0101-90-19', 'bloodType' => 'O',
+        ]);
+        $this->assertNull($this->db->table('recipients')->where('mrn', 4096)->get()->getRowArray());
+        $this->assertStringContainsString(
+            'the calendar has no such day',
+            $this->get('recipients/new')->getBody()
+        );
+    }
+
+    /** The catalogue's own tests are untouched: their answers are the sheet's. */
+    public function testACatalogueTestHasNoAnswerPicker(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4091', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        $html = $this->get('recipients/4091?edit=labs')->getBody();
+
+        $this->assertStringContainsString('Blood group', $html);
+        $this->assertStringNotContainsString('What this test answers', $html);
     }
 
     /** One record's test is not on anybody else's sheet. */

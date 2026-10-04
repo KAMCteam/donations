@@ -115,17 +115,20 @@ $dash = '—';
                                 $freeText   = in_array($test['resultType'], UiStore::FREE_TEXT_TYPES, true);
                                 $status     = (string) $test['status'];
                                 $unanswered = in_array($status, UiStore::RESULT_UNANSWERED, true);
-                                $flag       = (UiStore::RESULT_TONE[$status] ?? '') === 'tone-red';
+                                // The test's own answers, which for one the
+                                // record added are the ones it was given.
+                                $byKey      = array_column($test['answers'] ?? [], null, 'key');
+                                $flag       = ($byKey[$status]['tone'] ?? UiStore::RESULT_TONE[$status] ?? '') === 'tone-red';
                                 // A test that does not offer the answer it
                                 // holds has not been answered at all, and
                                 // the sheet says so the way an empty field
                                 // does — with a dash, not with a word the
                                 // screen never showed.
-                                $blank      = $freeText || ! UiStore::offersAnswer($test['resultType'], $status);
+                                $blank      = $freeText || ! isset($byKey[$status]);
                                 ?>
                                 <tr>
                                     <td class="l-test"><?= esc($test['name']) ?></td>
-                                    <td class="l-answer<?= $unanswered ? ' l-answer--unanswered' : '' ?><?= $flag ? ' l-answer--flag' : '' ?>"><?= $blank ? $dash : esc(UiStore::RESULT_LABEL[$status] ?? $status) ?></td>
+                                    <td class="l-answer<?= $unanswered ? ' l-answer--unanswered' : '' ?><?= $flag ? ' l-answer--flag' : '' ?>"><?= $blank ? $dash : esc($byKey[$status]['label'] ?? $status) ?></td>
                                     <td class="l-comment"><?= esc(($test['notes'] ?? '') !== '' ? $test['notes'] : $dash) ?></td>
                                 </tr>
                             <?php endforeach; ?>

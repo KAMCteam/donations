@@ -2275,12 +2275,16 @@ class Ui extends BaseController
     }
 
     /**
-     * Refuses a date that has not happened yet.
+     * Refuses a date that has not happened yet, or that never will.
      *
      * Everything the personal details collect is in the past — when somebody
      * was born, when their dialysis began, the day they joined the register —
      * so a later date is a typing slip. The screens stop it twice over, in the
      * picker and in `ui.js`, and neither of those is on the server.
+     *
+     * The other slip is a day the calendar has not got: a date field filled
+     * out of order sends 0101-90-19, which is date-shaped and nothing more.
+     * Saying so is better than storing a blank where a birthday was typed.
      *
      * A field the open card did not post is not checked: it was not asked.
      *
@@ -2291,8 +2295,16 @@ class Ui extends BaseController
         foreach ($fields as $field) {
             $value = $this->request->getPost($field);
 
-            if (is_string($value) && UiStore::isFutureDate($value)) {
+            if (! is_string($value) || trim($value) === '') {
+                continue;
+            }
+
+            if (UiStore::isFutureDate($value)) {
                 return 'A date cannot be in the future.';
+            }
+
+            if (UiStore::dmyToIso($value) === '') {
+                return 'Check the dates: the calendar has no such day.';
             }
         }
 
@@ -2412,12 +2424,30 @@ class Ui extends BaseController
 
             $status = (string) ($row['status'] ?? 'pending');
 
+            // An answer somebody wrote for their own test is not one of ours,
+            // so it cannot be checked against our list. The store checks it
+            // against the test's own answers, which is the only list that can
+            // say whether this test offers it.
+            $own    = str_starts_with($status, UiStore::CUSTOM_ANSWER_PREFIX);
+            $status = $own || in_array($status, UiStore::LAB_STATUSES, true) ? $status : 'pending';
+
             $tests[] = [
                 'id'     => (string) ($row['id'] ?? ''),
                 'name'   => (string) $row['name'],
-                'status' => in_array($status, UiStore::LAB_STATUSES, true) ? $status : 'pending',
+                'status' => $status,
                 'notes'  => (string) ($row['notes'] ?? ''),
-            ];
+            ] + (
+                // Only a card that was open for editing sends these, and only
+                // for a test the record added: what it answers, and the one
+                // the "add" box was holding.
+                isset($row['answers']) && is_array($row['answers'])
+                    ? [
+                        'answers'       => $row['answers'],
+                        'newAnswer'     => (string) ($row['newAnswer'] ?? ''),
+                        'newAnswerTone' => (string) ($row['newAnswerTone'] ?? UiStore::LAB_TONE_DEFAULT),
+                    ]
+                    : []
+            );
         }
 
         return $tests;

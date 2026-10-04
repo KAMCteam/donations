@@ -250,6 +250,46 @@ final class UiStore
     public const RESULT_UNANSWERED = ['not_done', 'pending'];
 
     /**
+     * The colours a lab answer can carry, and what each is for.
+     *
+     * The platform's own, not a colour wheel: a test somebody adds picks from
+     * the same ten the check list's answers already use, so a card they made
+     * reads like every other card. The words are what the picker shows under
+     * each swatch — a colour on a medical record means something, and naming
+     * it is how somebody chooses the right one rather than the nicest one.
+     */
+    public const LAB_TONES = [
+        'tone-emerald'    => 'Good',
+        'tone-red'        => 'Act on this',
+        'tone-amber'      => 'Outstanding',
+        'tone-amber-soft' => 'In progress',
+        'tone-slate'      => 'Neutral',
+        'tone-blue'       => 'Recorded',
+        'tone-blue-soft'  => 'Recorded, soft',
+        'tone-teal'       => 'Noted',
+        'tone-teal-soft'  => 'Noted, soft',
+        'tone-orange'     => 'Needs a look',
+    ];
+
+    /** The colour an answer nobody has given a colour to carries. */
+    public const LAB_TONE_DEFAULT = 'tone-slate';
+
+    /**
+     * What a test added under "Other" answers until somebody says otherwise.
+     *
+     * The three every test has in common: not looked at, being looked at,
+     * looked at. Seventeen was not a choice, it was a list — and the point of
+     * the card is that the person adding the test knows what it asks.
+     */
+    public const CUSTOM_ANSWER_DEFAULT = ['not_done', 'pending', 'done'];
+
+    /** How wide an answer somebody writes themselves may be. */
+    public const CUSTOM_ANSWER_MAX = 40;
+
+    /** What marks an answer as one somebody wrote rather than one of ours. */
+    public const CUSTOM_ANSWER_PREFIX = 'c_';
+
+    /**
      * Tests whose comment box the sheet gives a shape to.
      *
      * HLA typing is the only one: under its comment line the sheet prints the
@@ -1692,6 +1732,13 @@ final class UiStore
                 // A test this record added for itself: its name is theirs to
                 // type and theirs to take away again.
                 'custom'     => $row['owner_mrn'] !== null,
+                // What this test answers, with the colour each answer carries
+                // on it. The check list's tests answer what their type says;
+                // one somebody added answers what they chose.
+                'answers'    => self::answerSet(
+                    (string) ($row['result_type'] ?? 'text'),
+                    $row['answer_set'] ?? null
+                ),
                 'status'     => $row['status'],
                 'result'     => (string) $row['value'],
                 'date'       => $row['taken_on'] === null ? '' : self::isoToDMY($row['taken_on']),
@@ -1738,19 +1785,38 @@ final class UiStore
                 continue;
             }
 
-            // Their own test, so its name is theirs to type. The catalogue's
-            // names are the check list's and are never posted back.
+            // Their own test, so its name is theirs to type, and so is what
+            // it answers. The catalogue's names and answers are the check
+            // list's and are never posted back.
             if ($lab['person_mrn'] !== null) {
+                $own = [];
+
                 $typed = trim((string) ($test['name'] ?? ''));
 
                 if ($typed !== '' && $typed !== $lab['name']) {
-                    $this->labs->update($labId, ['name' => mb_substr($typed, 0, 150)]);
+                    $own['name'] = mb_substr($typed, 0, 150);
+                }
+
+                // What this test answers, and in what colours. Only sent by a
+                // card that was open for editing, so an absent key leaves the
+                // set as it was rather than clearing it.
+                if (isset($test['answers']) && is_array($test['answers'])) {
+                    $own['answer_set'] = self::answerSetToJson($this->withNewAnswer($test));
+                }
+
+                if ($own !== []) {
+                    $this->labs->update($labId, $own);
+                    $lab = $this->labs->find($labId) ?? $lab;
                 }
             }
 
-            // The answer has to be one this test actually offers. The form
-            // renders only those, so anything else was not typed on a screen.
-            $offered = self::RESULT_OPTIONS[$lab['result_type']] ?? self::RESULT_OPTIONS['text'];
+            // The answer has to be one this test actually offers — its own, if
+            // it has one. The form renders only those, so anything else was
+            // not pressed on a screen.
+            $offered = array_column(
+                self::answerSet((string) $lab['result_type'], $lab['answer_set'] ?? null),
+                'key'
+            );
             $status  = (string) ($test['status'] ?? 'not_done');
             $status  = in_array($status, $offered, true) ? $status : 'not_done';
 
@@ -1922,10 +1988,27 @@ final class UiStore
         $value = trim($value);
 
         if (preg_match('~^(\d{2})/(\d{2})/(\d{4})$~', $value, $m) === 1) {
-            return "{$m[3]}-{$m[2]}-{$m[1]}";
+            return self::realDate("{$m[3]}-{$m[2]}-{$m[1]}");
         }
 
-        return preg_match('~^\d{4}-\d{2}-\d{2}$~', $value) === 1 ? $value : '';
+        return preg_match('~^\d{4}-\d{2}-\d{2}$~', $value) === 1 ? self::realDate($value) : '';
+    }
+
+    /**
+     * An ISO date, or '' when the calendar has no such day.
+     *
+     * Date-shaped is not the same as a date: a browser whose date field was
+     * filled out of order sends 0101-90-19, which is four digits, two and two
+     * and means nothing. Everything here asks "is this a date" through
+     * `dmyToIso`, so this is the one place that has to know, and the answer
+     * has to be '' rather than an exception — the forms report a bad date,
+     * they do not fall over on one.
+     */
+    private static function realDate(string $iso): string
+    {
+        [$y, $m, $d] = array_map('intval', explode('-', $iso));
+
+        return checkdate($m, $d, $y) ? $iso : '';
     }
 
     /**
@@ -1938,6 +2021,172 @@ final class UiStore
     public static function offersAnswer(string $resultType, string $status): bool
     {
         return in_array($status, self::RESULT_OPTIONS[$resultType] ?? self::RESULT_OPTIONS['text'], true);
+    }
+
+    /**
+     * The answers one test offers, each with its label and its colour.
+     *
+     * A test from the check list answers what its result type says, in the
+     * colours those words carry everywhere. A test somebody added answers what
+     * they chose — some of ours, some of their own — in the colours they
+     * picked, which is what `answer_set` holds.
+     *
+     * @return list<array{key: string, label: string, tone: string, own: bool}>
+     */
+    public static function answerSet(string $resultType, ?string $stored): array
+    {
+        $chosen = $stored === null || trim($stored) === '' ? null : json_decode($stored, true);
+
+        if (! is_array($chosen)) {
+            // Nothing chosen: the type's own list, which is every test the
+            // check list seeded — and a new custom test until it is saved.
+            $keys = $resultType === 'custom'
+                ? self::CUSTOM_ANSWER_DEFAULT
+                : (self::RESULT_OPTIONS[$resultType] ?? self::RESULT_OPTIONS['text']);
+
+            return array_map(static fn (string $key): array => [
+                'key'   => $key,
+                'label' => self::RESULT_LABEL[$key] ?? $key,
+                'tone'  => self::RESULT_TONE[$key] ?? self::LAB_TONE_DEFAULT,
+                'own'   => false,
+            ], $keys);
+        }
+
+        $answers = [];
+
+        foreach ($chosen as $entry) {
+            if (! is_array($entry) || ($entry['key'] ?? '') === '') {
+                continue;
+            }
+
+            $key = (string) $entry['key'];
+            $own = str_starts_with($key, self::CUSTOM_ANSWER_PREFIX);
+
+            $answers[] = [
+                'key'   => $key,
+                // One of ours keeps its name wherever it is read; one of
+                // theirs is whatever they called it.
+                'label' => $own
+                    ? mb_substr((string) ($entry['label'] ?? $key), 0, self::CUSTOM_ANSWER_MAX)
+                    : (self::RESULT_LABEL[$key] ?? $key),
+                'tone'  => isset(self::LAB_TONES[$entry['tone'] ?? ''])
+                    ? (string) $entry['tone']
+                    : self::LAB_TONE_DEFAULT,
+                'own'   => $own,
+            ];
+        }
+
+        return $answers;
+    }
+
+    /**
+     * An answer set as the column keeps it, from what a card posted.
+     *
+     * Only what was ticked, in the order the card lists it, and only colours
+     * from the platform's own palette. An answer somebody wrote keeps its
+     * typed name; one of ours is only a key, because its name is ours.
+     *
+     * @param array<string, mixed> $posted
+     */
+    public static function answerSetToJson(array $posted): ?string
+    {
+        $answers = [];
+
+        foreach ($posted as $key => $entry) {
+            $key = (string) $key;
+
+            if (! is_array($entry) || ($entry['on'] ?? '') !== '1' || $key === '') {
+                continue;
+            }
+
+            $own   = str_starts_with($key, self::CUSTOM_ANSWER_PREFIX);
+            $label = trim((string) ($entry['label'] ?? ''));
+
+            // An answer of their own with its name rubbed out is an answer
+            // with nothing to show, so it is one they removed.
+            if ($own && $label === '') {
+                continue;
+            }
+
+            if (! $own && ! isset(self::RESULT_LABEL[$key])) {
+                continue;
+            }
+
+            $answers[] = [
+                'key'   => $key,
+                'label' => $own ? mb_substr($label, 0, self::CUSTOM_ANSWER_MAX) : (self::RESULT_LABEL[$key] ?? $key),
+                'tone'  => isset(self::LAB_TONES[$entry['tone'] ?? ''])
+                    ? (string) $entry['tone']
+                    : (self::RESULT_TONE[$key] ?? self::LAB_TONE_DEFAULT),
+            ];
+        }
+
+        // A test that answers nothing cannot be answered, so an empty set
+        // falls back to the three every test has in common.
+        if ($answers === []) {
+            return null;
+        }
+
+        return json_encode($answers, JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * The posted answers plus the one the card's "add" box was holding.
+     *
+     * The box is one field, always on the card, so adding an answer is typing
+     * a name and saving — no step of its own, and nothing to press before the
+     * thing you are already saving.
+     *
+     * @param array<string, mixed> $test
+     *
+     * @return array<string, mixed>
+     */
+    private function withNewAnswer(array $test): array
+    {
+        $answers = is_array($test['answers'] ?? null) ? $test['answers'] : [];
+        $label   = trim((string) ($test['newAnswer'] ?? ''));
+
+        if ($label === '') {
+            return $answers;
+        }
+
+        $key = self::customAnswerKey($label, array_map('strval', array_keys($answers)));
+
+        $answers[$key] = [
+            'on'    => '1',
+            'label' => $label,
+            'tone'  => (string) ($test['newAnswerTone'] ?? self::LAB_TONE_DEFAULT),
+        ];
+
+        return $answers;
+    }
+
+    /**
+     * A key for an answer somebody typed, from the name they typed.
+     *
+     * Derived from the name so the same answer written twice is the same
+     * answer, and suffixed when two different names would reduce to one.
+     *
+     * @param list<string> $taken
+     */
+    public static function customAnswerKey(string $label, array $taken = []): string
+    {
+        $slug = preg_replace('/[^a-z0-9]+/', '_', mb_strtolower(trim($label)));
+        $slug = trim((string) $slug, '_');
+
+        if ($slug === '') {
+            $slug = 'answer';
+        }
+
+        $key = self::CUSTOM_ANSWER_PREFIX . mb_substr($slug, 0, 30);
+        $try = $key;
+        $n   = 2;
+
+        while (in_array($try, $taken, true)) {
+            $try = $key . '_' . $n++;
+        }
+
+        return $try;
     }
 
     /**

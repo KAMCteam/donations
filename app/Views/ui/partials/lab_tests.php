@@ -112,10 +112,22 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
                   // starts with nothing on it rather than with a word it cannot
                   // offer. The pill is in the markup all the same, so pressing
                   // an answer has something to fill. ?>
-            <?php $answered = UiStore::offersAnswer($test['resultType'], $test['status']); ?>
-            <?php $custom = (bool) ($test['custom'] ?? false); ?>
-            <?php $nameId = $field . '-' . $i . '-name'; ?>
-            <div class="lab-card<?= $animated ? ' lab-card--animated' : '' ?><?= $freeText ? ' lab-card--free' : '' ?> status-<?= esc($test['status']) ?>" data-idx="<?= $i ?>">
+            <?php
+            // This test's own answers, with the colour each carries on it.
+            $answers  = $test['answers'] ?? [];
+            $byKey    = array_column($answers, null, 'key');
+            $answered = isset($byKey[$test['status']]);
+            $custom   = (bool) ($test['custom'] ?? false);
+            $nameId   = $field . '-' . $i . '-name';
+            // A test the record added is anchored, so its own Edit can bring
+            // the page back to this card rather than to the top of the workup.
+            $cardId   = 'lab-' . $test['id'];
+            // What the card calls this answer and what colour it is — its own
+            // word for it when somebody wrote one, ours otherwise.
+            $label = static fn (string $key): string => $byKey[$key]['label'] ?? UiStore::RESULT_LABEL[$key] ?? $key;
+            $tone  = static fn (string $key): string => $byKey[$key]['tone'] ?? ui_tone('labStatus', $key);
+            ?>
+            <div class="lab-card<?= $animated ? ' lab-card--animated' : '' ?><?= $freeText ? ' lab-card--free' : '' ?> status-<?= esc($test['status']) ?>"<?= $custom ? ' id="' . esc($cardId) . '"' : '' ?> data-idx="<?= $i ?>">
                 <input type="hidden" name="<?= $base ?>[id]" value="<?= esc($test['id']) ?>">
                 <?php if (! $custom): ?>
                     <input type="hidden" name="<?= $base ?>[name]" value="<?= esc($test['name']) ?>">
@@ -136,20 +148,49 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
                         <?php endif; ?>
                     </div>
                     <?php if (! $freeText): ?>
-                        <span class="lab-pill <?= ui_tone('labStatus', $test['status']) ?>" data-lab-pill<?= $answered ? '' : ' hidden' ?>><?= $answered ? esc(UiStore::RESULT_LABEL[$test['status']] ?? $test['status']) : '' ?></span>
+                        <span class="lab-pill <?= esc($tone($test['status'])) ?>" data-lab-pill<?= $answered ? '' : ' hidden' ?>><?= $answered ? esc($label($test['status'])) : '' ?></span>
+                    <?php endif; ?>
+                    <?php if ($custom && ! $editing && $editUrl !== null): ?>
+                        <?php // The saved test's own Edit: the workup's pencil
+                              // opens the whole card, and this one opens it at
+                              // this test, where the answer list it was given
+                              // is waiting with its words and its colours. ?>
+                        <a class="lab-edit-answers" href="<?= esc($editUrl) ?>#<?= esc($cardId) ?>"><?= ui_icon('edit') ?>Edit results</a>
                     <?php endif; ?>
                 </div>
 
                 <?php if (! $freeText): ?>
                 <div class="lab-actions">
-                    <?php // This test's own answers, from the check list: a serology
-                          // offers Positive / Negative, a referral Cleared / not.
-                          // The tone and label ride on the button so ui.js can
-                          // restyle the card without a copy of every vocabulary. ?>
-                    <?php foreach (UiStore::RESULT_OPTIONS[$test['resultType']] ?? UiStore::RESULT_OPTIONS['text'] as $status): ?>
-                        <button type="button" class="lab-status-btn<?= $test['status'] === $status ? ' is-active ' . ui_tone('labStatus', $status) : '' ?>" data-lab-status="<?= esc($status) ?>" data-lab-tone="<?= esc(ui_tone('labStatus', $status)) ?>" data-lab-label="<?= esc(UiStore::RESULT_LABEL[$status]) ?>"<?= in_array($status, UiStore::RESULT_UNANSWERED, true) ? ' data-lab-unanswered' : '' ?>><?= esc(UiStore::RESULT_LABEL[$status]) ?></button>
+                    <?php // This test's own answers: a serology offers Positive /
+                          // Negative, a referral Cleared / not, and a test the
+                          // record added offers whatever it was given. The tone
+                          // and label ride on the button so ui.js can restyle
+                          // the card without a copy of every vocabulary. ?>
+                    <?php foreach ($answers as $answer): ?>
+                        <?php // A test the record added wears the colours it was
+                              // given, on every answer rather than only on the
+                              // one recorded: choosing them was the point. ?>
+                        <button type="button" class="lab-status-btn<?= $custom ? ' lab-status-btn--tinted ' . esc($answer['tone']) : '' ?><?= $test['status'] === $answer['key'] ? ' is-active ' . esc($answer['tone']) : '' ?>" data-lab-status="<?= esc($answer['key']) ?>" data-lab-tone="<?= esc($answer['tone']) ?>" data-lab-label="<?= esc($answer['label']) ?>"<?= in_array($answer['key'], UiStore::RESULT_UNANSWERED, true) ? ' data-lab-unanswered' : '' ?>><?= esc($answer['label']) ?></button>
                     <?php endforeach; ?>
                 </div>
+                <?php endif; ?>
+
+                <?php if ($custom && $editing): ?>
+                    <?php // What this test answers is its own question, asked
+                          // once, on the card — because only the person adding
+                          // the test knows what it asks. Ticked answers are the
+                          // buttons above; the rest are offered and nothing
+                          // more, and vanish from the card once it is saved.
+                          //
+                          // Checkboxes and a `<details>` of radios, so choosing
+                          // an answer and choosing its colour both work with
+                          // scripting off. ?>
+                    <?= view('ui/partials/lab_answer_picker', [
+                        'base'    => $base,
+                        'idBase'  => $field . '-' . $i,
+                        'answers' => $answers,
+                        'byKey'   => $byKey,
+                    ], ['saveData' => false]) ?>
                 <?php endif; ?>
 
                 <?php // The sheet's comment line. Free text on every test, and

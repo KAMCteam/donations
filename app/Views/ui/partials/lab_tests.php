@@ -76,6 +76,41 @@ foreach ($tests as $i => $test) {
 if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROUP])) {
     $groups[DatabaseSeeder::CUSTOM_GROUP] = [];
 }
+
+// How each group is going, the same count as the card's own. A workup is read
+// group by group — immunology is somebody's morning and serology is somebody
+// else's — so "28%" against the whole sheet says less than the groups do.
+//
+// A group of nothing but free-text lines has nothing to complete and gets no
+// bar: `labProgress` leaves those out, so its total is zero and a percentage
+// of them would be a number about nothing.
+$groupProgress = array_map(
+    static fn (array $groupTests): array => UiStore::labProgress($groupTests),
+    $groups
+);
+
+// The groups are numbered, and a group's bar, its cards and its line in the
+// folded summary all carry the number. Names would do it too, until one of
+// them has a slash in it — "Hematology/Biochemistry" — and the script has to
+// start quoting. The numbers are ours.
+$groupNumber = [];
+
+foreach (array_keys($groups) as $n => $groupName) {
+    $groupNumber[$groupName] = $n;
+}
+
+/** One group's bar and percentage, the card's own in miniature. */
+$groupBar = static function (array $p): void {
+    if ($p['total'] === 0) {
+        return;
+    }
+    ?>
+    <span class="lab-group-progress">
+        <span class="progress"><span class="progress-fill" data-lab-group-fill style="width:<?= $p['pct'] ?>%;background-color:#15508A"></span></span>
+        <span class="lab-pct" data-lab-group-pct><?= $p['pct'] ?>%</span>
+    </span>
+    <?php
+};
 ?>
 <<?= $box ?> class="card card--pad<?= $foldable ? ' card-fold' : '' ?>" data-lab-section<?= $foldable && $open ? ' open' : '' ?>>
     <<?= $head ?> class="card-head<?= $foldable ? ' card-fold-head' : '' ?>">
@@ -96,6 +131,21 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
         </div>
         <?php if (! $editing && $editUrl !== null): ?>
             <a class="btn-edit" href="<?= esc($editUrl) ?>"><?= ui_icon('edit') ?>Edit</a>
+        <?php endif; ?>
+        <?php // Shut, the card is one line — so the line carries the groups:
+              // the names and how far each has got, which is what somebody
+              // shuts a seventy-card workup and still wants to know. Open,
+              // they go: each group says it over its own tests. ?>
+        <?php if ($foldable): ?>
+            <div class="lab-fold-groups">
+                <?php foreach ($groups as $groupName => $groupTests): ?>
+                    <?php if ($groupName === '' || $groupProgress[$groupName]['total'] === 0) { continue; } ?>
+                    <span class="lab-fold-group" data-lab-sum="<?= (int) $groupNumber[$groupName] ?>">
+                        <span class="lab-fold-group-name"><?= esc($groupName) ?></span>
+                        <?php $groupBar($groupProgress[$groupName]); ?>
+                    </span>
+                <?php endforeach; ?>
+            </div>
         <?php endif; ?>
     </<?= $head ?>>
 
@@ -119,8 +169,11 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
               // need the pencil pressed first. It is the last group, so this
               // closes the fields above it and opens another for its own. ?>
         </fieldset>
-        <div class="lab-group lab-group--add">
-            <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
+        <div class="lab-group lab-group--add" data-lab-group-head="<?= (int) $groupNumber[$groupName] ?>">
+            <div class="lab-group-add-head">
+                <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
+                <?php $groupBar($groupProgress[$groupName]); ?>
+            </div>
             <?php // While the card is open it belongs to the card's own form,
                   // so pressing it keeps whatever has been typed into the
                   // tests above. While the card is being read there is nothing
@@ -140,11 +193,12 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
         <?php // Its heading is above, with the button, except where there is
               // no button — a screen with no record to add a test to. ?>
         <?php if ($groupName !== '' && ! ($isCustomGroup && $addLabUrl !== null)): ?>
-            <div class="lab-group-head">
+            <div class="lab-group-head" data-lab-group-head="<?= (int) $groupNumber[$groupName] ?>">
                 <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
+                <?php $groupBar($groupProgress[$groupName]); ?>
             </div>
         <?php endif; ?>
-        <div class="lab-grid">
+        <div class="lab-grid" data-lab-group="<?= (int) $groupNumber[$groupName] ?>">
         <?php foreach ($groupTests as $i => $test): ?>
             <?php // $field and $i are ours, not user input, so the name needs no escaping. ?>
             <?php $base = $field . '[' . $i . ']'; ?>

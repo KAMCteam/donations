@@ -529,14 +529,17 @@ A card with a fold is a `<details>` with its head as the `<summary>`: the whole
 head is the control, so there is no small target to find, and it works with
 scripting off. Two kinds have one.
 
-**The pair's workups.** A workup is seventy-odd cards — a screenful and a half
-between whoever is reading the pair and the donors underneath it. On the pair's
-screen both workups, the recipient's and the open donor tab's, are shut when
-the screen opens, with the line that says how each is going still on them, and
-the card being edited open because that is the card somebody came for.
-`ui/partials/lab_tests` takes `foldable`, so this is the pair's arrangement and
-not a change to the workup itself. The record screens keep theirs open — what
-is under them is a notes box, not the point of the screen.
+**The workups**, on every screen that shows one. A workup is seventy-odd cards
+— a screenful and a half between whoever is reading the pair and the donors
+underneath it. On the pair's screen both workups, the recipient's and the open
+donor tab's, are **shut** when the screen opens, with the card being edited
+open because that is the card somebody came for. On a record screen the workup
+is most of the screen, so it arrives **open** and shutting it is a choice
+somebody makes. `ui/partials/lab_tests` takes `foldable` and `open`, so which
+it is belongs to the screen rather than to the workup.
+
+Shut, a workup is one line — so the line carries the groups, as the next
+section says.
 
 **The personal details**, on the record screens and on the pair, each donor tab
 included. These start **open**: the details are what a record is, and a record
@@ -549,6 +552,31 @@ of it. They are the values and not controls, because the card's real fields are
 a few lines below and a second set carrying the same names would post every
 answer twice. They go again when it opens, where the card says all three in its
 own fields.
+
+### How far a workup has got, group by group
+
+The card's head has always said "12 of 74 completed" with a bar against the
+whole sheet. One number against seventy-odd tests is the one number nobody
+works from: a workup is read group by group — immunology is somebody's morning
+and serology is somebody else's — and "16%" does not say which of them is
+waiting.
+
+So every group carries its own bar and percentage beside its heading, counted
+exactly as the card's own is (`UiStore::labProgress`, over that group's tests).
+A group of nothing but free-text lines gets none: there is nothing in it to
+complete, and a percentage of nothing is a number about nothing.
+
+Shut, the card shows the groups by name with the same percentages, two or three
+across depending on the width — which is the whole point of being able to shut
+it: the workup is out of the way and still readable at a glance. Open, the
+lines go, because each group is saying it over its own tests.
+
+`ui.js` keeps all of them in step as answers are pressed: the group a card is
+in is read off the markup (`data-lab-group="3"` on its cards, the same number
+on its heading and on its line in the folded summary), because the Other
+group's heading sits outside the fieldset — to keep **Add lab** pressable while
+the card is read-only — and the numbers are what tie the two together. Without
+the script, every bar is still right: the server renders them.
 
 ### Status: three facts, not one
 

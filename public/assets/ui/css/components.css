@@ -1037,6 +1037,62 @@
   line-height: var(--lh-sm);
   font-weight: 600;
   color: var(--slate-700);
+  margin-right: auto;
+}
+
+/* How far one group has got, in the card's own bar at the size of a heading.
+   Narrower than the card's, because it answers for a handful of tests rather
+   than for the whole sheet. */
+.lab-group-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+}
+.lab-group-progress .progress {
+  display: block;
+  width: 7rem;
+  height: 0.375rem;
+}
+.lab-group-progress .progress-fill { display: block; }
+
+/* Shut, the card says its groups: the names and the same percentages, one per
+   line, so a workup can be left closed and still read. Open, each group says
+   it over its own tests and this would be saying it twice. */
+.lab-fold-groups {
+  flex-basis: 100%;
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 0.375rem 1.5rem;
+  margin-top: 0.25rem;
+}
+.card-fold[open] > .card-fold-head .lab-fold-groups { display: none; }
+
+.lab-fold-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.lab-fold-group-name {
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 600;
+  color: var(--slate-600);
+  margin-right: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Side by side once there is room: nine groups down one column is a list
+   longer than the card it is standing in for. The breakpoints are here rather
+   than with the others, because a rule further down the file would undo them. */
+@media (min-width: 48rem) {
+  .lab-fold-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 64rem) {
+  .lab-fold-groups { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 .btn-add-lab {
@@ -1243,6 +1299,14 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 0.5rem;
+}
+
+/* The name and how far the group has got, on one line above the button. */
+.lab-group-add-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
   margin-bottom: 0.75rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--slate-100);

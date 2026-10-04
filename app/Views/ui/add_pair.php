@@ -233,6 +233,8 @@ foreach ($v as $field => $value) {
             'tests'    => $rLabTests,
             'field'    => 'rLabs',
             'animated' => true,
+            'foldable' => true,
+            'open'     => true,
             'editing'  => ! $fixedIs('recipient'),
             // `saveData` false, like every other partial here: CodeIgniter
             // keeps view data between `view()` calls, and a flag this one
@@ -344,6 +346,8 @@ foreach ($v as $field => $value) {
             'tests'    => $dLabTests,
             'field'    => 'dLabs',
             'animated' => true,
+            'foldable' => true,
+            'open'     => true,
             'editing'  => ! $fixedIs('donor'),
             // `saveData` false, like every other partial here: CodeIgniter
             // keeps view data between `view()` calls, and a flag this one

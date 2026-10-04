@@ -298,14 +298,13 @@
     });
   }
 
-  /* "3 of 7 completed", the bar and the percentage. */
-  function updateLabSummary(section) {
+  /* How far a set of cards has got: the same count the server makes. */
+  function labCount(root) {
     // Not the Other box: it has no answer to give, so it is neither done nor
     // outstanding. `UiStore::labProgress` leaves it out for the same reason,
     // and the two counts have to agree — otherwise the total jumps the moment
     // the first answer is pressed.
-    var cards = section.querySelectorAll(".lab-card:not(.lab-card--free)");
-    var total = cards.length;
+    var cards = root.querySelectorAll(".lab-card:not(.lab-card--free)");
     var done = 0;
 
     // Answered is anything but "not done" and "pending" — which the buttons
@@ -315,16 +314,47 @@
       if (chosen && !chosen.hasAttribute("data-lab-unanswered")) done += 1;
     });
 
-    var pct = Math.round((done / Math.max(total, 1)) * 100);
+    return {
+      done: done,
+      total: cards.length,
+      pct: Math.round((done / Math.max(cards.length, 1)) * 100)
+    };
+  }
+
+  /* A group's own bar, wherever it is drawn: over its tests, and on the line
+     the card shows while it is shut. */
+  function paintGroup(section, number, pct) {
+    section.querySelectorAll(
+      '[data-lab-group-head="' + number + '"], [data-lab-sum="' + number + '"]'
+    ).forEach(function (place) {
+      var fill = place.querySelector("[data-lab-group-fill]");
+      if (fill) fill.style.width = pct + "%";
+
+      var label = place.querySelector("[data-lab-group-pct]");
+      if (label) label.textContent = pct + "%";
+    });
+  }
+
+  /* "3 of 7 completed", the bar and the percentage — the card's, and each
+     group's. */
+  function updateLabSummary(section) {
+    var whole = labCount(section);
 
     var count = section.querySelector("[data-lab-count]");
-    if (count) count.textContent = done + " of " + total + " completed";
+    if (count) count.textContent = whole.done + " of " + whole.total + " completed";
 
     var fill = section.querySelector("[data-lab-fill]");
-    if (fill) fill.style.width = pct + "%";
+    if (fill) fill.style.width = whole.pct + "%";
 
     var label = section.querySelector("[data-lab-pct]");
-    if (label) label.textContent = pct + "%";
+    if (label) label.textContent = whole.pct + "%";
+
+    // Each group's bar sits beside its heading and its cards are elsewhere —
+    // the Other group's heading is outside the fieldset, to keep Add lab
+    // pressable — so the number on the markup is what ties them together.
+    section.querySelectorAll("[data-lab-group]").forEach(function (group) {
+      paintGroup(section, group.getAttribute("data-lab-group"), labCount(group).pct);
+    });
   }
 
   function initLabSections() {

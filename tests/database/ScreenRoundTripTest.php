@@ -1505,12 +1505,87 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('data-lab-section open', $open);
     }
 
-    /** The record screens are not folded: there is nothing under them to reach. */
-    public function testTheRecordsWorkupDoesNotFold(): void
+    /** The record screens fold too, and arrive open: the workup is the screen. */
+    public function testTheRecordsWorkupFoldsButArrivesOpen(): void
     {
         $this->post('recipients/new', ['mrn' => '8952', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
+        $this->post('donors/new', ['mrn' => '8953', 'name' => 'D', 'age' => '30', 'bloodType' => 'A']);
 
-        $this->assertStringNotContainsString('card-fold" data-lab-section', $this->get('recipients/8952')->getBody());
+        foreach (['recipients/8952', 'donors/8953'] as $screen) {
+            $html = $this->get($screen)->getBody();
+
+            $this->assertStringContainsString('data-lab-section open', $html, $screen);
+            $this->assertStringNotContainsString('card-fold" data-lab-section>', $html, $screen);
+        }
+    }
+
+    /**
+     * Each group says how far it has got, and the shut card says it for all
+     * of them.
+     *
+     * A workup is read group by group — immunology is somebody's morning and
+     * serology is somebody else's — so one percentage against seventy-odd
+     * tests is the one number nobody is working from.
+     */
+    public function testEachLabGroupCarriesItsOwnPercentage(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8954', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
+        [$pairId] = $this->pairWith('8955', '8956', 'The Donor');
+
+        foreach (['recipients/8954', 'donors/8956', 'pairs/' . $pairId] as $screen) {
+            $html = $this->get($screen)->getBody();
+
+            // A bar and a percentage over each group's own tests...
+            $this->assertStringContainsString('data-lab-group-head="0"', $html, $screen);
+            $this->assertStringContainsString('data-lab-group-fill', $html, $screen);
+            $this->assertStringContainsString('data-lab-group="0"', $html, $screen);
+
+            // ...and the same groups, by name, on the line the card shows
+            // while it is shut.
+            $this->assertStringContainsString('class="lab-fold-groups"', $html, $screen);
+            $this->assertStringContainsString('data-lab-sum="0"', $html, $screen);
+            $this->assertStringContainsString('<span class="lab-fold-group-name">Immunology', $html, $screen);
+        }
+    }
+
+    /** Answering moves the group's own number, not only the card's. */
+    public function testAGroupsPercentageCountsOnlyItsOwnTests(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8957', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
+
+        $before = $this->get('recipients/8957')->getBody();
+        $this->assertSame(0, $this->groupPct($before, 0), 'nothing answered yet');
+
+        // Answer one test in the first group.
+        $tests = (new UiStore(session()))->findRecipient('8957')['labTests'];
+        $posted = [];
+
+        foreach ($tests as $i => $test) {
+            $posted[$i] = ['id' => $test['id'], 'name' => $test['name'], 'status' => $test['status']];
+        }
+
+        // Whatever the first test's own answers are — every group asks a
+        // different question — as long as it is one that counts as answered.
+        $first   = array_key_first($posted);
+        $answers = array_column($tests[$first]['answers'] ?? [], 'key');
+        $answer  = array_values(array_diff($answers, UiStore::RESULT_UNANSWERED))[0] ?? 'done';
+
+        $posted[$first]['status'] = $answer;
+
+        $this->post('recipients/8957', ['section' => 'labs', 'labs' => $posted]);
+
+        $after = $this->get('recipients/8957')->getBody();
+        $this->assertGreaterThan(0, $this->groupPct($after, 0), 'the first group moved');
+        $this->assertSame(0, $this->groupPct($after, 1), 'and nobody else did');
+    }
+
+    /** The percentage one group's bar is showing. */
+    private function groupPct(string $html, int $group): int
+    {
+        $head = substr($html, (int) strpos($html, 'data-lab-group-head="' . $group . '"'));
+        $head = substr($head, 0, (int) strpos($head, '</div>'));
+
+        return preg_match('/data-lab-group-pct>(\d+)%/', $head, $m) === 1 ? (int) $m[1] : -1;
     }
 
     // ---- Saying what is wrong, once, and before Save -----------------------
@@ -3262,7 +3337,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('Add lab', $html);
         $this->assertStringContainsString(site_url('recipients/4030') . '/labs', $html);
         // Under the heading and on its own: the button says what it does.
-        $this->assertStringContainsString('<div class="lab-group lab-group--add">', $html);
+        $this->assertStringContainsString('<div class="lab-group lab-group--add" data-lab-group-head=', $html);
         $this->assertStringNotContainsString('No tests added.', $html);
 
         // And it answers to the page's own form, so Enter in a box on the card

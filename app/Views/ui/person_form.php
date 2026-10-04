@@ -385,6 +385,12 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             'tests'     => $labTests,
             'field'     => 'labs',
             'animated'  => true,
+            // It folds here as it does on the pair, and arrives open: the
+            // workup is most of this screen, so shutting it is a choice
+            // somebody makes, not the state it is handed to them in. Shut, it
+            // keeps the groups and how far each has got.
+            'foldable'  => true,
+            'open'      => true,
             'editing'   => $editable('labs'),
             'editUrl'   => $mode === 'add' ? null : $editUrl('labs'),
             'viewUrl'   => $mode === 'add' ? null : $viewUrl,

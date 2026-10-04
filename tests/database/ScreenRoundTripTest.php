@@ -1591,6 +1591,36 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertSame(2, substr_count($pair, 'card-fold-facts'), 'the recipient and the open donor tab');
     }
 
+    /**
+     * Both registers show the status they are already filtered by.
+     *
+     * The chips above the table narrowed the list by it; the table itself did
+     * not say it, so a list under "All" could not be read for it at all.
+     */
+    public function testBothRegistersShowTheStatusColumn(): void
+    {
+        $this->post('recipients/new', [
+            'mrn' => '8970', 'name' => 'Listed Recipient', 'age' => '40',
+            'bloodType' => 'A', 'status' => 'on_hold',
+        ]);
+        $this->post('donors/new', [
+            'mrn' => '8971', 'name' => 'Listed Donor', 'age' => '30',
+            'bloodType' => 'A', 'donorStatus' => 'Declined',
+        ]);
+
+        $waitlist = $this->get('recipients')->getBody();
+        $this->assertStringContainsString('<th>Status</th>', $waitlist);
+        $this->assertStringContainsString('>On Hold</span>', $waitlist);
+
+        $donors = $this->get('donors')->getBody();
+        $this->assertStringContainsString('<th>Status</th>', $donors);
+        $this->assertStringContainsString('>Declined</span>', $donors);
+
+        // And the sheet shows the columns the screen shows.
+        $this->assertStringContainsString('Status', $this->get('recipients/print')->getBody());
+        $this->assertStringContainsString('Declined', $this->get('donors/print')->getBody());
+    }
+
     // ---- Paired exchange ---------------------------------------------------
 
     /**

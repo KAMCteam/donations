@@ -17,7 +17,7 @@ use App\Libraries\UiStore;
  * @var string                     $statusFilter
  * @var string                     $searchQuery  What the search above the list is narrowing to
  */
-$headers = ['#', 'Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Score', 'Urgent', ''];
+$headers = ['#', 'Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Score', 'Urgent', 'Status', ''];
 // The score is a real number now: a tenth of a point per month waiting plus a
 // tenth per month on dialysis, computed by the query. It is NULL for a
 // recipient with no dialysis date, which shows as a dash rather than as zero.
@@ -122,6 +122,9 @@ $filterQuery = static function () use ($btFilter, $statusFilter, $searchQuery): 
                             <td class="mono"><?= esc($recipient['bloodType']) ?></td>
                             <td class="mono"><?= esc($score($recipient['score'] ?? null)) ?></td>
                             <td><?= $recipient['urgent'] ? 'Urgent' : 'Not Urgent' ?></td>
+                            <?php // The person's own status, the one the chips
+                                  // above already narrow the list by. ?>
+                            <td><span class="badge <?= esc(ui_tone('status', $recipient['status'])) ?>"><?= esc(UiStore::STATUS_OPTIONS[$recipient['status']] ?? $recipient['status']) ?></span></td>
                             <td class="cell-action"><?= view('ui/partials/delete_cell', [
                                 'url'    => site_url('recipients/' . rawurlencode($recipient['id']) . '/delete'),
                                 'name'   => $recipient['name'],

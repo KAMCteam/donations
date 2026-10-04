@@ -314,6 +314,11 @@ chip rebuilds the address keeping the other filter, so `?bt=A&status=on_hold`
 is one list rather than two that overwrite each other. A filter on `all` drops
 out of the URL, so a plain list has a plain address.
 
+Both tables carry a **Status** column too, in the same coloured tag the rest of
+the platform uses. A list narrowed by something it does not show can only be
+read for it one chip at a time, and under "All" it could not be read for it at
+all.
+
 Both carry an **Export PDF** beside their Add button, and it exports what is on
 the screen: the filtered rows, in the columns the list shows, with the filters
 named on the letterhead so a printout says what it is a printout of. The two

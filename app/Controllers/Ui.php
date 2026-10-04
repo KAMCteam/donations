@@ -238,7 +238,7 @@ class Ui extends BaseController
             'count'      => ui_plural(count($rows), 'unmatched recipient'),
             'filters'    => $this->registerFilterSummary($filter, $status, $query),
             'printedOn'  => date('d/m/Y'),
-            'headers'    => ['#', 'Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Score', 'Urgent'],
+            'headers'    => ['#', 'Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Score', 'Urgent', 'Status'],
             'rows'       => array_map(static fn (int $i, array $r): array => [
                 [(string) ($i + 1), 'c-pairno'],
                 [(string) $r['name'], 'c-name'],
@@ -248,6 +248,7 @@ class Ui extends BaseController
                 [(string) $r['bloodType'], 'c-mono'],
                 [$score($r['score'] ?? null), 'c-mono'],
                 [$r['urgent'] ? 'Urgent' : 'Not Urgent', ''],
+                [UiStore::STATUS_OPTIONS[$r['status']] ?? (string) $r['status'], ''],
             ], array_keys($rows), $rows),
             'empty'      => 'No recipients match these filters.',
             'backUrl'    => site_url('recipients') . $this->registerFilterQuery($filter, $status, $query),
@@ -315,9 +316,10 @@ class Ui extends BaseController
             'count'      => ui_plural(count($rows), 'unmatched donor'),
             'filters'    => $this->registerFilterSummary($filter, $status, $query),
             'printedOn'  => date('d/m/Y'),
-            'headers'    => ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs'],
+            'headers'    => ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs', 'Status'],
             'rows'       => array_map(static function (array $d): array {
                 $progress = UiStore::labProgress($d['labTests']);
+                $status   = UiStore::personStatusFromUi((string) $d['donorStatus']);
 
                 return [
                     [(string) $d['name'], 'c-name'],
@@ -327,6 +329,7 @@ class Ui extends BaseController
                     [(string) $d['bloodType'], 'c-mono'],
                     [UiStore::DONATION_TYPES[$d['donationType']] ?? (string) $d['donationType'], ''],
                     [$progress['done'] . '/' . $progress['total'], 'c-mono'],
+                    [UiStore::STATUS_OPTIONS[$status] ?? (string) $d['donorStatus'], ''],
                 ];
             }, $rows),
             'empty'      => 'No unmatched donors match these filters.',

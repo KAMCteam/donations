@@ -18,7 +18,7 @@ use App\Libraries\UiStore;
  * @var string                     $statusFilter
  * @var string                     $searchQuery  What the search above the list is narrowing to  The blood type chosen, or "all".
  */
-$headers = ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs', ''];
+$headers = ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs', 'Status', ''];
 
 /**
  * Rebuilds the address with one filter swapped out.
@@ -130,6 +130,13 @@ $filterQuery = static function () use ($btFilter, $statusFilter, $searchQuery): 
                             <td class="mono"><?= esc($donor['bloodType']) ?></td>
                             <td><span class="badge <?= str_starts_with($donor['donationType'], 'living') ? 'tone-teal-soft' : 'tone-slate' ?>"><?= esc(UiStore::DONATION_TYPES[$donor['donationType']] ?? $donor['donationType']) ?></span></td>
                             <td class="mono"><?= $progress['done'] ?>/<?= $progress['total'] ?></td>
+                            <?php // The donor's own status, the one the chips
+                                  // above already narrow the list by. It is
+                                  // kept on the record as the words the
+                                  // control shows, so it is turned back into
+                                  // the key the colours are listed under. ?>
+                            <?php $statusKey = UiStore::personStatusFromUi((string) $donor['donorStatus']); ?>
+                            <td><span class="badge <?= esc(ui_tone('status', $statusKey)) ?>"><?= esc(UiStore::STATUS_OPTIONS[$statusKey] ?? $donor['donorStatus']) ?></span></td>
                             <td class="cell-action"><?= view('ui/partials/delete_cell', [
                                 'url'    => site_url('donors/' . rawurlencode($donor['id']) . '/delete'),
                                 'name'   => $donor['name'],

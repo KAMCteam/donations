@@ -305,6 +305,21 @@ named on the letterhead so a printout says what it is a printout of. The two
 sheets are one view — `ui/register_print` — because they are the same document
 with different columns, and the caller hands the cells over already formatted.
 
+### Paired Exchange: the status is the offer
+
+A pair reaches the Paired Exchange list two ways, and they are the same way.
+**Pair Exchange** on the pair's own screen puts it forward, and so does setting
+the pair's **status** to Paired Exchange — the status already says what the
+button says, and making somebody say it twice only let the two disagree: a pair
+marked Paired Exchange that was not on the exchange list.
+
+So the status writes `for_exchange` with it, on a save and on a new pair alike.
+While the status says it, there is nothing to press: the header shows *On the
+exchange list* and no Withdraw, because withdrawing would be undone by the next
+save of the card. Taking the pair off means saying something else on the card,
+which is where the status is. A pair put forward by the button under any other
+status still withdraws by it, since the status is not what put it there.
+
 Paired Exchange has a blood-type row too, labelled **Recipient blood type**,
 and it asks a different question from the others': the Pairs List's matches a
 pair when *either* side has the group, and this one is the recipient's alone.

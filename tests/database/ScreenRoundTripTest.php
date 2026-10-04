@@ -2109,6 +2109,77 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringNotContainsString('Nasser Group B', $both);
     }
 
+    /**
+     * Setting a pair's status to Paired Exchange puts it on that list.
+     *
+     * The button and the status said the same thing, and making somebody say
+     * it twice only let the two disagree — a pair marked Paired Exchange that
+     * was not on the exchange list.
+     */
+    public function testPairedExchangeStatusOffersThePairWithoutTheButton(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9601', 'dMrn' => '9602',
+            'rName' => 'Status Offered', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Their Donor', 'dAge' => '30', 'dBloodType' => 'B',
+            'pairStatus' => 'active',
+        ]);
+        $pairId = (int) $this->db->table('pairs')->where('recipient_mrn', 9601)->get()->getRowArray()['id'];
+
+        // Active, so not offered and not on the list.
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'for_exchange' => 0]);
+        $this->assertStringNotContainsString('Status Offered', $this->get('exchange')->getBody());
+
+        // The status alone puts it there.
+        $this->post('pairs/' . $pairId, ['section' => 'pair', 'pairStatus' => 'paired_exchange']);
+
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'paired_exchange', 'for_exchange' => 1]);
+        $this->assertStringContainsString('Status Offered', $this->get('exchange')->getBody());
+
+        // And while the status says so there is nothing to press: taking it
+        // back means saying something else on the card.
+        $html = $this->get('pairs/' . $pairId)->getBody();
+        $this->assertStringContainsString('On the exchange list', $html);
+        $this->assertStringNotContainsString('Withdraw from exchange', $html);
+
+        $this->post('pairs/' . $pairId, ['section' => 'exchange', 'forExchange' => '0']);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'for_exchange' => 1]);
+        $this->assertStringContainsString('because its status says so', (string) session('ui_error'));
+    }
+
+    /** A pair created as Paired Exchange is on the list from the start. */
+    public function testAPairCreatedAsPairedExchangeIsOfferedAtOnce(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9611', 'dMrn' => '9612',
+            'rName' => 'Born Offered', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Their Donor', 'dAge' => '30', 'dBloodType' => 'B',
+            'pairStatus' => 'paired_exchange',
+        ]);
+
+        $this->seeInDatabase('pairs', ['recipient_mrn' => 9611, 'status' => 'paired_exchange', 'for_exchange' => 1]);
+        $this->assertStringContainsString('Born Offered', $this->get('exchange')->getBody());
+    }
+
+    /** The button still works on its own for a pair with any other status. */
+    public function testTheButtonStillOffersAPairThatIsNotMarkedForExchange(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '9621', 'dMrn' => '9622',
+            'rName' => 'Button Offered', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'Their Donor', 'dAge' => '30', 'dBloodType' => 'B',
+            'pairStatus' => 'active',
+        ]);
+        $pairId = (int) $this->db->table('pairs')->where('recipient_mrn', 9621)->get()->getRowArray()['id'];
+
+        $this->post('pairs/' . $pairId, ['section' => 'exchange', 'forExchange' => '1']);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'active', 'for_exchange' => 1]);
+
+        // And takes it back, because the status is not what put it there.
+        $this->post('pairs/' . $pairId, ['section' => 'exchange', 'forExchange' => '0']);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'for_exchange' => 0]);
+    }
+
     /** A status nobody can choose is read as no filter at all. */
     public function testAnUnknownStatusIsNotAFilter(): void
     {

@@ -32,6 +32,15 @@ class PairModel extends Model
     public const CLOSED = 'closed';
 
     /**
+     * The status that says this pair is in a paired exchange.
+     *
+     * Saying so is offering it: a pair set to this is on the Paired Exchange
+     * list without anybody pressing the button, because the status already
+     * said what the button says.
+     */
+    public const EXCHANGE = 'paired_exchange';
+
+    /**
      * The open pair holding this recipient, or null when they are free.
      *
      * A recipient may hold several at once — a donor is looked at, then

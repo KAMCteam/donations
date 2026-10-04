@@ -1700,7 +1700,19 @@ class Ui extends BaseController
         // for a paired exchange or taking it back.
         if ($section === 'exchange') {
             $offered = $post('forExchange') === '1';
-            $error   = $this->store->offerPairForExchange($pair['id'], $offered);
+
+            // A pair whose status is Paired Exchange is on that list because
+            // of the status, so withdrawing it here would be undone by the
+            // next save of the card. The button is not on the screen in that
+            // case; this is the same rule for a post that arrives anyway.
+            if (! $offered && $pair['status'] === PairModel::EXCHANGE) {
+                return $back->with(
+                    'ui_error',
+                    'This pair is on the exchange list because its status says so. Change the status to take it off.'
+                );
+            }
+
+            $error = $this->store->offerPairForExchange($pair['id'], $offered);
 
             $this->session->setFlashdata(
                 $error === '' ? 'ui_notice' : 'ui_error',

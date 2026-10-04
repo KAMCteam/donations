@@ -4,6 +4,7 @@
 <?php
 
 use App\Libraries\UiStore;
+use App\Models\PairModel;
 
 /**
  * Existing pair. Was `js/pages/pair-profile.js`.
@@ -47,11 +48,16 @@ $ageNote = static function (string $birthDate, string $storedAge): string {
             <div class="eyebrow"><?= esc($pair['id']) ?></div>
             <h1 class="page-title">Pair Profile</h1>
         </div>
-        <?php // Nothing reaches the exchange screen without this, so it is the
-              // pair's own team putting it forward — and taking it back. ?>
+        <?php // A pair reaches the exchange screen two ways: this button, or
+              // its status being set to Paired Exchange — which says the same
+              // thing, so it does the same thing. While the status says it,
+              // there is nothing to press: taking it back means saying
+              // something else on the card below. ?>
         <div class="header-actions">
             <a class="btn-outline" href="<?= site_url('pairs/' . rawurlencode($pair['id'])) ?>/print" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
-            <?php if ($pair['forExchange']): ?>
+            <?php if ($pair['status'] === PairModel::EXCHANGE): ?>
+                <span class="badge tone-teal-soft">On the exchange list</span>
+            <?php elseif ($pair['forExchange']): ?>
                 <span class="badge tone-teal-soft">Offered for exchange</span>
                 <form method="post" action="<?= esc($viewUrl) ?>" class="inline-form">
                     <?= csrf_field() ?>

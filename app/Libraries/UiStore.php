@@ -718,6 +718,9 @@ final class UiStore
 
         $id = (int) $this->pairs->link((int) $pair['recipientId'], (int) $pair['donorId'], [
             'status'          => $status,
+            // A pair created as Paired Exchange is on that list from the
+            // moment it exists, for the same reason.
+            'for_exchange'    => $status === PairModel::EXCHANGE ? 1 : 0,
             'relationship'    => $pair['relationship'] ?? null,
             'crossmatch_date' => $this->toDate($pair['scheduledDate'] ?? null),
             'notes'           => $pair['notes'] ?? null,
@@ -983,6 +986,13 @@ final class UiStore
 
         if ($status !== '') {
             $row['status'] = $status;
+
+            // Setting the status to Paired Exchange is offering the pair for
+            // one: the two said the same thing, and making somebody say it
+            // twice only let them disagree.
+            if ($status === PairModel::EXCHANGE) {
+                $row['for_exchange'] = 1;
+            }
         }
 
         if (array_key_exists('scheduledDate', $changes)) {

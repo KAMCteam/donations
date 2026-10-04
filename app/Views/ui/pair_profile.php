@@ -40,14 +40,6 @@ use App\Models\PairModel;
 $viewUrl  = site_url('pairs/' . rawurlencode($pair['id']));
 $editable = static fn (string $section): bool => $editing === $section;
 $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $section;
-
-// The age is the date of birth read out rather than a second answer, as on the
-// record screens; the pair holds two people, so the same note serves both.
-$ageNote = static function (string $birthDate, string $storedAge): string {
-    $age = $birthDate === '' ? $storedAge : (string) UiStore::ageFrom($birthDate);
-
-    return $age === '' || $age === '0' ? '' : 'Age ' . $age;
-};
 ?>
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
@@ -198,12 +190,10 @@ $ageNote = static function (string $birthDate, string $storedAge): string {
                         </select>
                     </div>
                     <div>
-                        <label class="field-label" for="f-r-birth">
-                            Date of Birth
-                            <span class="field-note" data-age-note="f-r-birth"><?= esc($ageNote($v['rBirthDate'], $v['rAge'])) ?></span>
-                        </label>
-                        <input type="hidden" name="rAge" value="<?= esc($v['rAge']) ?>">
-                        <?= view('ui/partials/date_field', ['id' => 'f-r-birth', 'name' => 'rBirthDate', 'value' => $v['rBirthDate'], 'past' => true], ['saveData' => false]) ?>
+                        <?= view('ui/partials/birth_date_field', [
+                            'id' => 'f-r-birth', 'name' => 'rBirthDate', 'value' => $v['rBirthDate'],
+                            'ageName' => 'rAge', 'age' => $v['rAge'],
+                        ], ['saveData' => false]) ?>
                     </div>
                     <div>
                         <label class="field-label" for="f-r-blood">Blood Group</label>
@@ -339,7 +329,6 @@ $ageNote = static function (string $birthDate, string $storedAge): string {
         'offerable' => $offerable,
         'mrps'      => $mrps,
         'coordinators' => $coordinators,
-        'ageNote'   => $ageNote,
     ], ['saveData' => false]) ?>
 </div>
 <?= $this->endSection() ?>

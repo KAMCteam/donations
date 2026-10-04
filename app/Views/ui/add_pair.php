@@ -31,14 +31,6 @@ $fixedIs = static fn (string $side): bool => $fixedSide === $side;
 foreach ($v as $field => $value) {
     $v[$field] = old($field, $value);
 }
-
-// The age is the date of birth read out rather than a second answer, as on the
-// record screens; the pair holds two people, so the same note serves both.
-$ageNote = static function (string $birthDate, string $storedAge): string {
-    $age = $birthDate === '' ? $storedAge : (string) UiStore::ageFrom($birthDate);
-
-    return $age === '' || $age === '0' ? '' : 'Age ' . $age;
-};
 ?>
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
@@ -157,12 +149,10 @@ $ageNote = static function (string $birthDate, string $storedAge): string {
                         </select>
                     </div>
                     <div>
-                        <label class="field-label" for="f-r-birth">
-                            Date of Birth
-                            <span class="field-note" data-age-note="f-r-birth"><?= esc($ageNote($v['rBirthDate'], $v['rAge'])) ?></span>
-                        </label>
-                        <input type="hidden" name="rAge" value="<?= esc($v['rAge']) ?>">
-                        <?= view('ui/partials/date_field', ['id' => 'f-r-birth', 'name' => 'rBirthDate', 'value' => $v['rBirthDate'], 'past' => true], ['saveData' => false]) ?>
+                        <?= view('ui/partials/birth_date_field', [
+                            'id' => 'f-r-birth', 'name' => 'rBirthDate', 'value' => $v['rBirthDate'],
+                            'ageName' => 'rAge', 'age' => $v['rAge'],
+                        ], ['saveData' => false]) ?>
                     </div>
                     <div>
                         <label class="field-label" for="f-r-blood">Blood Group</label>
@@ -298,12 +288,10 @@ $ageNote = static function (string $birthDate, string $storedAge): string {
 
                 <div class="form-grid-5">
                     <div>
-                        <label class="field-label" for="f-d-birth">
-                            Date of Birth
-                            <span class="field-note" data-age-note="f-d-birth"><?= esc($ageNote($v['dBirthDate'], $v['dAge'])) ?></span>
-                        </label>
-                        <input type="hidden" name="dAge" value="<?= esc($v['dAge']) ?>">
-                        <?= view('ui/partials/date_field', ['id' => 'f-d-birth', 'name' => 'dBirthDate', 'value' => $v['dBirthDate'], 'past' => true], ['saveData' => false]) ?>
+                        <?= view('ui/partials/birth_date_field', [
+                            'id' => 'f-d-birth', 'name' => 'dBirthDate', 'value' => $v['dBirthDate'],
+                            'ageName' => 'dAge', 'age' => $v['dAge'],
+                        ], ['saveData' => false]) ?>
                     </div>
                     <div>
                         <label class="field-label" for="f-d-blood">Donor Blood Group</label>

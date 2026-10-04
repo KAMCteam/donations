@@ -54,17 +54,6 @@ $eyebrow = $mode === 'add' ? 'New' : ($person['id'] ?? '');
 // form and the screen still works with JavaScript off. A new record has
 // nothing to read yet, so every card starts editable and one Save at the foot
 // of the form commits the lot — below the fields it saves, not above them.
-// The age is not asked for any more: the date of birth is, and the age is
-// what that comes to today. It is shown beside the field's own label rather
-// than in a box of its own, because it is not a second answer — it is the
-// same answer, read out. A record entered before birth dates were collected
-// has only the number, and that is what shows.
-$ageNote = static function (string $birthDate, string $storedAge): string {
-    $age = $birthDate === '' ? $storedAge : (string) UiStore::ageFrom($birthDate);
-
-    return $age === '' || $age === '0' ? '' : 'Age ' . $age;
-};
-
 $viewUrl  = $mode === 'add' ? null : site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id']));
 $editable = static fn (string $section): bool => $mode === 'add' || $editing === $section;
 $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $section;
@@ -161,15 +150,10 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                             </select>
                         </div>
                         <div>
-                            <label class="field-label" for="f-birth">
-                                Date of Birth
-                                <span class="field-note" data-age-note="f-birth"><?= esc($ageNote($v['birthDate'], $v['age'])) ?></span>
-                            </label>
-                            <?php // The number still travels, so a record saved
-                                  // without a birth date keeps the age it was
-                                  // entered with instead of dropping to zero. ?>
-                            <input type="hidden" name="age" value="<?= esc($v['age']) ?>">
-                            <?= view('ui/partials/date_field', ['id' => 'f-birth', 'name' => 'birthDate', 'value' => $v['birthDate'], 'past' => true], ['saveData' => false]) ?>
+                            <?= view('ui/partials/birth_date_field', [
+                                'id' => 'f-birth', 'name' => 'birthDate', 'value' => $v['birthDate'],
+                                'ageName' => 'age', 'age' => $v['age'],
+                            ], ['saveData' => false]) ?>
                         </div>
                         <div>
                             <label class="field-label" for="f-blood">Blood Group</label>
@@ -293,12 +277,10 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
                     <div class="form-grid-5">
                         <div>
-                            <label class="field-label" for="f-birth">
-                                Date of Birth
-                                <span class="field-note" data-age-note="f-birth"><?= esc($ageNote($v['birthDate'], $v['age'])) ?></span>
-                            </label>
-                            <input type="hidden" name="age" value="<?= esc($v['age']) ?>">
-                            <?= view('ui/partials/date_field', ['id' => 'f-birth', 'name' => 'birthDate', 'value' => $v['birthDate'], 'past' => true], ['saveData' => false]) ?>
+                            <?= view('ui/partials/birth_date_field', [
+                                'id' => 'f-birth', 'name' => 'birthDate', 'value' => $v['birthDate'],
+                                'ageName' => 'age', 'age' => $v['age'],
+                            ], ['saveData' => false]) ?>
                         </div>
                         <div>
                             <label class="field-label" for="f-blood">Donor Blood Group</label>

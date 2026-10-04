@@ -40,7 +40,6 @@ use App\Libraries\UiStore;
  * @var list<array<string, mixed>> $offerable Donors the Add dialog can offer
  * @var list<array{id: string, name: string}> $mrps
  * @var list<array<string, mixed>> $coordinators Everyone registered as one
- * @var callable                   $ageNote
  */
 $pairUrl = site_url('pairs/' . rawurlencode($pair['id']));
 $tabUrl  = static fn (array $t): string => site_url('pairs/' . rawurlencode($pair['id'])) . '?donor=' . (int) $t['number'];
@@ -163,7 +162,6 @@ $swapTo = array_values(array_filter(
                     'labUrl'   => $pairUrl . '/donors/' . rawurlencode($tab['id']) . '/labs',
                     'mrps'     => $mrps,
                     'coordinators' => $coordinators,
-                    'ageNote'  => $ageNote,
                     'hasActive' => $hasActive,
                 ], ['saveData' => false]) ?>
             </div>

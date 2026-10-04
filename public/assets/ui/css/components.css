@@ -217,6 +217,20 @@
 }
 .input-ro--faint { color: var(--slate-400); }
 .input-ro--mono  { font-family: var(--font-mono); }
+/* The age: a number of two digits, so the box is the width of one rather than
+   of the field it is worked out from. */
+.input-ro--age   { text-align: center; }
+
+/* Date of birth and the age it comes to, sharing one cell of whatever grid
+   they are dropped into — so the age could be given a field of its own without
+   moving anything else on any screen that asks for a birthday. */
+.dob-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.dob-field-date { flex: 1 1 auto; min-width: 0; }
+.dob-field-age  { flex: 0 0 3.5rem; }
 
 .textarea {
   width: 100%;

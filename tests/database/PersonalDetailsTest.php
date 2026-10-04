@@ -149,7 +149,7 @@ final class PersonalDetailsTest extends CIUnitTestCase
         $this->seeInDatabase('donors', ['mrn' => 6300, 'age' => 52, 'birth_date' => null]);
     }
 
-    /** The form asks for the date, and shows the age it comes to beside it. */
+    /** The form asks for the date, and the field beside it reads the age out. */
     public function testTheFormAsksForTheDateAndShowsTheAge(): void
     {
         $born = date('d/m/Y', strtotime('-33 years -1 day'));
@@ -159,9 +159,27 @@ final class PersonalDetailsTest extends CIUnitTestCase
         $html = $this->get('recipients/6400?edit=personal')->getBody();
 
         $this->assertStringContainsString('name="birthDate"', $html);
-        $this->assertStringContainsString('Age 33', $html);
-        // No box asking for the number itself any more.
+        // Its own field, labelled, next to the date it comes from — read-only,
+        // because it is that date read out rather than a second question.
+        $this->assertStringContainsString('>Age</label>', $html);
+        $this->assertStringContainsString('id="f-birth-age"', $html);
+        $this->assertStringContainsString('data-age-for="f-birth"', $html);
+        $this->assertMatchesRegularExpression('/id="f-birth-age"[^>]*value="33"[^>]*readonly/', $html);
+        // Nothing asks for the number: it is not collected, only carried.
         $this->assertStringNotContainsString('<input type="number" id="f-age"', $html);
+        $this->assertStringContainsString('<input type="hidden" name="age"', $html);
+    }
+
+    /** A record with no birth date shows the number it was entered with. */
+    public function testTheAgeFieldFallsBackToTheStoredNumber(): void
+    {
+        $this->post('donors/new', [
+            'mrn' => '6401', 'name' => 'Old Record', 'bloodType' => 'A', 'age' => '52',
+        ]);
+
+        $html = $this->get('donors/6401?edit=personal')->getBody();
+
+        $this->assertMatchesRegularExpression('/id="f-birth-age"[^>]*value="52"/', $html);
     }
 
     // ---- 3. The entry date starts at today, and can be corrected -----------

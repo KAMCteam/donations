@@ -29,7 +29,6 @@ use App\Libraries\UiStore;
  * @var string                     $labUrl     Where Add lab posts and Remove goes
  * @var bool                       $hasActive  Whether the pair has its donor already
  * @var list<array{id: string, name: string}> $mrps
- * @var callable                   $ageNote
  */
 // Each card is named for its link as well as for itself, so a screen holding
 // three donors knows which one a save is about.
@@ -83,12 +82,10 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
 
                 <div class="form-grid-5">
                     <div>
-                        <label class="field-label" for="f-d-birth">
-                            Date of Birth
-                            <span class="field-note" data-age-note="f-d-birth"><?= esc($ageNote($v['dBirthDate'], $v['dAge'])) ?></span>
-                        </label>
-                        <input type="hidden" name="dAge" value="<?= esc($v['dAge']) ?>">
-                        <?= view('ui/partials/date_field', ['id' => 'f-d-birth', 'name' => 'dBirthDate', 'value' => $v['dBirthDate'], 'past' => true], ['saveData' => false]) ?>
+                        <?= view('ui/partials/birth_date_field', [
+                            'id' => 'f-d-birth', 'name' => 'dBirthDate', 'value' => $v['dBirthDate'],
+                            'ageName' => 'dAge', 'age' => $v['dAge'],
+                        ], ['saveData' => false]) ?>
                     </div>
                     <div>
                         <label class="field-label" for="f-d-blood">Donor Blood Group</label>

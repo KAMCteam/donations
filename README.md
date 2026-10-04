@@ -515,10 +515,14 @@ belong either way.
 
 Age used to be typed as a number, which is a fact with a shelf life: right on
 the day it was entered and quietly wrong every year after, with nothing in the
-system to ask again. The field collects a **date of birth** now, and the age it
-comes to today is written beside the field's own label — not a second box to
-fill, the same answer read out. It updates as the date is typed, and the server
-works out the same number when it saves.
+system to ask again. The field collects a **date of birth** now, and **Age** is
+a field of its own beside it — read-only, with nothing to type into, because it
+is that date read out rather than a second question. It fills in as the date is
+typed and the server works out the same number when it saves.
+
+The two share one cell of whatever grid they are dropped into
+(`ui/partials/birth_date_field`), so giving the age a field of its own moved
+nothing else on any of the five screens that ask for a birthday.
 
 `age` is still a column, because every list, filter and report reads it and
 because the records entered before `birth_date` existed have nothing else. It

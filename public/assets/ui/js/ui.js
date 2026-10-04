@@ -305,17 +305,18 @@
     return age;
   }
 
-  /* The age that goes with a date of birth, written beside the field's label.
-     There is no second box to fill: it is the same answer read out, so it
-     follows the date as it is typed. */
+  /* The age that goes with a date of birth, in the box beside it. There is
+     nothing to fill in: it is the same answer read out, so it follows the date
+     as it is typed. The server works it out again from what is sent, so this
+     is only what you see while you type. */
   function updateAgeNote(input) {
-    var note = document.querySelector('[data-age-note="' + input.id + '"]');
-    if (!note) return;
+    var box = document.querySelector('[data-age-for="' + input.id + '"]');
+    if (!box) return;
 
     var iso = isoOf(input.value);
     var age = iso === "" || iso > today() ? -1 : ageFrom(iso);
 
-    note.textContent = age < 0 ? "" : "Age " + age;
+    box.value = age < 0 ? "" : String(age);
   }
 
   /* Everything the personal details ask for has already happened, so a date

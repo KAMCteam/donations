@@ -61,6 +61,8 @@ class Exchange extends BaseController
             'query'    => $query,
             'btFilter' => $bloodType,
             'hasDraft' => $this->draft->isOpen($organ),
+            'searchQuery'  => $query,
+            'searchPlaceholder' => 'Search these pairs by MRN or name',
             'error'    => (string) ($this->session->getFlashdata('ui_error') ?? ''),
         ]);
     }

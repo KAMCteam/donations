@@ -2038,52 +2038,75 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
-     * One search, in the bar at the top of every screen.
+     * The search narrows the list you are looking at, and never leaves it.
      *
-     * The moment before you know which list somebody is on belongs to no one
-     * screen, so it does not live on one: every page carries the same box, and
-     * it asks every register at once.
+     * A screen with a list carries the box; one without — the dashboard, Add
+     * MRP, a record — has nothing for it to do and does not. It posts back to
+     * the same address, with the filters already on the screen riding along,
+     * so searching narrows what is showing rather than replacing it.
      */
-    public function testTheTopBarSearchesEveryRegisterAtOnce(): void
+    public function testTheSearchNarrowsTheListYouAreOn(): void
     {
         $this->post('pairs/new', [
             'rMrn' => '9501', 'dMrn' => '9502',
             'rName' => 'Hamad Al-Qahtani', 'rAge' => '40', 'rBloodType' => 'A',
             'dName' => 'Sara Al-Qahtani', 'dAge' => '30', 'dBloodType' => 'A',
         ]);
-        $this->post('mrp', ['id' => 'MRP-500', 'name' => 'Dr. Qahtani', 'kind' => 'doctor']);
+        $this->post('recipients/new', ['mrn' => '9503', 'name' => 'Omar Al-Dosari', 'age' => '44', 'bloodType' => 'B']);
+        $this->post('donors/new', ['mrn' => '9504', 'name' => 'Lina Al-Dosari', 'age' => '34', 'bloodType' => 'B']);
 
-        // The box is on every screen, not on one of them.
-        foreach (['dashboard', 'recipients', 'donors', 'pairs', 'exchange', 'reports', 'mrp'] as $screen) {
-            $html = $this->get($screen)->getBody();
-            $this->assertStringContainsString('class="app-search"', $html, $screen . ' carries the search');
-            $this->assertStringContainsString('action="' . site_url('search') . '"', $html);
+        // The lists carry it; the screens with nothing to narrow do not.
+        foreach (['recipients', 'donors', 'pairs', 'exchange', 'reports'] as $screen) {
+            $this->assertStringContainsString('class="app-search"', $this->get($screen)->getBody(), $screen . ' carries the search');
         }
 
-        // One name, four kinds of answer.
-        $html = $this->get('search?q=Qahtani')->getBody();
-        $this->assertStringContainsString('Hamad Al-Qahtani', $html);
-        $this->assertStringContainsString('Sara Al-Qahtani', $html);
-        $this->assertStringContainsString('Dr. Qahtani', $html);
-        foreach (['Recipients', 'Donors', 'Pairs', 'Users'] as $group) {
-            $this->assertStringContainsString($group . ' <span>', $html);
+        foreach (['dashboard', 'mrp'] as $screen) {
+            $this->assertStringNotContainsString('class="app-search"', $this->get($screen)->getBody(), $screen . ' does not');
         }
 
-        // An MRN finds the one person it belongs to, and the pair holding them.
-        $byMrn = $this->get('search?q=9502')->getBody();
-        $this->assertStringContainsString('Sara Al-Qahtani', $byMrn);
-        $this->assertStringContainsString('Pairs <span>', $byMrn);
+        // It posts back to the screen it is on, not to a search page.
+        $html = $this->get('recipients')->getBody();
+        $this->assertStringContainsString('action="' . site_url('recipients') . '"', $html);
+        $this->assertStringNotContainsString(site_url('search'), $html);
 
-        // The question stays in the bar, so a result opens with it on screen.
-        $this->assertStringContainsString('value="9502"', $byMrn);
+        // And it narrows that screen's own list.
+        $narrowed = $this->get('recipients?q=Dosari')->getBody();
+        $this->assertStringContainsString('Omar Al-Dosari', $narrowed);
+        $this->assertStringNotContainsString('Hamad Al-Qahtani', $narrowed);
 
-        // Nothing found says so, rather than showing four empty headings.
-        $none = $this->get('search?q=zzzznobody')->getBody();
-        $this->assertStringContainsString('Nothing on this programme matches', $none);
-        $this->assertStringNotContainsString('Recipients <span>', $none);
+        $donors = $this->get('donors?q=Dosari')->getBody();
+        $this->assertStringContainsString('Lina Al-Dosari', $donors);
+        $this->assertStringNotContainsString('Sara Al-Qahtani', $donors);
 
-        // And an empty search is an invitation, not a result of none.
-        $this->assertStringContainsString('every register at once', $this->get('search')->getBody());
+        // A pair answers to either of its people, and to its own number.
+        $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
+        $this->assertStringContainsString('Hamad Al-Qahtani', $this->get('pairs?status=all&q=9502')->getBody());
+        $this->assertStringContainsString('Hamad Al-Qahtani', $this->get('pairs?status=all&q=' . $pairId)->getBody());
+        $this->assertStringNotContainsString('Hamad Al-Qahtani', $this->get('pairs?status=all&q=zzz')->getBody());
+
+        // An MRN narrows the report as well.
+        $this->assertStringContainsString('Omar Al-Dosari', $this->get('reports?q=9503')->getBody());
+        $this->assertStringNotContainsString('Omar Al-Dosari', $this->get('reports?q=9502')->getBody());
+    }
+
+    /** The filters already on the screen survive a search, and the other way round. */
+    public function testTheSearchAndTheChipsNarrowTogether(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9511', 'name' => 'Nasser Group A', 'age' => '40', 'bloodType' => 'A']);
+        $this->post('recipients/new', ['mrn' => '9512', 'name' => 'Nasser Group B', 'age' => '41', 'bloodType' => 'B']);
+
+        // Searching keeps the chip: the form re-sends what is in the address.
+        $html = $this->get('recipients?bt=A')->getBody();
+        $this->assertStringContainsString('<input type="hidden" name="bt" value="A">', $html);
+
+        // Pressing a chip keeps the search.
+        $searched = $this->get('recipients?q=Nasser')->getBody();
+        $this->assertStringContainsString('bt=A&amp;q=Nasser', $searched);
+
+        // Both together narrow to one.
+        $both = $this->get('recipients?bt=A&q=Nasser')->getBody();
+        $this->assertStringContainsString('Nasser Group A', $both);
+        $this->assertStringNotContainsString('Nasser Group B', $both);
     }
 
     /** A status nobody can choose is read as no filter at all. */

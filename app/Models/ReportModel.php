@@ -45,6 +45,17 @@ class ReportModel extends Model
             $rows = array_merge($rows, $this->side('donor', $f));
         }
 
+        // The box above the report, which narrows what the filters chose by
+        // the two things written on the paperwork: a number and a name.
+        if (($f['search'] ?? '') !== '') {
+            $search = (string) $f['search'];
+            $rows   = array_values(array_filter(
+                $rows,
+                static fn (array $row): bool => stripos($row['mrn'], $search) !== false
+                    || stripos($row['name'], $search) !== false
+            ));
+        }
+
         // One order for the merged set, so a mixed table does not read as two
         // tables stacked: by name, which is what somebody scanning it reads.
         usort($rows, static fn (array $a, array $b): int => strcasecmp((string) $a['name'], (string) $b['name']));

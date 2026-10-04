@@ -15,7 +15,8 @@ use App\Libraries\UiStore;
  *
  * @var list<array<string, mixed>> $donors    Unmatched donors for the current programme.
  * @var string                     $btFilter
- * @var string                     $statusFilter  The blood type chosen, or "all".
+ * @var string                     $statusFilter
+ * @var string                     $searchQuery  What the search above the list is narrowing to  The blood type chosen, or "all".
  */
 $headers = ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs', ''];
 
@@ -26,7 +27,7 @@ $headers = ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs', ''];
  * the URL, so a plain list has a plain address and the chips still say what is
  * being asked for.
  */
-$filterUrl = static function (string $key, string $value) use ($btFilter, $statusFilter): string {
+$filterUrl = static function (string $key, string $value) use ($btFilter, $statusFilter, $searchQuery): string {
     $query = ['bt' => $btFilter, 'status' => $statusFilter];
     $query[$key] = $value;
 
@@ -34,16 +35,26 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
     // address and the chips still say exactly what is being asked for.
     $query = array_filter($query, static fn (string $v): bool => $v !== 'all');
 
+    // The search above the list is a filter like the chips are, so pressing
+    // one keeps it rather than clearing it.
+    if ($searchQuery !== '') {
+        $query['q'] = $searchQuery;
+    }
+
     return site_url('donors') . ($query === [] ? '' : '?' . http_build_query($query));
 };
 
 // The same two as a bare query string, for the sheet: it is another address
 // under this one, not a replacement for it.
-$filterQuery = static function () use ($btFilter, $statusFilter): string {
+$filterQuery = static function () use ($btFilter, $statusFilter, $searchQuery): string {
     $query = array_filter(
         ['bt' => $btFilter, 'status' => $statusFilter],
         static fn (string $v): bool => $v !== 'all'
     );
+
+    if ($searchQuery !== '') {
+        $query['q'] = $searchQuery;
+    }
 
     return $query === [] ? '' : '?' . http_build_query($query);
 };

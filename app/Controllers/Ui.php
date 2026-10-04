@@ -192,6 +192,7 @@ class Ui extends BaseController
     {
         $filter = $this->bloodTypeFilter();
         $status = $this->personStatusFilter();
+        $query  = $this->listQuery();
 
         return view('ui/recipient_waitlist', [
             'title'   => 'Recipient Waitlist',
@@ -201,10 +202,13 @@ class Ui extends BaseController
             // SQL, because the score is computed and PHP cannot sort by it.
             'recipients' => $this->store->waitingList(
                 $filter === 'all' ? null : $filter,
-                $status === 'all' ? null : $status
+                $status === 'all' ? null : $status,
+                $query
             ),
             'btFilter'     => $filter,
             'statusFilter' => $status,
+            'searchQuery'  => $query,
+            'searchPlaceholder' => 'Search this waitlist by MRN or name',
         ]);
     }
 
@@ -218,9 +222,11 @@ class Ui extends BaseController
     {
         $filter = $this->bloodTypeFilter();
         $status = $this->personStatusFilter();
+        $query  = $this->listQuery();
         $rows   = $this->store->waitingList(
             $filter === 'all' ? null : $filter,
-            $status === 'all' ? null : $status
+            $status === 'all' ? null : $status,
+            $query
         );
 
         $score = static fn (?float $value): string => $value === null ? '' : number_format($value, 1);
@@ -229,7 +235,7 @@ class Ui extends BaseController
             'sheetTitle' => 'Recipient Waitlist',
             'organLabel' => $this->store->organLabel(),
             'count'      => ui_plural(count($rows), 'unmatched recipient'),
-            'filters'    => $this->registerFilterSummary($filter, $status),
+            'filters'    => $this->registerFilterSummary($filter, $status, $query),
             'printedOn'  => date('d/m/Y'),
             'headers'    => ['#', 'Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Score', 'Urgent'],
             'rows'       => array_map(static fn (int $i, array $r): array => [
@@ -243,7 +249,7 @@ class Ui extends BaseController
                 [$r['urgent'] ? 'Urgent' : 'Not Urgent', ''],
             ], array_keys($rows), $rows),
             'empty'      => 'No recipients match these filters.',
-            'backUrl'    => site_url('recipients') . $this->registerFilterQuery($filter, $status),
+            'backUrl'    => site_url('recipients') . $this->registerFilterQuery($filter, $status, $query),
             'backLabel'  => 'Back to Recipient Waitlist',
         ]);
     }
@@ -272,6 +278,7 @@ class Ui extends BaseController
         // registers are read with the same question in mind.
         $filter = $this->bloodTypeFilter();
         $status = $this->personStatusFilter();
+        $query  = $this->listQuery();
 
         return view('ui/donors_list', [
             'title'    => 'Donors List',
@@ -279,10 +286,13 @@ class Ui extends BaseController
             'organ'    => $this->store->organ(),
             'donors'   => $this->store->availableDonors(
                 $filter === 'all' ? null : $filter,
-                $status === 'all' ? null : $status
+                $status === 'all' ? null : $status,
+                $query
             ),
             'btFilter'     => $filter,
             'statusFilter' => $status,
+            'searchQuery'  => $query,
+            'searchPlaceholder' => 'Search this register by MRN or name',
         ]);
     }
 
@@ -291,16 +301,18 @@ class Ui extends BaseController
     {
         $filter = $this->bloodTypeFilter();
         $status = $this->personStatusFilter();
+        $query  = $this->listQuery();
         $rows   = $this->store->availableDonors(
             $filter === 'all' ? null : $filter,
-            $status === 'all' ? null : $status
+            $status === 'all' ? null : $status,
+            $query
         );
 
         return view('ui/register_print', [
             'sheetTitle' => 'Donors List',
             'organLabel' => $this->store->organLabel(),
             'count'      => ui_plural(count($rows), 'unmatched donor'),
-            'filters'    => $this->registerFilterSummary($filter, $status),
+            'filters'    => $this->registerFilterSummary($filter, $status, $query),
             'printedOn'  => date('d/m/Y'),
             'headers'    => ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs'],
             'rows'       => array_map(static function (array $d): array {
@@ -317,7 +329,7 @@ class Ui extends BaseController
                 ];
             }, $rows),
             'empty'      => 'No unmatched donors match these filters.',
-            'backUrl'    => site_url('donors') . $this->registerFilterQuery($filter, $status),
+            'backUrl'    => site_url('donors') . $this->registerFilterQuery($filter, $status, $query),
             'backLabel'  => 'Back to Donors List',
         ]);
     }
@@ -588,7 +600,7 @@ class Ui extends BaseController
 
     public function pairs(): string
     {
-        [$rows, $btFilter, $statusFilter] = $this->filteredPairs();
+        [$rows, $btFilter, $statusFilter, $query] = $this->filteredPairs();
 
         return view('ui/pairs_list', [
             'title'        => 'Pairs List',
@@ -598,6 +610,8 @@ class Ui extends BaseController
             'rows'         => $rows,
             'btFilter'     => $btFilter,
             'statusFilter' => $statusFilter,
+            'searchQuery'  => $query,
+            'searchPlaceholder' => 'Search these pairs by MRN, name or pair number',
         ]);
     }
 
@@ -723,15 +737,15 @@ class Ui extends BaseController
      */
     public function printPairs(): string
     {
-        [$rows, $btFilter, $statusFilter] = $this->filteredPairs();
+        [$rows, $btFilter, $statusFilter, $query] = $this->filteredPairs();
 
         return view('ui/pairs_print', [
             'rows'       => $rows,
             'mrps'       => $this->store->mrps(),
             'organLabel' => $this->store->organLabel(),
-            'filters'    => $this->filterSummary($btFilter, $statusFilter),
+            'filters'    => $this->filterSummary($btFilter, $statusFilter, $query),
             'printedOn'  => date('d/m/Y'),
-            'backUrl'    => site_url('pairs') . $this->filterQuery($btFilter, $statusFilter),
+            'backUrl'    => site_url('pairs') . $this->filterQuery($btFilter, $statusFilter, $query),
         ]);
     }
 
@@ -1237,7 +1251,7 @@ class Ui extends BaseController
     }
 
     /** What the chips were narrowed to, for the line under the title. */
-    private function filterSummary(string $btFilter, string $statusFilter): string
+    private function filterSummary(string $btFilter, string $statusFilter, string $search = ''): string
     {
         $applied = [];
 
@@ -1249,11 +1263,15 @@ class Ui extends BaseController
             $applied[] = UiStore::STATUS_OPTIONS[$statusFilter] ?? $statusFilter;
         }
 
+        if ($search !== '') {
+            $applied[] = 'matching “' . $search . '”';
+        }
+
         return $applied === [] ? 'All pairs' : implode(', ', $applied);
     }
 
     /** The filters as a query string, so Back returns to the same view. */
-    private function filterQuery(string $btFilter, string $statusFilter): string
+    private function filterQuery(string $btFilter, string $statusFilter, string $search = ''): string
     {
         // Each filter drops out of the URL when it is on its own default —
         // `all` for blood type, Active for status — so the address stays short
@@ -1261,6 +1279,7 @@ class Ui extends BaseController
         $query = array_filter([
             'bt'     => $btFilter === 'all' ? null : $btFilter,
             'status' => $statusFilter === UiStore::PAIRS_DEFAULT_STATUS ? null : $statusFilter,
+            'q'      => $search === '' ? null : $search,
         ], static fn (?string $value): bool => $value !== null);
 
         return $query === [] ? '' : '?' . http_build_query($query);
@@ -1275,6 +1294,7 @@ class Ui extends BaseController
     private function filteredPairs(): array
     {
         $btFilter = $this->bloodTypeFilter();
+        $query    = $this->listQuery();
 
         // No `status` in the query means the screen's own default rather than
         // everything; `all` is a filter the chips ask for by name.
@@ -1301,10 +1321,43 @@ class Ui extends BaseController
                 continue;
             }
 
+            // The search box above the list. A pair answers to either of its
+            // people, by name or by number, and to its own pair number — which
+            // is the column the list leads with.
+            if ($query !== '' && ! $this->pairMatches($pair, $recipient, $donor, $query)) {
+                continue;
+            }
+
             $rows[] = ['pair' => $pair, 'recipient' => $recipient, 'donor' => $donor];
         }
 
-        return [$rows, $btFilter, $statusFilter];
+        return [$rows, $btFilter, $statusFilter, $query];
+    }
+
+    /**
+     * Whether a pair answers to what was typed into the search box.
+     *
+     * @param array<string, mixed>      $pair
+     * @param array<string, mixed>|null $recipient
+     * @param array<string, mixed>|null $donor
+     */
+    private function pairMatches(array $pair, ?array $recipient, ?array $donor, string $query): bool
+    {
+        $fields = [
+            (string) $pair['id'],
+            (string) ($recipient['id'] ?? ''),
+            (string) ($recipient['name'] ?? ''),
+            (string) ($donor['id'] ?? ''),
+            (string) ($donor['name'] ?? ''),
+        ];
+
+        foreach ($fields as $field) {
+            if ($field !== '' && stripos($field, $query) !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function addPair(): string|RedirectResponse
@@ -2273,8 +2326,14 @@ class Ui extends BaseController
         return in_array($filter, UiStore::BLOOD_TYPES, true) ? $filter : 'all';
     }
 
+    /** What the search box above a list is asking for, trimmed. */
+    private function listQuery(): string
+    {
+        return trim((string) ($this->request->getGet('q') ?? ''));
+    }
+
     /** What the two registers' chips were narrowed to, for the sheet's meta line. */
-    private function registerFilterSummary(string $bloodType, string $status): string
+    private function registerFilterSummary(string $bloodType, string $status, string $search = ''): string
     {
         $applied = [];
 
@@ -2286,16 +2345,21 @@ class Ui extends BaseController
             $applied[] = UiStore::PERSON_STATUS_OPTIONS[$status] ?? $status;
         }
 
+        if ($search !== '') {
+            $applied[] = 'Matching “' . $search . '”';
+        }
+
         return $applied === [] ? 'No filters applied' : implode(' · ', $applied);
     }
 
-    /** The same two as a query string, so Back returns to the same list. */
-    private function registerFilterQuery(string $bloodType, string $status): string
+    /** The same ones as a query string, so Back returns to the same list. */
+    private function registerFilterQuery(string $bloodType, string $status, string $search = ''): string
     {
-        $query = array_filter(
-            ['bt' => $bloodType, 'status' => $status],
-            static fn (string $value): bool => $value !== 'all'
-        );
+        $query = array_filter([
+            'bt'     => $bloodType === 'all' ? '' : $bloodType,
+            'status' => $status === 'all' ? '' : $status,
+            'q'      => $search,
+        ], static fn (string $value): bool => $value !== '');
 
         return $query === [] ? '' : '?' . http_build_query($query);
     }

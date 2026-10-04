@@ -46,7 +46,7 @@ class RecipientModel extends Model
      *
      * @return list<array<string, mixed>>
      */
-    public function waitingList(?string $organCode = null, ?string $bloodGroup = null, ?string $status = null): array
+    public function waitingList(?string $organCode = null, ?string $bloodGroup = null, ?string $status = null, ?string $query = null): array
     {
         $builder = $this->db->table('recipients r')
             ->select('r.*, ' . self::SCORE_CALC, false)
@@ -66,6 +66,15 @@ class RecipientModel extends Model
 
         if ($status !== null && $status !== '') {
             $builder->where('r.status', $status);
+        }
+
+        // The search box above the list: an MRN or a name, which are the two
+        // things written on the paperwork somebody arrives with.
+        if ($query !== null && $query !== '') {
+            $builder->groupStart()
+                ->like('r.mrn', $query)
+                ->orLike('r.name', $query)
+            ->groupEnd();
         }
 
         return $builder->orderBy('r.is_urgent', 'DESC')

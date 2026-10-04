@@ -99,6 +99,8 @@ class Reports extends BaseController
 
         return view('ui/reports', [
             'title'    => 'Reports',
+            'searchQuery'  => $filters['search'],
+            'searchPlaceholder' => 'Search these results by MRN or name',
             'navPage'  => 'reports',
             'organ'    => $this->store->organ(),
             'filters'  => $filters,
@@ -183,6 +185,9 @@ class Reports extends BaseController
             'columns'      => array_values(array_intersect($list('column'), array_keys(self::OPTIONAL_COLUMNS))),
             // Nothing chosen is every column chosen, as everywhere else here.
             'columnsTouched' => $this->request->getGet('applied') !== null,
+            // The box above the report, which narrows what the filters chose
+            // rather than being a tenth filter of its own.
+            'search'         => trim((string) ($this->request->getGet('q') ?? '')),
         ];
     }
 
@@ -335,6 +340,10 @@ class Reports extends BaseController
                 . ($filters['to'] === '' ? 'onwards' : UiStore::isoToDMY($filters['to']));
         }
 
+        if ($filters['search'] !== '') {
+            $applied[] = 'Matching “' . $filters['search'] . '”';
+        }
+
         if ($filters['mrps'] !== []) {
             $applied[] = $named(array_map('strval', $filters['mrps']), array_column($choices['mrps'], 'name', 'id'));
         }
@@ -365,9 +374,9 @@ class Reports extends BaseController
             }
         }
 
-        foreach (['from', 'to'] as $end) {
+        foreach (['from', 'to', 'search'] as $end) {
             if ($filters[$end] !== '') {
-                $query[$end] = $filters[$end];
+                $query[$end === 'search' ? 'q' : $end] = $filters[$end];
             }
         }
 

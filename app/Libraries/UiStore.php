@@ -441,9 +441,9 @@ final class UiStore
      *
      * @return list<array<string, mixed>>
      */
-    public function waitingList(?string $bloodGroup = null, ?string $status = null): array
+    public function waitingList(?string $bloodGroup = null, ?string $status = null, ?string $query = null): array
     {
-        $rows = $this->recipients->waitingList($this->organ(), $bloodGroup, $status);
+        $rows = $this->recipients->waitingList($this->organ(), $bloodGroup, $status, $query);
 
         return array_map(function (array $row): array {
             $ui = $this->recipientToUi($row);
@@ -460,11 +460,11 @@ final class UiStore
      *
      * @return list<array<string, mixed>>
      */
-    public function availableDonors(?string $bloodGroup = null, ?string $status = null): array
+    public function availableDonors(?string $bloodGroup = null, ?string $status = null, ?string $query = null): array
     {
         return array_map(
             fn (array $row): array => $this->donorToUi($row),
-            $this->donors->register($this->organ(), true, $bloodGroup, $status)
+            $this->donors->register($this->organ(), true, $bloodGroup, $status, $query)
         );
     }
 
@@ -754,6 +754,16 @@ final class UiStore
         return $row === null ? null : $this->findPair((string) $row['id']);
     }
 
+    /**
+     * Registers a user — a physician or a coordinator.
+     *
+     * A coordinator also gets a row in `coordinators`, which is what the
+     * record screens point at: the MRP register is where people are made, and
+     * that table is where a record's coordinator lives. Without both, somebody
+     * registered here could not be assigned to anybody.
+     *
+     * @return string '' on success, or why not
+     */
     /**
      * Registers a user — a physician or a coordinator.
      *

@@ -66,7 +66,6 @@ alias to `public/` rather than the old `.htaccess` rewrite.
 | `/login` | Staff login |
 | `/organ` | Programme picker (kidney / liver) |
 | `/dashboard` | Programme statistics and high-priority waitlist |
-| `/search` | One question of every register at once |
 | `/recipients` | Recipient waitlist, filterable by blood type and status |
 | `/recipients/print` | The filtered waitlist as a printable sheet |
 | `/recipients/new`, `/recipients/{id}` | Add / open a recipient |
@@ -267,31 +266,30 @@ JavaScript off it is simply followed. A donor already in an open pair is sent to
 that pair rather than offered a second one, and a person who holds a row in both
 registers under one MRN is not offered as their own counterpart.
 
-### One search, across the top of every screen
+### The search narrows the list you are on
 
-Each list can be searched once you are on it. The search above every page is
-for the moment before that: there is an MRN on a form, or half a name, and you
-do not yet know whether it belongs to a recipient, a donor, a pair, or one of
-the people records are assigned to.
+Above the page header and centred in the content, on the five screens that
+have a list to narrow — Recipient Waitlist, Donors List, Pairs List, Paired
+Exchange, Reports. The dashboard, Add MRP and the record screens have nothing
+for it to do, so they do not carry it.
 
-It sits above the page header and centred in the content, at every width. Not
-on the mobile top bar — that carries the hamburger and disappears above 64rem,
-and this belongs on every screen at every size.
+It never leaves the screen. The form posts back to the same address with the
+filters already showing carried as hidden fields, so searching narrows what is
+on the page rather than replacing it — and the chips carry `q` in their own
+links, so pressing one keeps the search. Both end up in the address together
+(`?bt=A&q=Dosari`), which the Export PDF button then takes with it, so the
+sheet is what the screen was showing.
 
-A plain GET form, so the question is in the address, comes back on a refresh
-and can be sent to somebody. `/search?q=` matches an MRN or a name across the
-current programme's recipients, donors and pairs, and the users on the MRP
-register; a pair answers to either of its people as well as to its own number.
-Results are grouped by what kind of thing each answer is, because that is what
-decides where to go next, and a group with nothing in it is left out rather
-than shown empty. Every row is a link and nothing else: searching is for
-finding, and the screen that owns the record is where anything is done about
-it.
+What each screen matches is its own: the two registers match an MRN or a name
+in SQL; the Pairs List and Paired Exchange match either of a pair's people by
+number or name, and the Pairs List matches the pair number as well; Reports
+narrows the rows its nine filters chose.
 
-Paired Exchange had a file-number box of its own, which has gone — one place
-to type an MRN beats a different one per screen. `?q=` still narrows that list,
-so what is left there is the way out of a search, not a second box to type
-into.
+Which screens have the box is decided in the layout from the `navPage` every
+screen already declares, not from a flag each would have to pass. CodeIgniter
+keeps view data between `view()` calls, so a screen that simply forgot the flag
+would inherit the last screen's — which is how the dashboard first came to have
+a search box it was supposed not to have.
 
 ### Filtering the two registers
 

@@ -18,6 +18,7 @@ use App\Libraries\UiStore;
  * @var string $btFilter
  * @var string $statusFilter
  * @var list<array{id: string, name: string}> $mrps
+ * @var string $searchQuery  What the search above the list is narrowing to
  */
 $headers = [
     'Pair #', 'MRN', 'Name', 'Age', 'Type', 'Relationship',
@@ -48,13 +49,16 @@ $mrpName = static function (string $id) use ($mrps): string {
  * blood type, Active for status, which is what the screen opens on. That is
  * why `status=all` has to be written out: leaving it off would mean Active.
  */
-$filterUrl = static function (string $key, string $value) use ($btFilter, $statusFilter): string {
+$filterUrl = static function (string $key, string $value) use ($btFilter, $statusFilter, $searchQuery): string {
     $query = ['bt' => $btFilter, 'status' => $statusFilter];
     $query[$key] = $value;
 
     $query = array_filter([
         'bt'     => $query['bt'] === 'all' ? null : $query['bt'],
         'status' => $query['status'] === UiStore::PAIRS_DEFAULT_STATUS ? null : $query['status'],
+        // The search above the list is a filter like the chips are, so pressing
+        // one keeps it rather than clearing it.
+        'q'      => $searchQuery === '' ? null : $searchQuery,
     ], static fn (?string $v): bool => $v !== null);
 
     return site_url('pairs') . ($query === [] ? '' : '?' . http_build_query($query));
@@ -68,7 +72,7 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
             <p class="page-subtitle"><?= esc(ui_plural(count($rows), 'pair')) ?></p>
         </div>
         <div class="header-actions">
-            <a class="btn-outline" href="<?= site_url('pairs/print') . '?' . http_build_query(['bt' => $btFilter, 'status' => $statusFilter]) ?>" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
+            <a class="btn-outline" href="<?= site_url('pairs/print') . '?' . http_build_query(array_filter(['bt' => $btFilter, 'status' => $statusFilter, 'q' => $searchQuery])) ?>" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
             <a class="btn-primary" href="<?= site_url('pairs/new') ?>"><?= ui_icon('plus') ?>Add Pair</a>
         </div>
     </div>

@@ -11,7 +11,8 @@
  * @var string $title    Browser tab title.
  * @var string $navPage  Nav item to mark active (dashboard, recipients, ...).
  * @var string $organ    Current programme, for the top-bar title.
- * @var string $searchQuery  What the top bar's search is showing, if anything.
+ * @var string $searchQuery  What the search box is showing, if anything.
+ * @var string $searchPlaceholder  What it says when it is empty.
  */
 $navItems = [
     ['page' => 'dashboard',  'label' => 'Dashboard',          'icon' => 'dashboard', 'url' => site_url('dashboard')],
@@ -73,20 +74,58 @@ $navItems = [
                 </div>
 
                 <div id="page" class="page-host">
-                    <?php // One search, across the top of every screen and in
-                          // the middle of it: the moment before you know which
-                          // list somebody is on belongs to no one screen, so it
-                          // does not live on one. A GET form, so the question
-                          // is in the address and comes back on a refresh, and
-                          // a plain one, so it works with scripting off. ?>
-                    <div class="app-search-bar">
-                        <form class="app-search" method="get" action="<?= site_url('search') ?>" role="search">
-                            <label class="sr-only" for="app-q">Search the registers</label>
-                            <span class="app-search-icon"><?= ui_icon('search') ?></span>
-                            <input type="search" id="app-q" name="q" class="app-search-input"
-                                   value="<?= esc($searchQuery ?? '') ?>" placeholder="Search by MRN or name" inputmode="search" autocomplete="off">
-                        </form>
-                    </div>
+                    <?php // The search narrows the list you are looking at,
+                          // so it posts back to the screen you are on and
+                          // never leaves it. A screen with a list to narrow
+                          // asks for it by setting `searchOn`; one without —
+                          // the dashboard, Add MRP, a record — has nothing for
+                          // it to do and does not carry it.
+                          //
+                          // A GET form, so the question is in the address,
+                          // comes back on a refresh and can be sent to
+                          // somebody. The filters already on the screen ride
+                          // along as hidden fields, so searching narrows what
+                          // is showing rather than replacing it. ?>
+                    <?php
+                    // Which screens have one is decided here, from the nav item
+                    // every screen already declares, rather than from a flag
+                    // each would have to remember to pass: CodeIgniter keeps
+                    // view data between `view()` calls, so a missing flag is
+                    // not a false one — it is the last screen's.
+                    $searchable = in_array($navPage ?? '', ['recipients', 'donors', 'pairs', 'exchange', 'reports'], true);
+                    ?>
+                    <?php if ($searchable): ?>
+                        <div class="app-search-bar">
+                            <form class="app-search" method="get" action="<?= current_url() ?>" role="search">
+                                <?php // Everything in the address but the
+                                      // question itself, carried as it was —
+                                      // Reports asks its filters as arrays, so
+                                      // this has to nest. ?>
+                                <?php
+                                $keepFields = static function (array $values, string $prefix) use (&$keepFields): void {
+                                    foreach ($values as $key => $value) {
+                                        $name = $prefix === '' ? (string) $key : $prefix . '[' . $key . ']';
+
+                                        if (is_array($value)) {
+                                            $keepFields($value, $name);
+
+                                            continue;
+                                        }
+
+                                        echo '<input type="hidden" name="' . esc($name, 'attr') . '" value="' . esc((string) $value, 'attr') . '">';
+                                    }
+                                };
+                                $keep = service('request')->getGet();
+                                unset($keep['q']);
+                                $keepFields($keep, '');
+                                ?>
+                                <label class="sr-only" for="app-q">Search this list</label>
+                                <span class="app-search-icon"><?= ui_icon('search') ?></span>
+                                <input type="search" id="app-q" name="q" class="app-search-input"
+                                       value="<?= esc($searchQuery ?? '') ?>" placeholder="<?= esc($searchPlaceholder ?? 'Search this list by MRN or name') ?>" inputmode="search" autocomplete="off">
+                            </form>
+                        </div>
+                    <?php endif; ?>
 
                     <?php // What just happened, once. Set by the actions that
                           // redirect rather than render — a delete has no screen

@@ -26,7 +26,7 @@ class DonorModel extends Model
      *
      * @return list<array<string, mixed>>
      */
-    public function register(?string $organCode = null, bool $unmatchedOnly = false, ?string $bloodGroup = null, ?string $status = null): array
+    public function register(?string $organCode = null, bool $unmatchedOnly = false, ?string $bloodGroup = null, ?string $status = null, ?string $query = null): array
     {
         $builder = $this->db->table('donors d')
             // Somebody entered as one recipient's potential donor is not on
@@ -55,6 +55,14 @@ class DonorModel extends Model
 
         if ($status !== null && $status !== '') {
             $builder->where('d.status', $status);
+        }
+
+        // The search box above the list: an MRN or a name.
+        if ($query !== null && $query !== '') {
+            $builder->groupStart()
+                ->like('d.mrn', $query)
+                ->orLike('d.name', $query)
+            ->groupEnd();
         }
 
         return $builder->orderBy('d.mrn')->get()->getResultArray();

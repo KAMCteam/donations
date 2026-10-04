@@ -1319,6 +1319,66 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('coordinators', ['name' => 'Coordinator Three']);
     }
 
+    /**
+     * Transplanted is the one status with a day attached to it.
+     *
+     * The field is asked for beside the word rather than sitting empty on
+     * every pair, and a pair moved off Transplanted loses it — a date for
+     * something that has been taken back is worse than no date.
+     */
+    public function testATransplantedPairCarriesTheDayItHappened(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '4210', 'dMrn' => '4211',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
+        ]);
+        $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
+
+        // The question is on the card, hidden until the word asks for it.
+        $card = $this->get('pairs/' . $pairId . '?edit=pair')->getBody();
+        $this->assertStringContainsString('Date of Transplant', $card);
+        $this->assertStringContainsString('name="transplantDate"', $card);
+        $this->assertStringContainsString('data-reveal-when="closed,transplanted"', $card);
+        $this->assertMatchesRegularExpression('/id="transplant-date" hidden/', $card);
+
+        $this->post('pairs/' . $pairId, [
+            'section'        => 'pair',
+            'pairStatus'     => 'transplanted',
+            'transplantDate' => '14/09/2026',
+        ]);
+
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'transplanted', 'surgery_date' => '2026-09-14']);
+
+        // And it is read on the card without opening it.
+        $view = $this->get('pairs/' . $pairId)->getBody();
+        $this->assertStringContainsString('value="14/09/2026"', $view);
+        $this->assertStringNotContainsString('id="transplant-date" hidden', $view);
+
+        // A date belonging to no transplant is not kept.
+        $this->post('pairs/' . $pairId, [
+            'section'        => 'pair',
+            'pairStatus'     => 'active',
+            'transplantDate' => '14/09/2026',
+        ]);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'active', 'surgery_date' => null]);
+    }
+
+    /** A pair created as Transplanted keeps its day too. */
+    public function testAPairMadeTransplantedKeepsItsDay(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '4212', 'dMrn' => '4213',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
+            'pairStatus' => 'transplanted', 'transplantDate' => '01/03/2026',
+        ]);
+
+        $this->seeInDatabase('pairs', [
+            'recipient_mrn' => 4212, 'status' => 'transplanted', 'surgery_date' => '2026-03-01',
+        ]);
+    }
+
     // ---- Paired exchange ---------------------------------------------------
 
     /**

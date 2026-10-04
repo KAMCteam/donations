@@ -495,6 +495,22 @@ One of those means more than its label: **Closed** is what "open pair" is
 defined against, so closing a pair puts both sides back on their lists. That is
 the link's doing, not a change to either person's own status.
 
+Two of them bring a question with them, and the Pair Details card asks it where
+the answer belongs — beside the word, and only while the word is on the screen:
+
+| Status | What it asks for | Column |
+| --- | --- | --- |
+| **Closed** | Why was it closed? | `closed_reason` |
+| **Transplanted** | Date of Transplant | `surgery_date` |
+
+Both are kept only while their status holds. Moving a pair off Closed clears
+the reason and moving it off Transplanted clears the date, because a sentence
+about an ending that was undone, or a day for a transplant that was taken back,
+is worse than nothing. One `<select>` reveals both: `data-reveal` and
+`data-reveal-when` carry a list each and are read in step, and with `ui.js`
+absent the blocks are simply always visible — the server drops what does not
+belong either way.
+
 ### Age is a date of birth
 
 Age used to be typed as a number, which is a fact with a shelf life: right on

@@ -109,11 +109,26 @@ $ageNote = static function (string $birthDate, string $storedAge): string {
                 </div>
                 <div>
                     <label class="field-label" for="f-status">Status</label>
-                    <select id="f-status" name="pairStatus" class="input" data-reveal="closed-reason" data-reveal-when="closed">
+                    <select id="f-status" name="pairStatus" class="input" data-reveal="closed-reason,transplant-date" data-reveal-when="closed,transplanted">
                         <?php foreach (UiStore::PAIR_STATUS_OPTIONS as $value => $label): ?>
                             <option value="<?= esc($value) ?>"<?= $v['pairStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+            </div>
+
+            <?php // A transplanted pair has a day it happened on, and no other
+                  // status has one — so the field is asked for beside the word
+                  // rather than sitting empty on every pair. Hidden by ui.js
+                  // until Transplanted is chosen; without scripting it is
+                  // simply always there, and the server drops a date that
+                  // belongs to no transplant. ?>
+            <div class="stack-4 reveal" id="transplant-date"<?= $v['pairStatus'] === 'transplanted' ? '' : ' hidden' ?>>
+                <div class="form-grid-3">
+                    <div>
+                        <label class="field-label" for="f-transplant">Date of Transplant</label>
+                        <?= view('ui/partials/date_field', ['id' => 'f-transplant', 'name' => 'transplantDate', 'value' => $v['transplantDate'], 'past' => true], ['saveData' => false]) ?>
+                    </div>
                 </div>
             </div>
 

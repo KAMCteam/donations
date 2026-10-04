@@ -824,6 +824,7 @@ final class UiStore
             'for_exchange'    => $status === PairModel::EXCHANGE ? 1 : 0,
             'relationship'    => $pair['relationship'] ?? null,
             'crossmatch_date' => $this->toDate($pair['scheduledDate'] ?? null),
+            'surgery_date'    => $status === 'transplanted' ? $this->toDate($pair['transplantDate'] ?? null) : null,
             'notes'           => $pair['notes'] ?? null,
         ]);
 
@@ -1093,6 +1094,15 @@ final class UiStore
 
         if (array_key_exists('scheduledDate', $changes)) {
             $row['crossmatch_date'] = $this->toDate($changes['scheduledDate']);
+        }
+
+        // The day the transplant happened, kept only while the pair says one
+        // did. Moving a pair off Transplanted clears it, as Closed clears its
+        // reason: a date for something that has been taken back is worse than
+        // no date at all.
+        if (array_key_exists('transplantDate', $changes)) {
+            $date                 = $this->toDate($changes['transplantDate']);
+            $row['surgery_date'] = $status === 'transplanted' ? $date : null;
         }
 
         if (array_key_exists('notes', $changes)) {
@@ -1527,6 +1537,9 @@ final class UiStore
             'relationship'  => (string) $row['relationship'],
             'closedReason'  => (string) ($row['closed_reason'] ?? ''),
             'scheduledDate' => $row['crossmatch_date'] === null ? '' : self::isoToDMY($row['crossmatch_date']),
+            // The day it happened. Only a transplanted pair has one, which is
+            // why it is asked for beside the word rather than always.
+            'transplantDate' => ($row['surgery_date'] ?? null) === null ? '' : self::isoToDMY($row['surgery_date']),
             'createdDate'   => substr((string) $row['created_at'], 0, 10),
             'notes'         => (string) $row['notes'],
         ];

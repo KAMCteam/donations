@@ -1430,6 +1430,7 @@ class Ui extends BaseController
             'v'         => ($fixed === null ? [] : $this->fixedValues($prefix, $fixedSide, $fixed)) + [
                 'relationship'   => '',
                 'crossmatchDate' => '',
+                'transplantDate' => '',
                 // Active is where a pair has always started; it is a field to
                 // change now rather than a value to discover afterwards.
                 'pairStatus'     => 'active',
@@ -1636,6 +1637,9 @@ class Ui extends BaseController
             'donorId'       => $donorId,
             'relationship'  => $relationship,
             'scheduledDate' => $crossmatch,
+            // Dropped by the store on any other status, so it is safe to send
+            // whatever the form had on it.
+            'transplantDate' => (string) $this->request->getPost('transplantDate'),
             'createdDate'   => $entryDate,
         ]);
 
@@ -1717,6 +1721,7 @@ class Ui extends BaseController
                 // the pair's notes; Save then writes it back to both.
                 'relationship'   => $donor['relationship'] ?? $pair['notes'] ?? '',
                 'crossmatchDate' => $pair['scheduledDate'] ?? '',
+                'transplantDate' => $pair['transplantDate'] ?? '',
                 'pairStatus'     => $pair['status'],
                 'closedReason'   => $pair['closedReason'] ?? '',
                 'rName'          => $recipient['name'] ?? '',
@@ -1788,10 +1793,11 @@ class Ui extends BaseController
         // donors list shows it — so the pair card keeps the two in step.
         if ($section === 'pair') {
             $this->store->updatePair($pair['id'], [
-                'status'        => $post('pairStatus'),
-                'scheduledDate' => $post('crossmatchDate'),
-                'relationship'  => $post('relationship'),
-                'closedReason'  => $post('closedReason'),
+                'status'         => $post('pairStatus'),
+                'scheduledDate'  => $post('crossmatchDate'),
+                'transplantDate' => $post('transplantDate'),
+                'relationship'   => $post('relationship'),
+                'closedReason'   => $post('closedReason'),
             ]);
 
             if ($donor !== null) {

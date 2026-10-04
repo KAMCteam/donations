@@ -521,17 +521,23 @@
 
   /* ---- A field that only one answer asks for ----------------------------- */
 
-  /* The pair's Closed status wants a reason; the other five do not. The block
-     is in the page either way, so with this file absent it is simply always
-     visible — which is the honest fallback, since the server discards a reason
-     that does not belong to a closed pair. */
+  /* The pair's Closed status wants a reason and its Transplanted one wants the
+     date it happened, and the other four want neither. One select, so the two
+     attributes carry a list each and are read in step. The blocks are in the
+     page either way, so with this file absent they are simply always visible —
+     which is the honest fallback, since the server discards a reason that does
+     not belong to a closed pair and a date that belongs to no transplant. */
   function initReveals() {
     document.querySelectorAll("[data-reveal]").forEach(function (select) {
-      var target = document.getElementById(select.getAttribute("data-reveal"));
-      var when = select.getAttribute("data-reveal-when");
-      if (!target) return;
+      var ids = select.getAttribute("data-reveal").split(",");
+      var whens = (select.getAttribute("data-reveal-when") || "").split(",");
 
-      function sync() { target.hidden = select.value !== when; }
+      function sync() {
+        ids.forEach(function (id, i) {
+          var target = document.getElementById(id.trim());
+          if (target) target.hidden = select.value !== (whens[i] || "").trim();
+        });
+      }
 
       select.addEventListener("change", sync);
       sync();

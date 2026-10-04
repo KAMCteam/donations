@@ -10,11 +10,12 @@
  * choice at its own URL, which is where the button points, so it works with
  * JavaScript switched off and can be linked to or bookmarked.
  *
- * @var string               $personType
- * @var array<string, mixed> $person
- * @var string               $newUrl
- * @var string               $existingUrl
- * @var string               $backUrl
+ * @var string                     $personType
+ * @var array<string, mixed>       $person
+ * @var list<array<string, mixed>> $candidates
+ * @var string                     $newUrl
+ * @var string                     $existingUrl
+ * @var string                     $backUrl
  */
 $counterpart = $personType === 'recipient' ? 'donor' : 'recipient';
 ?>
@@ -31,7 +32,8 @@ $counterpart = $personType === 'recipient' ? 'donor' : 'recipient';
             'newUrl'      => $newUrl,
             'existingUrl' => $existingUrl,
             'person'      => $person,
-        ]) ?>
+            'candidates'  => $candidates,
+        ], ['saveData' => false]) ?>
     </div>
 </div>
 <?= $this->endSection() ?>

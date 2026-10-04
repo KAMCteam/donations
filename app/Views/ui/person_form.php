@@ -29,6 +29,7 @@ use App\Libraries\UiStore;
  * @var string                     $linkUrl     The pairing choice, as a page
  * @var string                     $linkNewUrl
  * @var string                     $linkExistingUrl
+ * @var list<array<string, mixed>> $linkCandidates
  */
 // A save that bounced re-renders with what was typed rather than with what the
 // record held, so a rejected MRN does not cost the rest of the form. The keys
@@ -431,6 +432,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                     'newUrl'      => $linkNewUrl,
                     'existingUrl' => $linkExistingUrl,
                     'person'      => $person,
+                    'candidates'  => $linkCandidates,
                 ], ['saveData' => false]) ?>
             </div>
         </dialog>

@@ -179,8 +179,18 @@ donor's record has always had:
 
 - **Link with a new donor** — Add Pair, with the recipient already filled in
   and shown read-only.
-- **Link with an existing donor** — the donors on this programme who are free,
-  one form, the relationship and crossmatch date beside the choice.
+- **Link with an existing donor** — a select of the donors on this programme
+  who are free, each read as name, MRN, blood group and age, and a **Link**
+  button beside it.
+
+The second choice used to be a screen of its own: *Choose a donor*, a table of
+every unpaired donor with a Link button on each row and Pair Details above it.
+That screen is gone, and so is its mirror for recipients. Choosing somebody
+already registered needs a name, a blood group and an age, which fit on a line,
+so the whole choice is made in the dialog without leaving the record. Nothing
+else is asked there — no status, which is the pair's to say about its donors on
+its own screen, and no relationship or crossmatch date, which belong to the
+pair and are entered on it.
 
 Either way the pair exists as soon as it is answered, and the pair's own screen
 opens. The button is on the record only while the recipient has no pair; once
@@ -271,13 +281,14 @@ recipient. "Link with Recipient" opens the same kind of choice:
 
 - **Link with a new recipient** — Add Pair, with this record already filled in
   and shown read-only, and only the other person to enter.
-- **Link with an existing recipient** — the recipients on this programme who
-  are not already paired, one form: the relationship and crossmatch date are
-  entered once at the top and each row's Link button carries that person's MRN.
+- **Link with an existing recipient** — a select of the recipients on the
+  waitlist who are not already paired, and a **Link** button beside it.
 
 The choice is a `<dialog>` on the record, opened by `ui.js`. The button under it
 is a real link to `donors/{id}/link`, the same choice at its own URL, so with
-JavaScript off it is simply followed. A donor already in an open pair is sent to
+JavaScript off it is simply followed; the select is a plain form either way and
+posts to `donors/{id}/link/existing`, which is a post and nothing else — there
+is no screen behind it to open. A donor already in an open pair is sent to
 that pair rather than offered a second one, and a person who holds a row in both
 registers under one MRN is not offered as their own counterpart.
 

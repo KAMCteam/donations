@@ -170,16 +170,43 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringNotContainsString('Potential Donor', $html);
     }
 
-    /** And the two pages it leads to are reachable on their own. */
-    public function testTheRecipientsLinkPagesAreBack(): void
+    /**
+     * The existing one is chosen in the dialog, from a select, and nothing
+     * else is asked there.
+     *
+     * The status belongs to the pair's donors — a pair decides which of them
+     * it is going ahead with on its own screen — so the dialog that makes the
+     * pair does not offer it.
+     */
+    public function testTheLinkDialogChoosesFromASelectAndAsksNothingElse(): void
     {
         $this->post('recipients/new', ['mrn' => '9002', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
+        $this->post('donors/new', ['mrn' => '9023', 'name' => 'Free Donor', 'age' => '33', 'bloodType' => 'B']);
 
-        $this->assertStringContainsString('recipients/9002/link', $this->get('recipients/9002')->getBody());
+        $html   = $this->get('recipients/9002')->getBody();
+        $dialog = substr($html, (int) strpos($html, '<dialog id="link-choice"'));
 
-        // Both are real pages, reachable without the dialog.
-        $this->assertStringContainsString('Link with a new donor', $this->get('recipients/9002/link')->getBody());
-        $this->assertStringContainsString('Choose a donor', $this->get('recipients/9002/link/existing')->getBody());
+        $this->assertStringContainsString('name="mrn"', $dialog);
+        $this->assertStringContainsString('<option value="9023"', $dialog);
+        $this->assertStringContainsString(site_url('recipients/9002/link/existing'), $dialog);
+        $this->assertStringNotContainsString('name="status"', $dialog, 'the dialog does not set a status');
+    }
+
+    /** The same choice is a page of its own, for when scripting is off. */
+    public function testTheLinkChoiceIsStillAPageOfItsOwn(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9024', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
+        $this->post('donors/new', ['mrn' => '9025', 'name' => 'Free Donor', 'age' => '33', 'bloodType' => 'B']);
+
+        $this->assertStringContainsString('recipients/9024/link', $this->get('recipients/9024')->getBody());
+
+        $html = $this->get('recipients/9024/link')->getBody();
+
+        $this->assertStringContainsString('Link with a new donor', $html);
+        $this->assertStringContainsString('Link with an existing donor', $html);
+        $this->assertStringContainsString('<option value="9025"', $html);
+        // The screen of names it used to lead to is gone.
+        $this->assertStringNotContainsString('Choose a donor', $html);
     }
 
     /** A donor record offers the mirror image of it. */
@@ -192,6 +219,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('Link with a new recipient', $html);
         $this->assertStringContainsString('Link with an existing recipient', $html);
         $this->assertStringContainsString(site_url('pairs/new') . '?donor=9003', $html);
+        $this->assertStringNotContainsString('Choose a recipient', $html);
     }
 
     /** Somebody already paired has nothing to choose, so they see the pair. */
@@ -271,11 +299,11 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
         ]);
 
-        $html = $this->get('donors/9012/link/existing')->getBody();
+        $html = $this->get('donors/9012')->getBody();
 
         $this->assertStringContainsString('Free Recipient', $html);
         $this->assertStringNotContainsString('Paired Recipient', $html);
-        $this->assertStringContainsString('name="mrn" value="9013"', $html);
+        $this->assertStringContainsString('<option value="9013"', $html);
     }
 
     /**
@@ -287,9 +315,9 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->post('recipients/new', ['mrn' => '9016', 'name' => 'Both Test', 'age' => '38', 'bloodType' => 'B']);
         $this->post('donors/new', ['mrn' => '9016', 'name' => 'Both Test', 'age' => '38', 'bloodType' => 'B']);
 
-        $html = $this->get('donors/9016/link/existing')->getBody();
+        $html = $this->get('donors/9016')->getBody();
 
-        $this->assertStringNotContainsString('name="mrn" value="9016"', $html);
+        $this->assertStringNotContainsString('<option value="9016"', $html);
     }
 
     public function testChoosingFromThePickerCreatesThePair(): void
@@ -297,21 +325,15 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->post('recipients/new', ['mrn' => '9017', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
         $this->post('donors/new', ['mrn' => '9018', 'name' => 'Free Donor', 'age' => '33', 'bloodType' => 'B']);
 
-        $this->post('donors/9018/link/existing', [
-            'mrn'            => '9017',
-            'relationship'   => 'Brother',
-            'crossmatchDate' => '01/10/2026',
-        ]);
+        // Only the MRN: the relationship and the crossmatch date are the
+        // pair's, entered on the pair's own screen, which is where this lands.
+        $this->post('donors/9018/link/existing', ['mrn' => '9017']);
 
         $this->seeInDatabase('pairs', [
-            'recipient_mrn'   => 9017,
-            'donor_mrn'       => 9018,
-            'status'          => 'active',
-            'relationship'    => 'Brother',
-            'crossmatch_date' => '2026-10-01',
+            'recipient_mrn' => 9017,
+            'donor_mrn'     => 9018,
+            'status'        => 'active',
         ]);
-        // The donors list shows the relationship, so it lands there too.
-        $this->seeInDatabase('donors', ['mrn' => 9018, 'relationship' => 'Brother']);
         // Neither person is duplicated: the pair links what was already there.
         $this->assertSame(1, $this->db->table('recipients')->countAllResults());
         $this->assertSame(1, $this->db->table('donors')->countAllResults());

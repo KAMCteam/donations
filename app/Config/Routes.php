@@ -44,9 +44,10 @@ $routes->get('recipients/print', 'Ui::printRecipients');
 $routes->match(['get', 'post'], 'recipients/new', 'Ui::addRecipient');
 // Both link routes come before the record route: `(:segment)` stops at a
 // slash, so they cannot be confused, but reading them in this order makes
-// that obvious.
+// that obvious. The second is where the dialog's select posts — there is no
+// screen behind it to GET any more.
 $routes->get('recipients/(:segment)/link', 'Ui::linkRecipient/$1');
-$routes->match(['get', 'post'], 'recipients/(:segment)/link/existing', 'Ui::linkRecipientExisting/$1');
+$routes->post('recipients/(:segment)/link/existing', 'Ui::linkRecipientExisting/$1');
 $routes->post('recipients/(:segment)/labs', 'Ui::addLab/recipient/$1');
 $routes->match(['get', 'post'], 'recipients/(:segment)/labs/(:num)/delete', 'Ui::removeLab/recipient/$1/$2');
 $routes->get('recipients/(:segment)/print', 'Ui::printRecipient/$1');
@@ -61,7 +62,7 @@ $routes->match(['get', 'post'], 'donors/(:segment)/labs/(:num)/delete', 'Ui::rem
 $routes->get('donors/(:segment)/print', 'Ui::printDonor/$1');
 $routes->match(['get', 'post'], 'donors/(:segment)/delete', 'Ui::deleteDonor/$1');
 $routes->get('donors/(:segment)/link', 'Ui::linkDonor/$1');
-$routes->match(['get', 'post'], 'donors/(:segment)/link/existing', 'Ui::linkDonorExisting/$1');
+$routes->post('donors/(:segment)/link/existing', 'Ui::linkDonorExisting/$1');
 $routes->match(['get', 'post'], 'donors/(:segment)', 'Ui::donor/$1');
 
 $routes->get('pairs', 'Ui::pairs');

@@ -426,6 +426,9 @@ class Ui extends BaseController
             'linkUrl'         => $person === null ? '' : $links['backUrl'] . '/link',
             'linkNewUrl'      => $person === null ? '' : $links['newUrl'],
             'linkExistingUrl' => $person === null ? '' : $links['existingUrl'],
+            // The dialog chooses from a select, so the record screen carries
+            // the list rather than sending anybody to a screen of names.
+            'linkCandidates'  => $person === null ? [] : $this->linkCandidates($personType, (string) $person['id']),
             'v'          => [
                 // Entered, not generated: a real MRN comes from the hospital.
                 'mrn'              => $person['id'] ?? '',
@@ -1870,7 +1873,7 @@ class Ui extends BaseController
         return $this->linkChoice('recipient', $id);
     }
 
-    public function linkRecipientExisting(string $id): string|RedirectResponse
+    public function linkRecipientExisting(string $id): RedirectResponse
     {
         return $this->linkExisting('recipient', $id);
     }
@@ -1880,7 +1883,7 @@ class Ui extends BaseController
         return $this->linkChoice('donor', $id);
     }
 
-    public function linkDonorExisting(string $id): string|RedirectResponse
+    public function linkDonorExisting(string $id): RedirectResponse
     {
         return $this->linkExisting('donor', $id);
     }
@@ -1915,17 +1918,40 @@ class Ui extends BaseController
             'organ'      => $this->store->organ(),
             'personType' => $personType,
             'person'     => $person,
+            'candidates' => $this->linkCandidates($personType, (string) $person['id']),
         ] + $this->linkUrls($personType, $person['id']));
     }
 
     /**
-     * Pick the counterpart from those already registered and not yet paired.
+     * Who the other half of the pair can be chosen from.
      *
-     * The list is one form: each row's button carries that person's MRN, and
-     * the relationship and crossmatch date at the top are filled in once and
-     * ride along with whichever row is chosen.
+     * Everybody on the counterpart's list who is free to pair. One person can
+     * hold a row in both registers under the one hospital number; offering
+     * them as their own counterpart would only be refused, so they are not
+     * offered.
+     *
+     * @return list<array<string, mixed>>
      */
-    private function linkExisting(string $personType, string $id): string|RedirectResponse
+    private function linkCandidates(string $personType, string $id): array
+    {
+        $candidates = self::COUNTERPART[$personType] === 'donor'
+            ? $this->store->availableDonors()
+            : $this->store->waitingList();
+
+        return array_values(array_filter(
+            $candidates,
+            static fn (array $row): bool => (string) $row['id'] !== $id
+        ));
+    }
+
+    /**
+     * Make the pair from the counterpart chosen in the link dialog.
+     *
+     * Post only: the select is on the record screen and on the choice page,
+     * and there is no longer a screen of its own to show. Anything that
+     * cannot be paired goes back where it was asked with the reason.
+     */
+    private function linkExisting(string $personType, string $id): RedirectResponse
     {
         $person = $this->findPerson($personType, $id);
 
@@ -1933,34 +1959,7 @@ class Ui extends BaseController
             return redirect()->to(site_url($personType === 'recipient' ? 'recipients' : 'donors'));
         }
 
-        $counterpart = self::COUNTERPART[$personType];
-
-        if ($this->request->is('post')) {
-            return $this->linkToExisting($personType, $person);
-        }
-
-        $candidates = $counterpart === 'donor'
-            ? $this->store->availableDonors()
-            : $this->store->waitingList();
-
-        // One person can hold a row in both registers under the one hospital
-        // number. Offering them as their own counterpart would only be
-        // refused, so they are not offered.
-        $candidates = array_values(array_filter(
-            $candidates,
-            static fn (array $row): bool => (string) $row['id'] !== (string) $person['id']
-        ));
-
-        return view('ui/link_existing', [
-            'title'       => 'Link ' . $person['name'],
-            'navPage'     => '',
-            'organ'       => $this->store->organ(),
-            'personType'  => $personType,
-            'counterpart' => $counterpart,
-            'person'      => $person,
-            'candidates'  => $candidates,
-            'error'       => (string) ($this->session->getFlashdata('ui_error') ?? ''),
-        ] + $this->linkUrls($personType, $person['id']));
+        return $this->linkToExisting($personType, $person);
     }
 
     /**

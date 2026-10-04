@@ -51,7 +51,9 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
             <h2 class="card-title">Donor &mdash; Personal Information</h2>
         </div>
         <?= view('ui/partials/card_fold_facts', [
+            'person'    => 'Donor',
             'name'      => (string) $v['dName'],
+            'bloodType' => (string) $v['dBloodType'],
             'statusKey' => (string) $v['dStatus'],
         ], ['saveData' => false]) ?>
         <?php if (! $editable('personal') && ! $tab['archived']): ?>

@@ -1578,7 +1578,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
      * They start open, because the details are what a record is; shut, the
      * summary still says who it is about and where they stand.
      */
-    public function testThePersonalDetailsFoldAndKeepTheNameAndStatus(): void
+    public function testThePersonalDetailsFoldAndKeepTheNameBloodGroupAndStatus(): void
     {
         $this->post('recipients/new', [
             'mrn' => '8960', 'name' => 'Folded Recipient', 'age' => '40',
@@ -1599,14 +1599,27 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             $this->assertStringContainsString('class="card-head card-fold-head"', $html, $screen);
         }
 
-        // What a shut card still says: the name, and where they stand.
+        // What a shut card still says, and in the shape the card's own fields
+        // say it in: the label above, the value in the read-only box.
         $recipient = $this->get('recipients/8960')->getBody();
-        $this->assertStringContainsString('<span class="card-fold-name">Folded Recipient</span>', $recipient);
+        $this->assertStringContainsString('<span class="field-label">Recipient Name</span>', $recipient);
+        $this->assertStringContainsString('>Folded Recipient</span>', $recipient);
+        $this->assertStringContainsString('<span class="field-label">Blood Group</span>', $recipient);
+        $this->assertStringContainsString('<span class="field-label">Recipient Status</span>', $recipient);
         $this->assertStringContainsString('>On Hold</span>', $recipient);
 
         $donor = $this->get('donors/8961')->getBody();
-        $this->assertStringContainsString('<span class="card-fold-name">Folded Donor</span>', $donor);
+        $this->assertStringContainsString('<span class="field-label">Donor Name</span>', $donor);
+        $this->assertStringContainsString('>Folded Donor</span>', $donor);
+        $this->assertStringContainsString('<span class="field-label">Donor Status</span>', $donor);
         $this->assertStringContainsString('>Declined</span>', $donor);
+
+        // The three are shown, not asked: a second set of controls carrying
+        // the card's own field names would post every answer twice.
+        $facts = substr($recipient, (int) strpos($recipient, 'class="card-fold-facts"'));
+        $facts = substr($facts, 0, (int) strpos($facts, '</summary>'));
+        $this->assertStringNotContainsString('<input', $facts);
+        $this->assertStringNotContainsString('<select', $facts);
 
         // The pair says it for both of them, on each card.
         $pair = $this->get('pairs/' . $pairId)->getBody();

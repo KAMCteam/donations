@@ -113,7 +113,9 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                 <span class="card-fold-mark" aria-hidden="true"><?= ui_icon('chevron') ?></span>
                 <h2 class="card-title">Personal Information</h2>
                 <?= view('ui/partials/card_fold_facts', [
+                    'person'    => $isRecipient ? 'Recipient' : 'Donor',
                     'name'      => (string) $v['name'],
+                    'bloodType' => (string) $v['bloodType'],
                     'statusKey' => (string) ($isRecipient ? $v['status'] : $v['donorStatus']),
                 ], ['saveData' => false]) ?>
                 <?php if (! $editable('personal')): ?>

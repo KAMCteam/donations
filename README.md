@@ -525,9 +525,14 @@ is under them is a notes box, not the point of the screen.
 
 **The personal details**, on the record screens and on the pair, each donor tab
 included. These start **open**: the details are what a record is, and a record
-that opens shut would be asking to be opened before it could be read. Shut,
-the summary keeps the two things anybody scans the card for — the name and the
-status — and drops them again when it opens, where the card says both in its
+that opens shut would be asking to be opened before it could be read. Shut, the
+summary keeps the three things anybody scans the card for — the name, the blood
+group and the status — and keeps them *as fields*: the label above and the
+value in the same read-only box the card's own fields wear while they are not
+being edited, so a shut card reads like the open one rather than like a caption
+of it. They are the values and not controls, because the card's real fields are
+a few lines below and a second set carrying the same names would post every
+answer twice. They go again when it opens, where the card says all three in its
 own fields.
 
 ### Status: three facts, not one

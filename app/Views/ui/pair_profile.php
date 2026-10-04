@@ -157,7 +157,9 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                     <h2 class="card-title">Recipient — Personal Information</h2>
                 </div>
                 <?= view('ui/partials/card_fold_facts', [
+                    'person'    => 'Recipient',
                     'name'      => (string) $v['rName'],
+                    'bloodType' => (string) $v['rBloodType'],
                     'statusKey' => (string) $v['rStatus'],
                 ], ['saveData' => false]) ?>
                 <?php if (! $editable('recipient')): ?>

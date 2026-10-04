@@ -3,36 +3,38 @@
 use App\Libraries\UiStore;
 
 /**
- * One potential donor, as the cards the rest of the platform uses.
+ * One of a pair's donors, as the cards the rest of the platform uses.
  *
- * The recipient's record reads top to bottom — who they are, their workup,
- * then the donors being considered — and a donor inside it has to read the
+ * The pair reads top to bottom — the pair's own details, the recipient, their
+ * workup, their notes, then the donors — and a donor inside it has to read the
  * same way, or the screen changes shape halfway down. So this is the pair
  * profile's donor half, card for card: personal details, workup, notes, each
  * opened for editing on its own and each saving on its own.
  *
- * Every card is its own form, because the recipient's own form is already on
- * the page and forms do not nest. The `section` each posts names the candidate
- * as well as the card, so the controller knows which of several donors it is
- * being asked about.
+ * Every card is its own form, because the pair's own form is already on the
+ * page and forms do not nest. The `section` each posts names the link as well
+ * as the card, so the controller knows which of several donors it is being
+ * asked about.
  *
- * A candidate who was set aside is shown and not edited: no Edit links, and
- * the fieldsets stay closed.
+ * An archived donor is shown and not edited: no Edit links, and the fieldsets
+ * stay closed. The word they were given still shows, because archiving is the
+ * pair's doing and says nothing about them.
  *
  * @var array<string, mixed>       $donor      The donor record
- * @var array<string, mixed>       $tab        Their candidacy
+ * @var array<string, mixed>       $tab        Their link to this pair
  * @var array<string, mixed>       $v          The donor's fields, d-prefixed
  * @var list<array<string, mixed>> $labTests
  * @var string                     $editing    Which card is open, '' for none
  * @var string                     $viewUrl    This tab, read-only
  * @var string                     $labUrl     Where Add lab posts and Remove goes
+ * @var bool                       $hasActive  Whether the pair has its donor already
  * @var list<array{id: string, name: string}> $mrps
  * @var callable                   $ageNote
  */
-// Each card is named for its candidate as well as for itself, so a screen
-// holding three donors knows which one a save is about.
+// Each card is named for its link as well as for itself, so a screen holding
+// three donors knows which one a save is about.
 $card     = static fn (string $name): string => 'pd' . $tab['id'] . '-' . $name;
-$editable = fn (string $name): bool => ! $tab['delinked'] && $editing === $card($name);
+$editable = fn (string $name): bool => ! $tab['archived'] && $editing === $card($name);
 $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
 ?>
 <div class="card card--pad">
@@ -43,7 +45,7 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
                 <div class="role-badge role-badge--donor">D</div>
                 <h2 class="card-title">Donor &mdash; Personal Information</h2>
             </div>
-            <?php if (! $editable('personal') && ! $tab['delinked']): ?>
+            <?php if (! $editable('personal') && ! $tab['archived']): ?>
                 <a class="btn-edit" href="<?= esc($editUrl('personal')) ?>"><?= ui_icon('edit') ?>Edit</a>
             <?php endif; ?>
         </div>
@@ -132,11 +134,14 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
                         <?= view('ui/partials/date_field', ['id' => 'f-d-entry', 'name' => 'dEntryDate', 'value' => $v['dEntryDate'], 'past' => true], ['saveData' => false]) ?>
                     </div>
                     <div>
-                        <?php // The donor's own, and nobody else's: the tab
-                              // above carries how this candidacy is going. ?>
+                        <?php // The donor's own, and the same fact the tab
+                              // above sets: a pair goes ahead with one donor,
+                              // so Active is left off while somebody else
+                              // holds it, here as there. ?>
                         <label class="field-label" for="f-d-status">Donor Status</label>
                         <select id="f-d-status" name="dStatus" class="input">
                             <?php foreach (UiStore::DONOR_STATUS_OPTIONS as $value => $label): ?>
+                                <?php if ($value === 'Active' && $hasActive && ! $tab['isActive']) { continue; } ?>
                                 <option value="<?= esc($value) ?>"<?= $v['dStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
                             <?php endforeach; ?>
                         </select>
@@ -164,7 +169,7 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
         'field'        => 'dLabs',
         'animated'     => true,
         'editing'      => $editable('labs'),
-        'editUrl'      => $tab['delinked'] ? null : $editUrl('labs'),
+        'editUrl'      => $tab['archived'] ? null : $editUrl('labs'),
         'viewUrl'      => $viewUrl,
         'section'      => $card('labs'),
         'labsTitle'    => 'Donor &mdash; Required Lab Tests',
@@ -178,7 +183,7 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
         <?= csrf_field() ?>
         <div class="card-head">
             <h2 class="card-title">Donor &mdash; Clinical Notes</h2>
-            <?php if (! $editable('notes') && ! $tab['delinked']): ?>
+            <?php if (! $editable('notes') && ! $tab['archived']): ?>
                 <a class="btn-edit" href="<?= esc($editUrl('notes')) ?>"><?= ui_icon('edit') ?>Edit</a>
             <?php endif; ?>
         </div>

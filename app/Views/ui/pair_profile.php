@@ -15,12 +15,20 @@ use App\Models\PairModel;
  * them, and a control that shows a stored value but throws an edit away is a
  * way to lose a record, not fidelity to the design.
  *
+ * The donors are tabs rather than one card: a pair is worked up against more
+ * than one, and all of them belong to the same pair — the one it is going
+ * ahead with, the ones it is holding, and the ones it has finished with.
+ * {@see ui/partials/donor_tabs} is that half of the screen.
+ *
  * @var array<string, mixed>                  $pair
  * @var array<string, mixed>|null             $recipient
- * @var array<string, mixed>|null             $donor
+ * @var array<string, mixed>|null             $donor      The open tab's donor
  * @var array<string, mixed>                  $v
  * @var list<array<string, mixed>>            $rLabTests
- * @var list<array<string, mixed>>            $dLabTests
+ * @var list<array<string, mixed>>            $dLabTests  The open tab's workup
+ * @var list<array<string, mixed>>            $tabs       Every donor of this pair
+ * @var int                                   $openTab    1-based, or 0 for none
+ * @var list<array<string, mixed>>            $offerable  Donors the Add dialog can offer
  * @var list<array{id: string, name: string}> $mrps
  * @var string                                $entryDate
  * @var string                                $editing    The card open for editing, '' for none
@@ -299,142 +307,23 @@ $ageNote = static function (string $birthDate, string $storedAge): string {
             <?php endif; ?>
         </div>
 
-        <div class="card card--pad">
-            <div class="card-head">
-                <div class="section-head">
-                    <div class="role-badge role-badge--donor">D</div>
-                    <h2 class="card-title">Donor — Personal Information</h2>
-                </div>
-                <?php if (! $editable('donor')): ?>
-                    <a class="btn-edit" href="<?= esc($editUrl('donor')) ?>"><?= ui_icon('edit') ?>Edit</a>
-                <?php endif; ?>
-            </div>
-            <fieldset class="card-fields"<?= $editable('donor') ? '' : ' disabled' ?>>
-                <?php if ($editable('donor')): ?>
-                    <input type="hidden" name="section" value="donor">
-                <?php endif; ?>
-            <div class="stack-4">
-                <div class="form-grid-5">
-                    <div>
-                        <label class="field-label">Donor MRN</label>
-                        <input type="text" class="input-ro input-ro--mono" value="<?= esc($donor['id'] ?? '—') ?>" readonly>
-                    </div>
-                    <div>
-                        <label class="field-label" for="f-d-name">Donor Name</label>
-                        <input type="text" id="f-d-name" name="dName" class="input" value="<?= esc($v['dName']) ?>" placeholder="Full name">
-                    </div>
-                    <div>
-                        <label class="field-label" for="f-d-city">Donor City</label>
-                        <input type="text" id="f-d-city" name="dCity" class="input" value="<?= esc($v['dCity']) ?>" placeholder="City">
-                    </div>
-                    <div>
-                        <label class="field-label" for="f-d-phone">Donor Phone Number</label>
-                        <input type="tel" id="f-d-phone" name="dPhone" class="input" value="<?= esc($v['dPhone']) ?>" placeholder="+966 5x xxx xxxx">
-                    </div>
-                    <div>
-                        <label class="field-label" for="f-d-gender">Donor Gender</label>
-                        <select id="f-d-gender" name="dGender" class="input">
-                            <?php foreach (UiStore::GENDER_OPTIONS as $value => $label): ?>
-                                <option value="<?= esc($value) ?>"<?= $v['dGender'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-grid-5">
-                    <div>
-                        <label class="field-label" for="f-d-birth">
-                            Date of Birth
-                            <span class="field-note" data-age-note="f-d-birth"><?= esc($ageNote($v['dBirthDate'], $v['dAge'])) ?></span>
-                        </label>
-                        <input type="hidden" name="dAge" value="<?= esc($v['dAge']) ?>">
-                        <?= view('ui/partials/date_field', ['id' => 'f-d-birth', 'name' => 'dBirthDate', 'value' => $v['dBirthDate'], 'past' => true], ['saveData' => false]) ?>
-                    </div>
-                    <div>
-                        <label class="field-label" for="f-d-blood">Donor Blood Group</label>
-                        <select id="f-d-blood" name="dBloodType" class="input input--mono">
-                            <?php foreach (UiStore::BLOOD_TYPES as $bloodType): ?>
-                                <option value="<?= esc($bloodType) ?>"<?= $v['dBloodType'] === $bloodType ? ' selected' : '' ?>><?= esc($bloodType) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="field-label" for="f-d-mrp">Donor MRP</label>
-                        <select id="f-d-mrp" name="dMrp" class="input">
-                            <option value=""<?= $v['dMrp'] === '' ? ' selected' : '' ?>>Choose MRP</option>
-                            <?php foreach ($mrps as $mrp): ?>
-                                <option value="<?= esc($mrp['id']) ?>"<?= $v['dMrp'] === $mrp['id'] ? ' selected' : '' ?>><?= esc($mrp['name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="field-label" for="f-d-coordinator">Donor Coordinator</label>
-                        <input type="text" id="f-d-coordinator" name="dCoordinator" class="input" value="<?= esc($v['dCoordinator']) ?>" placeholder="Choose Coordinator">
-                    </div>
-                    <div>
-                        <?php // The recipient is on this screen, so the finer question can
-                              // be asked here: whether a living donor is related to them. ?>
-                        <label class="field-label" for="f-d-type">Donor Type</label>
-                        <select id="f-d-type" name="dType" class="input">
-                            <?php foreach (UiStore::DONATION_TYPES_ON_PAIR as $value): ?>
-                                <option value="<?= esc($value) ?>"<?= $v['dType'] === $value ? ' selected' : '' ?>><?= esc(UiStore::DONATION_TYPES[$value]) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="field-label" for="f-d-status">Donor Status</label>
-                        <select id="f-d-status" name="dStatus" class="input">
-                            <?php foreach (UiStore::DONOR_STATUS_OPTIONS as $value => $label): ?>
-                                <option value="<?= esc($value) ?>"<?= $v['dStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
-            </div>
-            </fieldset>
-
-            <?php if ($editable('donor')): ?>
-                <div class="card-actions">
-                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
-                    <button type="submit" class="btn-save">Save</button>
-                </div>
-            <?php endif; ?>
-        </div>
-
-        <?= view('ui/partials/lab_tests', [
-            'tests'   => $dLabTests,
-            'field'   => 'dLabs',
-            'editing' => $editable('dlabs'),
-            'editUrl' => $editUrl('dlabs'),
-            'viewUrl' => $viewUrl,
-            'section' => 'dlabs',
-            // The donor's own tests, added and removed from this screen but
-            // belonging to their record wherever it is opened.
-            'addLabUrl'    => site_url('pairs/' . rawurlencode($pair['id']) . '/labs/donor'),
-            'removeLabUrl' => site_url('pairs/' . rawurlencode($pair['id']) . '/labs/donor'),
-        ]) ?>
-
-        <div class="card card--pad">
-            <div class="card-head">
-                <h2 class="card-title">Donor — Clinical Notes</h2>
-                <?php if (! $editable('dnotes')): ?>
-                    <a class="btn-edit" href="<?= esc($editUrl('dnotes')) ?>"><?= ui_icon('edit') ?>Edit</a>
-                <?php endif; ?>
-            </div>
-            <fieldset class="card-fields"<?= $editable('dnotes') ? '' : ' disabled' ?>>
-                <?php if ($editable('dnotes')): ?>
-                    <input type="hidden" name="section" value="dnotes">
-                <?php endif; ?>
-                <textarea class="textarea" name="dNotes" rows="4" placeholder="Add clinical notes, observations, or relevant context..."><?= esc($v['dNotes']) ?></textarea>
-            </fieldset>
-
-            <?php if ($editable('dnotes')): ?>
-                <div class="card-actions">
-                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
-                    <button type="submit" class="btn-save">Save</button>
-                </div>
-            <?php endif; ?>
-        </div>
     </form>
+
+    <?php // The pair's donors, each a tab: the one it is going ahead with, the
+          // ones it is holding, and the ones it has finished with. Below the
+          // recipient, because reading a donor means having read who they are
+          // being worked up for. ?>
+    <?= view('ui/partials/donor_tabs', [
+        'pair'      => $pair,
+        'tabs'      => $tabs,
+        'openTab'   => $openTab,
+        'donor'     => $donor,
+        'v'         => $v,
+        'labTests'  => $dLabTests,
+        'editing'   => $editing,
+        'offerable' => $offerable,
+        'mrps'      => $mrps,
+        'ageNote'   => $ageNote,
+    ], ['saveData' => false]) ?>
 </div>
 <?= $this->endSection() ?>

@@ -141,14 +141,15 @@
         var dot = tone.parentNode.querySelector(".tone-dot");
 
         // The swatch wears the tone's own class, so it is repainted by
-        // swapping that class rather than by knowing any colour.
-        swatch.className = "tone-swatch " + tone.value;
-        swatch.title = dot ? "Colour: " + tone.parentNode.textContent.trim() : "";
+        // swapping that class rather than by knowing any colour. No colour
+        // chosen leaves it empty, which is where every answer starts.
+        swatch.className = "tone-swatch " + (tone.value || "tone-swatch--none");
+        swatch.title = tone.value ? "Colour: " + tone.parentNode.textContent.trim() : "No colour";
         picker.removeAttribute("open");
 
         // An answer of ours shows its colour on the chip beside the tick.
         var label = picker.parentNode.querySelector(".lab-answer-label");
-        if (label) label.className = "lab-answer-label badge " + tone.value;
+        if (label) label.className = "lab-answer-label badge " + (tone.value || "tone-none");
 
         return;
       }
@@ -184,13 +185,21 @@
       // A card that started with no answer — a vaccination — keeps its pill
       // hidden until one is pressed.
       pill.hidden = false;
-      pill.className = "lab-pill " + chosen.getAttribute("data-lab-tone");
+      pill.className = "lab-pill " + (chosen.getAttribute("data-lab-tone") || "tone-none");
       pill.textContent = chosen.getAttribute("data-lab-label");
     }
 
     card.querySelectorAll("[data-lab-status]").forEach(function (btn) {
       var active = btn === chosen;
-      btn.className = "lab-status-btn" + (active ? " is-active " + btn.getAttribute("data-lab-tone") : "");
+      var tone = btn.getAttribute("data-lab-tone");
+      // Whether this answer keeps its colour when it is not the one recorded.
+      // The server decided that — a colour somebody chose for a test of their
+      // own — and this only has to not lose it.
+      var tinted = btn.classList.contains("lab-status-btn--tinted");
+
+      btn.className = "lab-status-btn" +
+        (tinted ? " lab-status-btn--tinted " + tone : "") +
+        (active ? " is-active" + (tone ? " " + tone : "") : "");
     });
   }
 

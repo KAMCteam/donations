@@ -14,7 +14,8 @@ use App\Libraries\UiStore;
  * a button and leaves it there, and the rest disappear when the card is saved.
  * Beside each is a swatch that opens the colours the check list's own answers
  * use — a colour on a medical record means something, so the palette names
- * what each is for rather than offering a wheel.
+ * what each is for rather than offering a wheel, and an answer carries none
+ * until one is picked.
  *
  * Checkboxes and a `<details>` of radios: choosing an answer, choosing its
  * colour and adding one of your own all work with scripting off.
@@ -38,15 +39,28 @@ foreach ($answers as $answer) {
     }
 }
 
-/** The swatch and the palette behind it, for one answer. */
+/**
+ * The swatch and the palette behind it, for one answer.
+ *
+ * An answer starts with no colour at all, and the swatch is empty until one is
+ * picked: a colour on a medical record means something, so it is said on
+ * purpose or not said. "No colour" is the first thing in the palette, so a
+ * colour can be taken back off again.
+ */
 $palette = static function (string $name, string $id, string $current) {
-    $current = isset(UiStore::LAB_TONES[$current]) ? $current : UiStore::LAB_TONE_DEFAULT;
+    $current = isset(UiStore::LAB_TONES[$current]) ? $current : '';
     ?>
     <details class="tone-picker">
-        <summary class="tone-swatch <?= esc($current) ?>" title="Colour: <?= esc(UiStore::LAB_TONES[$current]) ?>">
+        <summary class="tone-swatch <?= $current === '' ? 'tone-swatch--none' : esc($current) ?>"
+                 title="<?= $current === '' ? 'No colour' : 'Colour: ' . esc(UiStore::LAB_TONES[$current]) ?>">
             <span class="sr-only">Colour for this answer</span>
         </summary>
         <div class="tone-menu">
+            <label class="tone-option">
+                <input type="radio" name="<?= $name ?>" value=""<?= $current === '' ? ' checked' : '' ?>>
+                <span class="tone-dot tone-dot--none"></span>
+                <span class="tone-name">No colour</span>
+            </label>
             <?php foreach (UiStore::LAB_TONES as $tone => $means): ?>
                 <label class="tone-option">
                     <input type="radio" name="<?= $name ?>" value="<?= esc($tone) ?>"<?= $current === $tone ? ' checked' : '' ?>>
@@ -68,7 +82,7 @@ $palette = static function (string $name, string $id, string $current) {
             <?php
             $key    = (string) $option['key'];
             $on     = isset($byKey[$key]);
-            $tone   = $byKey[$key]['tone'] ?? UiStore::RESULT_TONE[$key] ?? UiStore::LAB_TONE_DEFAULT;
+            $tone   = (string) ($byKey[$key]['tone'] ?? '');
             $field  = $base . '[answers][' . $key . ']';
             $rowId  = $idBase . '-ans-' . $key;
             ?>
@@ -84,7 +98,7 @@ $palette = static function (string $name, string $id, string $current) {
                                value="<?= esc($option['label']) ?>" maxlength="<?= UiStore::CUSTOM_ANSWER_MAX ?>"
                                aria-label="Name of this answer" autocomplete="off">
                     <?php else: ?>
-                        <span class="lab-answer-label badge <?= esc($tone) ?>"><?= esc($option['label']) ?></span>
+                        <span class="lab-answer-label badge <?= $tone === '' ? 'tone-none' : esc($tone) ?>"><?= esc($option['label']) ?></span>
                         <input type="hidden" name="<?= $field ?>[label]" value="<?= esc($option['label']) ?>">
                     <?php endif; ?>
                 </label>
@@ -100,6 +114,6 @@ $palette = static function (string $name, string $id, string $current) {
         <label class="sr-only" for="<?= esc($idBase) ?>-new">Add an answer of your own</label>
         <input type="text" id="<?= esc($idBase) ?>-new" class="lab-answer-name" name="<?= $base ?>[newAnswer]"
                value="" placeholder="+ Add an answer of your own" maxlength="<?= UiStore::CUSTOM_ANSWER_MAX ?>" autocomplete="off">
-        <?php $palette($base . '[newAnswerTone]', $idBase . '-new-tone', UiStore::LAB_TONE_DEFAULT); ?>
+        <?php $palette($base . '[newAnswerTone]', $idBase . '-new-tone', ''); ?>
     </div>
 </div>

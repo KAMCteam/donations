@@ -37,21 +37,11 @@ $routes->get('recipients', 'Ui::recipients');
 // Before the record route, which would otherwise read `print` as an MRN.
 $routes->get('recipients/print', 'Ui::printRecipients');
 $routes->match(['get', 'post'], 'recipients/new', 'Ui::addRecipient');
-// These come before the record route: `(:segment)` stops at a slash, so they
-// cannot be confused, but reading them in this order makes that obvious.
-//
-// A recipient's potential donors are all worked from the recipient's own
-// screen — added, set aside, and finally paired — so each of these posts and
-// comes straight back to it. There is no page of their own: the tabs are on
-// the record.
-$routes->post('recipients/(:segment)/donors', 'Ui::considerDonor/$1');
-$routes->match(['get', 'post'], 'recipients/(:segment)/donors/(:num)/delink', 'Ui::delinkDonor/$1/$2');
-$routes->post('recipients/(:segment)/donors/(:num)/status', 'Ui::candidateStatus/$1/$2');
-$routes->post('recipients/(:segment)/donors/(:num)/pair', 'Ui::pairUp/$1/$2');
-// A candidate's workup is edited where it is read, so adding and removing a
-// test they added for themselves comes back to the recipient's screen too.
-$routes->post('recipients/(:segment)/donors/(:num)/labs', 'Ui::addCandidateLab/$1/$2');
-$routes->match(['get', 'post'], 'recipients/(:segment)/donors/(:num)/labs/(:num)/delete', 'Ui::removeCandidateLab/$1/$2/$3');
+// Both link routes come before the record route: `(:segment)` stops at a
+// slash, so they cannot be confused, but reading them in this order makes
+// that obvious.
+$routes->get('recipients/(:segment)/link', 'Ui::linkRecipient/$1');
+$routes->match(['get', 'post'], 'recipients/(:segment)/link/existing', 'Ui::linkRecipientExisting/$1');
 $routes->post('recipients/(:segment)/labs', 'Ui::addLab/recipient/$1');
 $routes->match(['get', 'post'], 'recipients/(:segment)/labs/(:num)/delete', 'Ui::removeLab/recipient/$1/$2');
 $routes->get('recipients/(:segment)/print', 'Ui::printRecipient/$1');
@@ -72,6 +62,18 @@ $routes->match(['get', 'post'], 'donors/(:segment)', 'Ui::donor/$1');
 $routes->get('pairs', 'Ui::pairs');
 $routes->get('pairs/print', 'Ui::printPairs');
 $routes->match(['get', 'post'], 'pairs/new', 'Ui::addPair');
+// A pair's donors are all worked from the pair's own screen — added, moved
+// between the three words, swapped and archived — so each of these posts and
+// comes straight back to it, at the tab it was pressed on. There is no page
+// of their own: the tabs are on the pair.
+$routes->post('pairs/(:segment)/donors', 'Ui::addPairDonor/$1');
+$routes->post('pairs/(:segment)/donors/(:num)/status', 'Ui::pairDonorStatus/$1/$2');
+$routes->match(['get', 'post'], 'pairs/(:segment)/donors/(:num)/delink', 'Ui::delinkPairDonor/$1/$2');
+$routes->post('pairs/(:segment)/donors/(:num)/swap', 'Ui::swapPairDonor/$1/$2');
+// A donor's workup is edited where it is read, so adding and removing a test
+// they added for themselves comes back to the pair's screen too.
+$routes->post('pairs/(:segment)/donors/(:num)/labs', 'Ui::addPairDonorLab/$1/$2');
+$routes->match(['get', 'post'], 'pairs/(:segment)/donors/(:num)/labs/(:num)/delete', 'Ui::removePairDonorLab/$1/$2/$3');
 $routes->post('pairs/(:segment)/labs/(:segment)', 'Ui::addPairLab/$1/$2');
 $routes->match(['get', 'post'], 'pairs/(:segment)/labs/(:segment)/(:num)/delete', 'Ui::removePairLab/$1/$2/$3');
 $routes->get('pairs/(:segment)/print', 'Ui::printPair/$1');

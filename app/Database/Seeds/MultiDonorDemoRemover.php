@@ -23,7 +23,7 @@ class MultiDonorDemoRemover extends Seeder
         $from = MultiDonorDemoSeeder::MRN_FROM;
         $to   = MultiDonorDemoSeeder::MRN_TO;
 
-        foreach (['pairs', 'potential_donors'] as $table) {
+        foreach (['pairs'] as $table) {
             $this->db->table($table)
                 ->groupStart()->where('recipient_mrn >=', $from)->where('recipient_mrn <=', $to)->groupEnd()
                 ->orGroupStart()->where('donor_mrn >=', $from)->where('donor_mrn <=', $to)->groupEnd()

@@ -11,12 +11,13 @@
  * the other way round. The button that does the deleting is a POST either way,
  * because a GET that deletes fires on a prefetch.
  *
- * Not every answer here is a deletion: setting a potential donor aside asks
- * the same question and is just as hard to take back, so `$verb` lets the page
- * say what it is actually about to do.
+ * Not every answer here is a deletion: some of what the screens ask is just as
+ * hard to take back, so `$verb` lets the page say what it is actually about to
+ * do. Taking a donor off a pair has a page of its own, `ui/delink_donor`,
+ * because the active one is asked two questions and not one.
  *
  * @var string $name     What is being acted on, as the screens name it
- * @var string $kind     recipient | donor | pair | potential donor
+ * @var string $kind     recipient | donor | pair
  * @var string $detail   Exactly what goes, and what stays
  * @var string $action   Where the POST goes
  * @var string $backUrl  The list it came from

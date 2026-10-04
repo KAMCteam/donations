@@ -160,94 +160,109 @@ blanking one is a slip rather than an instruction.
 The add screens are unchanged: a new record has nothing to read yet, so it
 stays one open form with a single Save.
 
-### Potential donors, and the pair at the end of them
+### A pair and its donors
 
-A recipient is worked up against several donors at once — they are collected,
-tested, and set aside one by one — and only at the end is one of them the pair.
-Linking used to be one step, so every candidate *was* a pair, which is not what
-a pair means. There is a middle state now, and all of it lives on the
-recipient's own record. No separate page: the tabs are the record.
+A pair is a recipient and the donors being worked up for them. One of those is
+the donor the pair is going ahead with and there is never more than one; the
+rest are being held — **On Hold** while they are still a possibility, **Declined**
+once they are not — and both are still the pair's donors, so either can be
+taken back up.
 
-**Add Potential Donor** opens a `<dialog>` with the two ways in:
+There is no such thing as a potential donor. A recipient with no pair has
+**Link with Donor**, which makes the pair in one step, and every donor after
+the first is added on the pair's own screen. Nothing in between.
 
-- **A new donor** — Add Donor, opened with `?for=<recipient MRN>`. The record
-  is stored with `is_listed = 0`, so they are not on the Donors List, and Save
-  comes back to the recipient with their tab open.
-- **A donor already registered** — a select of the donors on this programme who
-  are free, posted straight back to the recipient. Nobody is re-entered and
-  nothing about them changes.
+#### The recipient's record: one button, and only until there is a pair
 
-Neither makes a pair. The button has no limit: a recipient can collect as many
-candidates as the case calls for. With JavaScript off the button is a plain
-link to Add Donor, which is the commoner of the two.
+**Link with Donor** opens a `<dialog>` with the two ways in, the same two the
+donor's record has always had:
 
-The section sits at the foot of the record, after the recipient's own
-Personal Information, Required Lab Tests and Clinical Notes. The record reads
-top to bottom and the donors are about it rather than part of it, so reading
-one means having read the other first.
+- **Link with a new donor** — Add Pair, with the recipient already filled in
+  and shown read-only.
+- **Link with an existing donor** — the donors on this programme who are free,
+  one form, the relationship and crossmatch date beside the choice.
 
-Each candidate is a tab — **donor-1**, **donor-2**, in the order they were
-added — with its status beside the name as a plain word, in no colour: *active*,
-*on hold*, *declined* are three ordinary answers, and a colour here would be
-read as a warning.
+Either way the pair exists as soon as it is answered, and the pair's own screen
+opens. The button is on the record only while the recipient has no pair; once
+they have one it reads **Linked: <name>** and goes to it, because that is where
+their donors are.
 
-Opening a tab shows that donor as the same three cards the pair profile uses —
+#### The pair's screen: the donors, as tabs
+
+Under the recipient's three cards, each donor the pair has ever had is a tab —
+**Donor-1**, **Donor-2**, in the order they were taken on — with the donor's own
+status beside the name as a plain word, in no colour: *Active*, *On Hold*,
+*Declined* are three ordinary answers, and a colour here would be read as a
+warning. A tab the pair has finished with says **· Archived** as well.
+
+Opening a tab shows that donor as the same three cards the record screens use —
 **Donor — Personal Information**, **Donor — Required Lab Tests**, **Donor —
 Clinical Notes** — each opened for editing on its own and each saving on its
-own, exactly as every other record screen behaves. The section a card posts
-names the candidate as well as the card (`pd12-personal`), because a recipient
-may have several donors on the screen and the server has to know which one a
-save is about. They write the donor's own record, so a change here is a change
-there. A candidate who was set aside is shown and not edited: no Edit links,
-and a post naming one of their cards does nothing.
+own. The section a card posts names the link as well as the card
+(`pd12-personal`), because a pair may have several donors on the screen and the
+server has to know which one a save is about. They write the donor's own
+record, so a change here is a change there.
 
-Two buttons end a candidacy, and they are opposites:
+**Add donor** puts another one on the pair, as a new donor (Add Donor opened
+with `?pair=<recipient MRN>`) or one already on the register. Both ask the word
+the pair starts them on, and both refuse **Active** while the pair already has
+its own — the control does not offer it, and the store refuses it if it is
+posted anyway.
 
-- **Delink** sets this one aside. The status becomes declined, the tab goes
-  grey and read-only, and nothing is deleted — a donor who was looked at and
-  declined is part of what happened.
-- **Pair up** chooses this one. The pair is made from this recipient and this
-  donor, every other candidate is set aside with it, the donor joins the
-  register, and the pair's own screen opens. No step in between.
+#### One active donor, and the two ways to change which
 
-One recipient, one donor, one pair — which is why Pair up closes everything
-else rather than leaving the list half-decided.
+**One donor to a pair may be Active.** A pair that said it was going ahead with
+two people would be saying nothing, so everything that could make a second one
+asks first: the tab's status control, the donor's card behind it, and both
+doors of Add donor.
 
-#### A pair does not end the list
+There are two ways to change which donor that is, and they are not the same:
 
-The candidates stay on the record afterwards, and so does Pair up, because the
-one thing a list of candidates is for is changing your mind. On a tab that is
-not the pair the button reads **Switch to this donor**: the current pair closes,
-a new one opens with that donor, and the two candidates swap places.
+- **Move the words about.** Stand the current one down to On Hold or Declined,
+  then set another to Active. Nobody is archived; both are still the pair's
+  donors and either can be taken back up.
+- **Swap**, which is only ever offered on the active donor — swapping a reserve
+  would be swapping nothing. The one swapped out is **archived**: finished with,
+  kept read-only, with the word they were given still on their tab. The one
+  swapped to is the pair's donor from that moment.
 
-That needs the two ways of being set aside told apart, so `aside_reason` says
-which:
+#### Archived is a mode, not a status
 
-| | What it means | On the tab |
-| --- | --- | --- |
-| `delinked` | A decision about *this* donor: considered, not going ahead | Frozen. No way back. |
-| `superseded` | A decision about *somebody else*: another was paired | Read-only, but Pair up switches back to them |
+An archived tab is a link that is closed. The donor keeps whatever word they
+were given — archiving is the pair's doing and says nothing about them — and
+because the link is closed they are free again: their own record is editable,
+they are back on the Donors List, and they can be linked to somebody else.
 
-Both read **Declined**, because both are. The column only says which door they
-came through — and it is why switching back to a donor who was passed over
-works, while a donor who was delinked by hand stays delinked.
+Exactly two things archive a donor:
 
-#### The pairing history
+| | What happens |
+| --- | --- |
+| **Delink** | Available on every live tab. On a reserve it archives that donor and nothing else. On the active one it asks the further question: carry on with another donor, or take the pair apart. |
+| **A swap** | The donor swapped out is archived, and the one swapped to is the pair's. |
 
-Under the tabs, closed until it is pressed: every pair this recipient has ever
-had, newest first, with who it was with, when it began, when it ended and what
-ended it — a switch records *Switched to <name>.* on the pair it closed.
+Taking the pair apart closes every link at once: the recipient goes back to the
+waiting list, every donor back to the register, and the pair's screen stays
+with every tab on it archived — which is where anybody asking what happened
+goes. Nothing is deleted.
 
-It is built from the `pairs` table rather than from a log, because the pairs
-*are* the log: one row per link ever made, and closing one is how a link ends.
-Switching is two rows — the one that closed and the one that opened — which is
-exactly what somebody opening the archive is asking about.
+An archived tab carries its own dates and the reason it ended, so the tabs are
+the history: *Linked 30/09/2026, archived 04/10/2026. Swapped for Nouf
+Al-Shamrani.* There is no separate archive, because `pairs` **is** the log —
+one row per link ever made, and closing one is how a link ends.
 
-`potential_donors` holds the middle state: one row per pairing considered, with
-its own status. The row stays after a pair is made, so the tabs still say who
-else was looked at. A pair made by any other door — Add Pair, or a donor's own
-screen — writes its candidate row too, so the recipient's tabs are the same
-whichever way the pair came about.
+#### Where it is stored
+
+`pairs` holds it all: one row per donor ever linked to a recipient, with the
+link's own status. Archived is `status = 'closed'`, which is the same row state
+that frees both sides — so being archived and being released are one fact, not
+two that could disagree. The donor's Active / On Hold / Declined is
+`donors.status`, their own, read wherever they are.
+
+`potential_donors` is gone, and so is the middle state it held: its rows became
+pairs, a declined candidate becoming an archived one. `donors.is_listed` stays
+as a column but nothing writes 0 to it — it existed so a donor entered as
+somebody's candidate stayed off the register until a pair was made, and a donor
+is only ever entered into a pair now.
 
 ### Pairing a donor from their own record
 
@@ -431,10 +446,13 @@ the card asks, under **What this test answers**:
 - A swatch beside each, opening the colours the check list's own answers use.
   The palette names what each colour is for — *Act on this*, *Outstanding*,
   *Recorded* — because a colour on a medical record means something, and a
-  wheel of sixteen million would mean nothing. Each answer starts on the
-  colour the platform would have given it.
+  wheel of sixteen million would mean nothing. An answer starts with **no
+  colour**: the swatch is empty until one is picked, and *No colour* is the
+  first thing in the palette so it can be taken back off again. A colour means
+  somebody chose it, which it would not if every answer arrived wearing one.
 
-Ticked answers are the buttons on the card, in the colours they were given,
+Ticked answers are the buttons on the card, those with a colour in it and the
+rest plain,
 and the list itself is only on screen while the card is being edited: once it
 is saved the card shows the chosen answers and nothing else. Its own **Edit
 results**, beside the pill, opens the workup at that card with the ticks,
@@ -699,8 +717,7 @@ writes.
 | `labs` | The catalogue: which tests a workup is made of, per programme and side |
 | `recipients` | The waiting list, and the two dates the score is computed from |
 | `donors` | The donor register |
-| `potential_donors` | Who is being considered for a recipient, before any pair exists |
-| `pairs` | The link between a recipient and a donor, and its history |
+| `pairs` | One row per donor ever linked to a recipient: the pair, and its history |
 | `lab_results` | One row per person per test: status, value, date |
 
 Two tables rather than one for people, because a recipient and a donor are not

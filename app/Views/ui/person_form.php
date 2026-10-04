@@ -20,11 +20,9 @@ use App\Libraries\UiStore;
  * @var array<string, mixed>|null  $person      The stored record, when viewing
  * @var array<string, mixed>|null  $linked      The paired counterpart, if any
  * @var list<array<string, mixed>> $labTests
- * @var list<array<string, mixed>> $openDonorLabs  The open tab's workup
- * @var array<string, mixed>       $donorValues    The open tab's fields, d-prefixed
- * @var list<array<string, mixed>> $pairHistory    Every pair this recipient has had
- * @var list<array<string, mixed>> $candidates     Donors the dialog can offer
- * @var string                     $forRecipient   Whose potential donor this is
+ * @var string                     $forPair     The pair this new donor is being entered for
+ * @var string                     $pairUrl     This recipient's pair, '' when they have none
+ * @var bool                       $pairHasActive  Whether that pair already has its donor
  * @var list<array{id: string, name: string}> $mrps
  * @var string                     $error       Why the last save bounced, if it did
  * @var string                     $editing     The card open for editing, '' for none
@@ -40,10 +38,10 @@ foreach ($v as $field => $value) {
 }
 
 $isRecipient = $personType === 'recipient';
-// Entered from a recipient's record, Back belongs to that record rather than
-// to the register this donor is not going to appear on.
-$backUrl     = $forRecipient !== ''
-    ? site_url('recipients/' . rawurlencode($forRecipient))
+// Entered from a pair's screen, Back belongs to that pair rather than to the
+// register the donor has not been read on yet.
+$backUrl     = $forPair !== ''
+    ? site_url('recipients/' . rawurlencode($forPair))
     : site_url($isRecipient ? 'recipients' : 'donors');
 $backLabel   = $isRecipient ? 'Back to Recipient Waitlist' : 'Donors List';
 $title       = $mode === 'add'
@@ -74,11 +72,11 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
         <div>
-            <a class="back-link" href="<?= $backUrl ?>"><?= ui_icon('back') ?>Back to <?= esc($forRecipient !== '' ? 'the recipient' : ($isRecipient ? 'Recipient Waitlist' : 'Donors List')) ?></a>
+            <a class="back-link" href="<?= $backUrl ?>"><?= ui_icon('back') ?>Back to <?= esc($forPair !== '' ? 'the pair' : ($isRecipient ? 'Recipient Waitlist' : 'Donors List')) ?></a>
             <div class="eyebrow"><?= esc($eyebrow) ?></div>
             <h1 class="page-title"><?= esc($title) ?></h1>
-            <?php if ($forRecipient !== ''): ?>
-                <p class="page-subtitle">Entered as a potential donor. They are not added to the Donors List, and no pair is made.</p>
+            <?php if ($forPair !== ''): ?>
+                <p class="page-subtitle">Being entered for a pair. Saving adds them to it on the status chosen below &mdash; Active is only open to them when the pair has nobody active.</p>
             <?php endif; ?>
         </div>
         <div class="header-actions">
@@ -86,21 +84,20 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             <?php if ($mode === 'view'): ?>
                 <a class="btn-outline" href="<?= site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id'])) ?>/print" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
             <?php endif; ?>
-            <?php // A recipient collects donors rather than linking to one:
-                  // several are considered at a time, so the button adds to
-                  // that list and never runs out of things to do. Making the
-                  // pair is a separate decision, on the tab of whichever donor
-                  // it turns out to be. A donor has one recipient, so theirs
-                  // is still a link, and turns into a link to them. ?>
-            <?php if ($mode === 'view' && ! $isRecipient && $linked !== null): ?>
-                <a class="btn-outline" href="<?= site_url('recipients/' . rawurlencode($linked['id'])) ?>">Linked: <?= esc($linked['name']) ?></a>
-            <?php elseif ($mode === 'view' && $isRecipient): ?>
-                <?php // With scripting off the link goes to Add Donor, which is
-                      // the commoner of the two choices; ui.js opens the dialog
-                      // below instead when it can. ?>
-                <a class="btn-primary" href="<?= esc($linkNewUrl) ?>" data-dialog="link-choice"><?= ui_icon('plus') ?>Add Potential Donor</a>
+            <?php // One link to a side, and the button goes once it is made.
+                  // Making the pair is one step again: choose a new donor or a
+                  // registered one and the pair exists. A pair's further
+                  // donors are added on the pair's own screen, which is where
+                  // the button turns into a link. ?>
+            <?php if ($mode === 'view' && $linked !== null): ?>
+                <?php // The recipient's goes to the pair, because that is
+                      // where their donors are: the one it is going ahead
+                      // with, and any it is holding in reserve. ?>
+                <a class="btn-outline" href="<?= esc($isRecipient && $pairUrl !== '' ? $pairUrl : site_url('recipients/' . rawurlencode($linked['id']))) ?>">Linked: <?= esc($linked['name']) ?></a>
             <?php elseif ($mode === 'view'): ?>
-                <a class="btn-outline" href="<?= esc($linkUrl) ?>" data-dialog="link-choice"><?= ui_icon('link14') ?>Link with Recipient</a>
+                <?php // A real link to the choice at its own URL; ui.js opens
+                      // the dialog below instead when it can. ?>
+                <a class="btn-outline" href="<?= esc($linkUrl) ?>" data-dialog="link-choice"><?= ui_icon('link14') ?>Link with <?= esc($isRecipient ? 'Donor' : 'Recipient') ?></a>
             <?php endif; ?>
         </div>
     </div>
@@ -111,11 +108,10 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
     <form id="person-form" class="stack-5" method="post" action="<?= current_url() ?>">
         <?= csrf_field() ?>
-        <?php // Opened from a recipient's record: this donor is being entered
-              // as their potential donor, so they are stored off the Donors
-              // List and saving comes back to that record. ?>
-        <?php if ($forRecipient !== ''): ?>
-            <input type="hidden" name="for" value="<?= esc($forRecipient) ?>">
+        <?php // Opened from a pair's screen: saving adds this donor to that
+              // pair, and comes back to it with their tab open. ?>
+        <?php if ($forPair !== ''): ?>
+            <input type="hidden" name="pair" value="<?= esc($forPair) ?>">
         <?php endif; ?>
 
         <div class="card card--pad">
@@ -341,10 +337,17 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                         <div>
                             <?php // The donor's own. A pair's status and the
                                   // recipient's are theirs, on their own cards;
-                                  // none of the three follows another. ?>
+                                  // none of the three follows another.
+                                  //
+                                  // Entered for a pair that already has the
+                                  // donor it is going ahead with, Active is
+                                  // left off: there is one of those, and this
+                                  // form is a slower way of pressing the same
+                                  // control the pair's tab carries. ?>
                             <label class="field-label" for="f-donor-status">Donor Status</label>
                             <select id="f-donor-status" name="donorStatus" class="input">
                                 <?php foreach (UiStore::DONOR_STATUS_OPTIONS as $value => $label): ?>
+                                    <?php if ($value === 'Active' && $pairHasActive) { continue; } ?>
                                     <option value="<?= esc($value) ?>"<?= $v['donorStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
                                 <?php endforeach; ?>
                             </select>
@@ -417,46 +420,18 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
         <?php endif; ?>
     </form>
 
-    <?php // The record reads top to bottom: who they are, their workup, their
-          // notes — and then the donors being considered for them. The donors
-          // come last because they are about this record rather than part of
-          // it, and because reading one means having read the other first. ?>
-    <?php if ($isRecipient && $mode === 'view' && $donorTabs !== []): ?>
-        <?= view('ui/partials/donor_tabs', [
-            'mrn'      => $person['id'],
-            'tabs'     => $donorTabs,
-            'openTab'  => $openTab,
-            'donor'    => $openDonor,
-            'v'        => $donorValues,
-            'labTests' => $openDonorLabs,
-            'editing'  => $editing,
-            'mrps'     => $mrps,
-            'ageNote'  => $ageNote,
-            'history'  => $pairHistory,
-        ], ['saveData' => false]) ?>
-    <?php endif; ?>
-
-    <?php if ($mode === 'view' && ($isRecipient || $linked === null)): ?>
+    <?php if ($mode === 'view' && $linked === null): ?>
         <dialog id="link-choice" class="dialog">
             <div class="dialog-body">
                 <form method="dialog" class="dialog-close-form">
                     <button class="dialog-close" aria-label="Close">&times;</button>
                 </form>
-                <?php if ($isRecipient): ?>
-                    <?= view('ui/partials/potential_donor_choice', [
-                        'person'      => $person,
-                        'newUrl'      => $linkNewUrl,
-                        'considerUrl' => site_url('recipients/' . rawurlencode($person['id']) . '/donors'),
-                        'candidates'  => $candidates,
-                    ], ['saveData' => false]) ?>
-                <?php else: ?>
-                    <?= view('ui/partials/link_choice', [
-                        'counterpart' => 'recipient',
-                        'newUrl'      => $linkNewUrl,
-                        'existingUrl' => $linkExistingUrl,
-                        'person'      => $person,
-                    ], ['saveData' => false]) ?>
-                <?php endif; ?>
+                <?= view('ui/partials/link_choice', [
+                    'counterpart' => $isRecipient ? 'donor' : 'recipient',
+                    'newUrl'      => $linkNewUrl,
+                    'existingUrl' => $linkExistingUrl,
+                    'person'      => $person,
+                ], ['saveData' => false]) ?>
             </div>
         </dialog>
     <?php endif; ?>

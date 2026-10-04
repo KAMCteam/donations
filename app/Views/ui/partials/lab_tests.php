@@ -125,7 +125,12 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
             // What the card calls this answer and what colour it is — its own
             // word for it when somebody wrote one, ours otherwise.
             $label = static fn (string $key): string => $byKey[$key]['label'] ?? UiStore::RESULT_LABEL[$key] ?? $key;
-            $tone  = static fn (string $key): string => $byKey[$key]['tone'] ?? ui_tone('labStatus', $key);
+            // A test the record added wears only the colours somebody chose
+            // for it: '' means none was, and the answer shows plain. The check
+            // list's own tests keep the colours the sheet gives them.
+            $tone  = static fn (string $key): string => isset($byKey[$key])
+                ? (string) $byKey[$key]['tone']
+                : ui_tone('labStatus', $key);
             ?>
             <div class="lab-card<?= $animated ? ' lab-card--animated' : '' ?><?= $freeText ? ' lab-card--free' : '' ?> status-<?= esc($test['status']) ?>"<?= $custom ? ' id="' . esc($cardId) . '"' : '' ?> data-idx="<?= $i ?>">
                 <input type="hidden" name="<?= $base ?>[id]" value="<?= esc($test['id']) ?>">
@@ -148,7 +153,8 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
                         <?php endif; ?>
                     </div>
                     <?php if (! $freeText): ?>
-                        <span class="lab-pill <?= esc($tone($test['status'])) ?>" data-lab-pill<?= $answered ? '' : ' hidden' ?>><?= $answered ? esc($label($test['status'])) : '' ?></span>
+                        <?php $pillTone = $tone($test['status']); ?>
+                        <span class="lab-pill <?= $pillTone === '' ? 'tone-none' : esc($pillTone) ?>" data-lab-pill<?= $answered ? '' : ' hidden' ?>><?= $answered ? esc($label($test['status'])) : '' ?></span>
                     <?php endif; ?>
                     <?php if ($custom && ! $editing && $editUrl !== null): ?>
                         <?php // The saved test's own Edit: the workup's pencil
@@ -167,10 +173,12 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
                           // and label ride on the button so ui.js can restyle
                           // the card without a copy of every vocabulary. ?>
                     <?php foreach ($answers as $answer): ?>
-                        <?php // A test the record added wears the colours it was
-                              // given, on every answer rather than only on the
-                              // one recorded: choosing them was the point. ?>
-                        <button type="button" class="lab-status-btn<?= $custom ? ' lab-status-btn--tinted ' . esc($answer['tone']) : '' ?><?= $test['status'] === $answer['key'] ? ' is-active ' . esc($answer['tone']) : '' ?>" data-lab-status="<?= esc($answer['key']) ?>" data-lab-tone="<?= esc($answer['tone']) ?>" data-lab-label="<?= esc($answer['label']) ?>"<?= in_array($answer['key'], UiStore::RESULT_UNANSWERED, true) ? ' data-lab-unanswered' : '' ?>><?= esc($answer['label']) ?></button>
+                        <?php // A colour somebody chose shows on every answer
+                              // that has one, not only on the one recorded:
+                              // choosing them was the point. An answer nobody
+                              // coloured is plain, recorded or not. ?>
+                        <?php $answerTone = (string) $answer['tone']; ?>
+                        <button type="button" class="lab-status-btn<?= $custom && $answerTone !== '' ? ' lab-status-btn--tinted ' . esc($answerTone) : '' ?><?= $test['status'] === $answer['key'] ? ' is-active' . ($answerTone === '' ? '' : ' ' . esc($answerTone)) : '' ?>" data-lab-status="<?= esc($answer['key']) ?>" data-lab-tone="<?= esc($answerTone) ?>" data-lab-label="<?= esc($answer['label']) ?>"<?= in_array($answer['key'], UiStore::RESULT_UNANSWERED, true) ? ' data-lab-unanswered' : '' ?>><?= esc($answer['label']) ?></button>
                     <?php endforeach; ?>
                 </div>
                 <?php endif; ?>

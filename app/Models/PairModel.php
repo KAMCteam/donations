@@ -41,15 +41,25 @@ class PairModel extends Model
     public const EXCHANGE = 'paired_exchange';
 
     /**
-     * The open pair holding this recipient, or null when they are free.
+     * The link this recipient's pair is going ahead with, or null when they
+     * have no pair at all.
      *
-     * A recipient may hold several at once — a donor is looked at, then
-     * another — so this is the first of them and is only ever used where one
-     * will do. {@see self::pairsForRecipient()} is the whole list.
+     * A pair holds several donors at once — one it is going ahead with, and
+     * any it is keeping in reserve — so this is the one that answers "who is
+     * their donor": the Active one, and failing that the first still open.
+     * {@see self::pairsForRecipient()} is the whole list.
      */
     public function openPairForRecipient(int|string $mrn): ?array
     {
-        return $this->openPairs()->where('recipient_mrn', $mrn)->get()->getRowArray();
+        return $this->db->table('pairs p')
+            ->select('p.*')
+            ->join('donors d', 'd.mrn = p.donor_mrn', 'left')
+            ->where('p.recipient_mrn', $mrn)
+            ->where('p.status !=', self::CLOSED)
+            ->orderBy("d.status = 'active'", 'DESC', false)
+            ->orderBy('p.id')
+            ->get()
+            ->getRowArray();
     }
 
     /**

@@ -293,6 +293,14 @@
 .tone-blue-soft   { background-color: var(--blue-50);     color: var(--blue-700);    border: 1px solid var(--blue-200); }
 .tone-slate       { background-color: var(--slate-100);   color: var(--slate-600);   border: 1px solid var(--slate-200); }
 
+/* An answer nobody gave a colour to: the card's own quiet grey, which is what
+   a word with nothing said about it looks like. */
+.tone-none {
+  background-color: #fff;
+  color: var(--slate-500);
+  border: 1px solid var(--slate-200);
+}
+
 /* Small badge (urgency, donation type) */
 .badge {
   font-size: var(--text-xs);
@@ -1081,6 +1089,14 @@
 }
 
 .tone-name { white-space: nowrap; }
+
+/* No colour picked: the swatch and its dot are empty rather than showing one
+   by default. Written after the two they qualify, so they win. */
+.tone-swatch--none,
+.tone-dot--none {
+  background-color: #fff;
+  border: 1px dashed var(--slate-300);
+}
 
 .lab-remove {
   padding: 0.5rem 0.75rem;

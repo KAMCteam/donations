@@ -29,9 +29,10 @@ class DonorModel extends Model
     public function register(?string $organCode = null, bool $unmatchedOnly = false, ?string $bloodGroup = null, ?string $status = null, ?string $query = null): array
     {
         $builder = $this->db->table('donors d')
-            // Somebody entered as one recipient's potential donor is not on
-            // the register: the list is who the programme has, not who is
-            // being thought about. They join it when a pair is made.
+            // Kept from when a donor could be entered for one recipient and
+            // held off the register until a pair was made. There are no
+            // donors off it now — every one of them is entered into a pair —
+            // so this excludes nobody, and stays as the column's own rule.
             ->where('d.is_listed', 1)
             ->select('d.*, op.label AS program_label, m.name AS mrp_name, c.name AS coordinator_name')
             ->select('(SELECT COUNT(*) FROM lab_results lr WHERE lr.person_mrn = d.mrn AND lr.person_type = \'donor\') AS labs_total', false)

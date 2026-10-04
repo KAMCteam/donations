@@ -71,7 +71,7 @@ class RecordBlocks
      * A recipient's donors on paper, in the order they were linked.
      *
      * One field each, numbered as the tabs are, saying who and what became of
-     * it — including the ones that were delinked.
+     * it — including the ones the pair has finished with.
      *
      * @param list<array<string, mixed>> $tabs
      *
@@ -87,7 +87,7 @@ class RecordBlocks
             $fields[] = [
                 'label' => 'Donor ' . $tab['number'],
                 'value' => $tab['name'] . ' (' . $tab['donorId'] . ') — ' . $status
-                    . ($tab['delinked'] ? ', delinked' : ''),
+                    . ($tab['archived'] ? ', archived' : ''),
                 'wide'  => true,
             ];
         }

@@ -11,7 +11,6 @@ use App\Models\LabResultModel;
 use App\Models\MrpModel;
 use App\Models\OrganProgramModel;
 use App\Models\PairModel;
-use App\Models\PotentialDonorModel;
 use App\Models\RecipientModel;
 use CodeIgniter\Model;
 use CodeIgniter\Session\Session;
@@ -378,7 +377,6 @@ final class UiStore
     private RecipientModel $recipients;
     private DonorModel $donors;
     private PairModel $pairs;
-    private PotentialDonorModel $candidates;
     private MrpModel $mrp;
     private CoordinatorModel $coordinators;
     private LabModel $labs;
@@ -391,7 +389,6 @@ final class UiStore
         $this->recipients   = model(RecipientModel::class);
         $this->donors       = model(DonorModel::class);
         $this->pairs        = model(PairModel::class);
-        $this->candidates   = model(PotentialDonorModel::class);
         $this->mrp          = model(MrpModel::class);
         $this->coordinators = model(CoordinatorModel::class);
         $this->labs         = model(LabModel::class);
@@ -717,6 +714,69 @@ final class UiStore
         return null;
     }
 
+    /**
+     * The pair a link belongs to, read as the whole case.
+     *
+     * A pair is one recipient and all the donors worked up for them, and every
+     * one of those is a row in `pairs` with an id of its own. So any of those
+     * ids opens the same pair — what differs is only which tab the screen
+     * lands on. The row this returns is the pair's own: the link to the donor
+     * it is going ahead with, or, when it has none, the last one it had.
+     *
+     * With `$byRecipient`, the id is a recipient's file number instead, which
+     * is how a screen that knows who it is about finds their pair.
+     */
+    public function findPairCase(?string $id, bool $byRecipient = false): ?array
+    {
+        if (! $this->isMrn($id)) {
+            return null;
+        }
+
+        if ($byRecipient) {
+            $recipientMrn = (string) $id;
+        } else {
+            $row = $this->pairs->find((int) $id);
+
+            if ($row === null) {
+                return null;
+            }
+
+            $recipientMrn = (string) $row['recipient_mrn'];
+        }
+
+        $links = $this->pairs->pairsForRecipient($recipientMrn);
+
+        if ($links === []) {
+            return null;
+        }
+
+        $primary = null;
+
+        foreach ($links as $link) {
+            if ($link['status'] === PairModel::CLOSED) {
+                continue;
+            }
+
+            // The donor it is going ahead with wins outright; failing that,
+            // the last link still open is the one the pair is working from.
+            if ($primary === null || ($link['donor_status'] ?? '') === 'active') {
+                $primary = $link;
+            }
+        }
+
+        $primary ??= $links[array_key_last($links)];
+        $pair = $this->findPair((string) $primary['id']);
+
+        if ($pair === null) {
+            return null;
+        }
+
+        $recipient = $this->recipients->find((int) $recipientMrn);
+        $pair['recipientName'] = (string) ($recipient['name'] ?? '');
+
+        return $pair;
+    }
+
     // ---- Writes ------------------------------------------------------------
 
     /** @param array<string, mixed> $recipient */
@@ -735,10 +795,11 @@ final class UiStore
             $this->donorToRow($donor) + [
                 'mrn'           => (int) $donor['id'],
                 'registered_on' => date('Y-m-d'),
-                // Somebody entered from a recipient's screen is that
-                // recipient's candidate, not yet one of the programme's
-                // donors. They join the register when a pair is made.
-                'is_listed'     => ($donor['listed'] ?? true) ? 1 : 0,
+                // On the register from the start. A donor used to be able to
+                // be entered as somebody's candidate and kept off it until a
+                // pair was made; there are no candidates now, so there is
+                // nobody to keep off.
+                'is_listed'     => 1,
             ]
         );
         $this->saveLabTests((int) $donor['id'], 'donor', $donor['labTests'] ?? []);
@@ -765,11 +826,6 @@ final class UiStore
             'crossmatch_date' => $this->toDate($pair['scheduledDate'] ?? null),
             'notes'           => $pair['notes'] ?? null,
         ]);
-
-        // However a pair came about — Add Pair, a donor's own screen, Pair up
-        // — the two were considered together, so the recipient's screen says
-        // so. Without this, a pair made by any other door would have no tab.
-        $this->candidates->consider((int) $pair['recipientId'], (int) $pair['donorId']);
 
         return $id;
     }
@@ -1162,64 +1218,105 @@ final class UiStore
             'notes'          => (string) $row['notes'],
             'labTests'       => $this->labTestsFor($row['mrn'], 'recipient', $row['organ_code']),
             'pairedDonorId'  => $pair === null ? '' : (string) $pair['donor_mrn'],
-            // Every donor they have been linked with, the undone ones too:
-            // the screens show those greyed rather than forgetting them.
-            'donors'         => $this->donorTabs($row['mrn']),
+            // Every donor their pair has had, the archived ones too: a donor
+            // the pair worked up and did not go ahead with is part of what
+            // happened, and the screens keep them rather than forgetting them.
+            'donors'         => $this->pairDonors($row['mrn']),
         ];
     }
 
     /**
-     * A recipient's potential donors, one entry per candidate, in the order
-     * they were added.
+     * A pair's donors, one entry per donor ever linked to this recipient.
      *
-     * Each is a tab on their screen: the number it is, who it is, and how that
-     * candidacy is going. None of them is a pair — a pair is made from one of
-     * them, by hand, and the rest are set aside at the same moment.
+     * A pair is a recipient and the donors being worked up for them: the one
+     * it is going ahead with, the ones kept in reserve, and the ones it has
+     * finished with. `pairs` holds one row for each, and this is that list in
+     * the order it was made — which is what numbers the tabs. A donor is
+     * donor-1 because they were the first, and stays donor-1 whatever becomes
+     * of the rest.
+     *
+     * Two facts ride on each entry and they are easy to confuse:
+     *
+     *   **status** is the donor's own — Active, On Hold, Declined. It is set
+     *   on their record and on their tab, and it is theirs wherever they are
+     *   read.
+     *
+     *   **archived** is the pair's doing: this link is finished with, so the
+     *   tab is kept for the history and nothing on it can be changed. It is a
+     *   mode and not a status, and it leaves the donor's own word alone.
      *
      * @return list<array<string, mixed>>
      */
-    private function donorTabs(int|string $mrn): array
+    public function pairDonors(int|string $recipientMrn): array
     {
         $tabs = [];
 
-        foreach ($this->candidates->forRecipient($mrn) as $i => $row) {
-            $declined = $row['status'] === PotentialDonorModel::DECLINED;
+        foreach ($this->pairs->pairsForRecipient($recipientMrn) as $i => $row) {
+            $archived = $row['status'] === PairModel::CLOSED;
+            $status   = (string) ($row['donor_status'] ?? 'on_hold');
 
             $tabs[] = [
-                'number'      => $i + 1,
-                'id'          => (string) $row['id'],
-                'donorId'     => (string) $row['donor_mrn'],
-                'name'        => (string) ($row['donor_name'] ?? ''),
-                'bloodType'   => (string) ($row['donor_blood_group'] ?? ''),
-                'status'      => (string) $row['status'],
-                'donorStatus' => (string) ($row['donor_status'] ?? ''),
-                'asideReason' => (string) ($row['aside_reason'] ?? ''),
-                // Set aside: the tab stays, as a record of who was looked at,
-                // and their details cannot be edited from it.
-                'delinked'    => $declined,
-                // But set aside for two different reasons. Somebody passed
-                // over when another candidate was paired had nothing decided
-                // about them, so the pair can be switched back here; somebody
-                // delinked by hand was decided about, and stays decided.
-                'switchable'  => ! $declined
-                    || (string) ($row['aside_reason'] ?? '') === PotentialDonorModel::SUPERSEDED,
-                // The pair this candidate became, if one was made from them.
-                'pairId'      => (string) ($row['pair_id'] ?? ''),
+                'number'    => $i + 1,
+                // The link, not the donor: two pairs may hold the same person
+                // over time, and each link is its own tab.
+                'id'        => (string) $row['id'],
+                'donorId'   => (string) $row['donor_mrn'],
+                'name'      => (string) ($row['donor_name'] ?? ''),
+                'bloodType' => (string) ($row['donor_blood_group'] ?? ''),
+                'status'    => $status,
+                'archived'  => $archived,
+                // The one the pair is going ahead with. At most one at a time,
+                // which is the rule everything else here is built around.
+                'isActive'  => ! $archived && $status === 'active',
+                'linkedOn'  => substr((string) $row['created_at'], 0, 10),
+                'endedOn'   => $archived ? substr((string) $row['updated_at'], 0, 10) : '',
+                'reason'    => (string) ($row['closed_reason'] ?? ''),
             ];
         }
 
         return $tabs;
     }
 
+    /** One of a pair's donors, by the id of the link. */
+    public function pairDonor(int|string $recipientMrn, int|string $id): ?array
+    {
+        foreach ($this->pairDonors($recipientMrn) as $tab) {
+            if ((string) $tab['id'] === (string) $id) {
+                return $tab;
+            }
+        }
+
+        return null;
+    }
+
     /**
-     * Adds somebody to a recipient's list of candidates.
+     * Whether this pair already has the donor it is going ahead with.
      *
-     * No pair, and no place on the Donors List: this says only that the two
-     * are being looked at together. The donor record itself has to exist —
-     * they have a workup of their own to fill in — but a donor entered for
-     * this reason is unlisted until a pair is made from them.
+     * One Active donor at a time: a pair that said it was going ahead with two
+     * people would be saying nothing. Everything that could make a second one
+     * — adding a donor, changing a status — asks this first, and the way past
+     * it is to stand the current one down, or to swap.
      */
-    public function considerDonor(string $recipientMrn, string $donorMrn): string
+    public function hasActiveDonor(int|string $recipientMrn, int|string $except = 0): bool
+    {
+        foreach ($this->pairDonors($recipientMrn) as $tab) {
+            if ($tab['isActive'] && (string) $tab['id'] !== (string) $except) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Adds a donor to a pair, with the word the pair starts them on.
+     *
+     * On Hold or Declined, ordinarily: Active is the donor the pair is going
+     * ahead with and there is one of those. A pair that has nobody active —
+     * the first donor, or one whose donor has stood down — may start somebody
+     * there directly, because there is nothing to clash with.
+     */
+    public function addPairDonor(string $recipientMrn, string $donorMrn, string $status): string
     {
         if (! $this->isMrn($recipientMrn) || ! $this->isMrn($donorMrn)) {
             return 'That record could not be found.';
@@ -1229,173 +1326,163 @@ final class UiStore
             return 'That record could not be found.';
         }
 
+        if (! isset(self::PERSON_STATUS_OPTIONS[$status])) {
+            return 'That is not a status a donor can be added on.';
+        }
+
+        if ($status === 'active' && $this->hasActiveDonor($recipientMrn)) {
+            return 'This pair already has an active donor. Stand them down first, or swap.';
+        }
+
         if ($this->pairs->openPairForDonor($donorMrn) !== null) {
             return 'That donor is already in an open pair.';
         }
 
-        $this->candidates->consider($recipientMrn, $donorMrn);
-
-        return '';
-    }
-
-    /**
-     * Sets a candidate aside.
-     *
-     * They were considered for this recipient and are not going ahead. Nothing
-     * is deleted: the tab stays on the record, read-only, because a donor who
-     * was looked at and set aside is part of what happened. If a pair had
-     * already been made from them, it closes with them.
-     */
-    public function declineCandidate(string $recipientMrn, string $id, string $reason = ''): string
-    {
-        $row = $this->candidates->forRecipientById($recipientMrn, $id);
-
-        if ($row === null) {
-            return 'That potential donor could not be found.';
+        if ($this->pairs->openPairFor($recipientMrn, $donorMrn) !== null) {
+            return 'That donor is already on this pair.';
         }
 
-        if ($row['status'] === PotentialDonorModel::DECLINED) {
-            return 'That potential donor has already been set aside.';
-        }
-
-        $this->candidates->update((int) $row['id'], [
-            'status'       => PotentialDonorModel::DECLINED,
-            'aside_reason' => PotentialDonorModel::DELINKED,
-        ]);
-        $this->closePairBetween($recipientMrn, (string) $row['donor_mrn'], $reason);
-
-        return '';
-    }
-
-    /** Moves a candidate between Active and On Hold. Setting aside has its own door. */
-    public function setCandidateStatus(string $recipientMrn, string $id, string $status): string
-    {
-        $row = $this->candidates->forRecipientById($recipientMrn, $id);
-
-        if ($row === null) {
-            return 'That potential donor could not be found.';
-        }
-
-        if ($row['status'] === PotentialDonorModel::DECLINED) {
-            return 'That potential donor has been set aside and cannot be changed.';
-        }
-
-        if (! in_array($status, PotentialDonorModel::STATUSES, true) || $status === PotentialDonorModel::DECLINED) {
-            return 'That is not a status a potential donor can be moved to.';
-        }
-
-        $this->candidates->update((int) $row['id'], ['status' => $status]);
-
-        return '';
-    }
-
-    /**
-     * Makes the pair, from one candidate out of the list.
-     *
-     * This is the decision the whole list was leading to, so it is the moment
-     * everything else settles: the pair is created, every other candidate is
-     * set aside, and the donor joins the register — until now they may have
-     * been somebody entered for this recipient alone.
-     *
-     * @return array{0: string, 1: string} The pair's id, or '' and why not.
-     */
-    public function pairUpCandidate(string $recipientMrn, string $id): array
-    {
-        $row = $this->candidates->forRecipientById($recipientMrn, $id);
-
-        if ($row === null) {
-            return ['', 'That potential donor could not be found.'];
-        }
-
-        // Delinked by hand is a decision; being passed over when somebody else
-        // was paired is not, so that one can still be switched to.
-        if ($row['status'] === PotentialDonorModel::DECLINED
-            && $row['aside_reason'] !== PotentialDonorModel::SUPERSEDED) {
-            return ['', 'That potential donor has been set aside.'];
-        }
-
-        $donorMrn = (string) $row['donor_mrn'];
-        $existing = $this->pairs->openPairFor($recipientMrn, $donorMrn);
-
-        if ($existing !== null) {
-            return [(string) $existing['id'], ''];
-        }
-
-        if ($this->pairs->openPairForDonor($donorMrn) !== null) {
-            return ['', 'That donor is already in an open pair.'];
-        }
-
-        // One recipient, one donor, one pair. Whoever was the pair before
-        // closes — with a reason naming the person who replaced them, so the
-        // archive says what happened rather than only that it did.
-        foreach ($this->candidates->forRecipient($recipientMrn) as $other) {
-            if ((int) $other['id'] !== (int) $row['id']) {
-                $this->closePairBetween(
-                    $recipientMrn,
-                    (string) $other['donor_mrn'],
-                    'Switched to ' . ($this->donors->find((int) $donorMrn)['name'] ?? 'MRN ' . $donorMrn) . '.'
-                );
-            }
-        }
-
-        $this->candidates->declineOthers($recipientMrn, (int) $row['id']);
-
-        // Back in play: the one being paired is active again whatever it was.
-        $this->candidates->update((int) $row['id'], ['status' => 'active', 'aside_reason' => null]);
-
-        $pairId = (string) $this->pairs->link((int) $recipientMrn, (int) $donorMrn, [
-            'status'       => 'active',
+        $this->pairs->link((int) $recipientMrn, (int) $donorMrn, [
+            'status'       => $status,
             'relationship' => $this->donors->find((int) $donorMrn)['relationship'] ?? null,
         ]);
+        $this->donors->update((int) $donorMrn, ['status' => $status, 'is_listed' => 1]);
 
-        // On the register now: the Donors List is who the programme has, and a
-        // donor in a pair is one of them.
-        $this->donors->update((int) $donorMrn, ['is_listed' => 1]);
-
-        return [$pairId, ''];
+        return '';
     }
 
     /**
-     * Every pair this recipient has had, newest first.
+     * Moves one of a pair's donors between the three words.
      *
-     * Built from the pairs themselves rather than from a log, because the
-     * pairs *are* the log: one row per link ever made, with when it was made,
-     * when it ended and why. Switching from one donor to another closes a pair
-     * and opens another, so a switch is two rows here — which is exactly what
-     * somebody opening the archive wants to see.
-     *
-     * @return list<array<string, mixed>>
+     * The ordinary way to change which donor a pair is going ahead with: stand
+     * the current one down, then set the other active. Nothing is archived by
+     * it — both are still the pair's donors, and either can be taken back up.
      */
-    public function pairingHistory(int|string $recipientMrn): array
+    public function setPairDonorStatus(string $recipientMrn, string $id, string $status): string
     {
-        $rows = array_reverse($this->pairs->pairsForRecipient($recipientMrn));
+        $tab = $this->pairDonor($recipientMrn, $id);
 
-        return array_map(static fn (array $row): array => [
-            'id'        => (string) $row['id'],
-            'donorId'   => (string) $row['donor_mrn'],
-            'donorName' => (string) ($row['donor_name'] ?? ''),
-            'open'      => $row['status'] !== PairModel::CLOSED,
-            'status'    => (string) $row['status'],
-            'pairedOn'  => substr((string) $row['created_at'], 0, 10),
-            // A closed pair's last change is when it closed; an open one has
-            // not ended, so it has no ending to show.
-            'endedOn'   => $row['status'] === PairModel::CLOSED
-                ? substr((string) $row['updated_at'], 0, 10)
-                : '',
-            'reason'    => (string) ($row['closed_reason'] ?? ''),
-        ], $rows);
+        if ($tab === null) {
+            return 'That donor is not on this pair.';
+        }
+
+        if ($tab['archived']) {
+            return 'That donor has been archived, so the tab cannot be changed.';
+        }
+
+        if (! isset(self::PERSON_STATUS_OPTIONS[$status])) {
+            return 'That is not a status a donor can be moved to.';
+        }
+
+        if ($status === 'active' && $this->hasActiveDonor($recipientMrn, $id)) {
+            return 'This pair already has an active donor. Stand them down first, or swap.';
+        }
+
+        $this->donors->update((int) $tab['donorId'], ['status' => $status]);
+        $this->mirrorLinkStatus((int) $tab['id'], $status);
+
+        return '';
     }
 
-    /** Closes the open pair between these two, if there is one. */
-    private function closePairBetween(string $recipientMrn, string $donorMrn, string $reason = ''): void
+    /**
+     * Archives one of a pair's donors: this link is finished with.
+     *
+     * The tab stays, read-only, because a donor the pair worked up and did not
+     * go ahead with is part of what happened. Their own record is untouched —
+     * the word they were given stands, and they are free to be linked again
+     * from their own screen, because the link that held them is closed.
+     */
+    public function delinkPairDonor(string $recipientMrn, string $id, string $reason = ''): string
     {
-        $pair = $this->pairs->openPairFor($recipientMrn, $donorMrn);
+        $tab = $this->pairDonor($recipientMrn, $id);
 
-        if ($pair !== null) {
-            $this->pairs->close(
-                (int) $pair['id'],
-                trim($reason) === '' ? 'The potential donor was set aside.' : trim($reason)
-            );
+        if ($tab === null) {
+            return 'That donor is not on this pair.';
+        }
+
+        if ($tab['archived']) {
+            return 'That donor has already been archived.';
+        }
+
+        $this->pairs->close((int) $tab['id'], trim($reason) === '' ? 'Delinked from the pair.' : trim($reason));
+
+        return '';
+    }
+
+    /**
+     * Takes the whole pair apart.
+     *
+     * Every link closes at once, so the recipient goes back to the waiting
+     * list and each donor back to the register. Nothing is deleted: the pair's
+     * own screen is still there, every tab on it archived, which is where
+     * anybody asking what happened goes.
+     */
+    public function dissolvePair(string $recipientMrn, string $reason = ''): string
+    {
+        $tabs = array_filter($this->pairDonors($recipientMrn), static fn (array $t): bool => ! $t['archived']);
+
+        if ($tabs === []) {
+            return 'This pair has already been taken apart.';
+        }
+
+        foreach ($tabs as $tab) {
+            $this->pairs->close((int) $tab['id'], trim($reason) === '' ? 'The pair was dissolved.' : trim($reason));
+        }
+
+        return '';
+    }
+
+    /**
+     * Swaps the donor a pair is going ahead with for another of its own.
+     *
+     * The difference from standing one down and raising the other: a swap says
+     * the first one is finished with. Their tab is archived — kept, read-only,
+     * with the word they were given still on it — and the one swapped to is
+     * the pair's active donor from that moment.
+     */
+    public function swapPairDonor(string $recipientMrn, string $fromId, string $toId): string
+    {
+        $from = $this->pairDonor($recipientMrn, $fromId);
+        $to   = $this->pairDonor($recipientMrn, $toId);
+
+        if ($from === null || $to === null) {
+            return 'That donor is not on this pair.';
+        }
+
+        if (! $from['isActive']) {
+            return 'Only the donor the pair is going ahead with can be swapped.';
+        }
+
+        if ($to['archived'] || $to['id'] === $from['id']) {
+            return 'Choose another of this pair\'s donors to swap to.';
+        }
+
+        $this->donors->update((int) $to['donorId'], ['status' => 'active']);
+        $this->mirrorLinkStatus((int) $to['id'], 'active');
+        // Archived without being argued with: the word they were given is
+        // theirs, and the swap is a fact about the pair, not about them.
+        $this->pairs->close(
+            (int) $from['id'],
+            'Swapped for ' . ($to['name'] !== '' ? $to['name'] : 'MRN ' . $to['donorId']) . '.'
+        );
+
+        return '';
+    }
+
+    /**
+     * Keeps a link's own word in step with its donor's, where it can.
+     *
+     * A link carries the pair's Match Status, which says more than the three
+     * words a person can hold — Transplanted, Paired Exchange. Those are the
+     * pair's business and a donor's status has no say in them, so this only
+     * writes where the link is already holding one of the three.
+     */
+    private function mirrorLinkStatus(int $linkId, string $status): void
+    {
+        $row = $this->pairs->find($linkId);
+
+        if ($row !== null && isset(self::PERSON_STATUS_OPTIONS[$row['status']])) {
+            $this->pairs->update($linkId, ['status' => $status]);
         }
     }
 
@@ -1862,6 +1949,22 @@ final class UiStore
         return strtolower($gender) === 'female' ? 'female' : 'male';
     }
 
+    /**
+     * "On Hold" as the column spells it, and '' for anything that is not one
+     * of the three a person can hold.
+     *
+     * The screens collect a donor's status as the words on the control, and
+     * the column is an ENUM — so somewhere the one has to become the other,
+     * and a value that is neither has to come back empty rather than take the
+     * request down.
+     */
+    public static function personStatusFromUi(string $status): string
+    {
+        $key = str_replace(' ', '_', strtolower(trim($status)));
+
+        return isset(self::PERSON_STATUS_OPTIONS[$key]) ? $key : '';
+    }
+
     /** "On Hold" <-> on_hold */
     private function statusToUi(string $status): string
     {
@@ -2047,7 +2150,10 @@ final class UiStore
             return array_map(static fn (string $key): array => [
                 'key'   => $key,
                 'label' => self::RESULT_LABEL[$key] ?? $key,
-                'tone'  => self::RESULT_TONE[$key] ?? self::LAB_TONE_DEFAULT,
+                // No colour until somebody picks one. An answer is a word
+                // first; a colour on it is something the record decided to
+                // say, and one nobody chose would be saying it by accident.
+                'tone'  => '',
                 'own'   => false,
             ], $keys);
         }
@@ -2069,9 +2175,11 @@ final class UiStore
                 'label' => $own
                     ? mb_substr((string) ($entry['label'] ?? $key), 0, self::CUSTOM_ANSWER_MAX)
                     : (self::RESULT_LABEL[$key] ?? $key),
+                // '' for an answer nobody gave a colour to, which the card
+                // shows plain.
                 'tone'  => isset(self::LAB_TONES[$entry['tone'] ?? ''])
                     ? (string) $entry['tone']
-                    : self::LAB_TONE_DEFAULT,
+                    : '',
                 'own'   => $own,
             ];
         }
@@ -2115,9 +2223,11 @@ final class UiStore
             $answers[] = [
                 'key'   => $key,
                 'label' => $own ? mb_substr($label, 0, self::CUSTOM_ANSWER_MAX) : (self::RESULT_LABEL[$key] ?? $key),
+                // Only a colour somebody picked is stored. Nothing picked is
+                // stored as nothing, and the card shows the answer plain.
                 'tone'  => isset(self::LAB_TONES[$entry['tone'] ?? ''])
                     ? (string) $entry['tone']
-                    : (self::RESULT_TONE[$key] ?? self::LAB_TONE_DEFAULT),
+                    : '',
             ];
         }
 
@@ -2155,7 +2265,7 @@ final class UiStore
         $answers[$key] = [
             'on'    => '1',
             'label' => $label,
-            'tone'  => (string) ($test['newAnswerTone'] ?? self::LAB_TONE_DEFAULT),
+            'tone'  => (string) ($test['newAnswerTone'] ?? ''),
         ];
 
         return $answers;

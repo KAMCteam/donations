@@ -152,41 +152,34 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     // ---- Linking: a new counterpart, or one already registered -------------
 
     /**
-     * A recipient collects potential donors rather than linking to one, so the
-     * button adds to that list and the choice is on the record itself.
+     * A recipient with no pair is offered one, in one step: the two ways in,
+     * and the pair exists as soon as either is answered.
      */
-    public function testTheRecipientsButtonAddsAPotentialDonor(): void
+    public function testTheRecipientsButtonLinksWithADonor(): void
     {
         $this->post('recipients/new', ['mrn' => '9001', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
-        $this->post('donors/new', ['mrn' => '9009', 'name' => 'Free Donor', 'age' => '33', 'bloodType' => 'B']);
 
         $html = $this->get('recipients/9001')->getBody();
 
-        $this->assertStringContainsString('Add Potential Donor', $html);
-        // With scripting off it goes to Add Donor, entered for this recipient.
-        $this->assertStringContainsString(site_url('donors/new') . '?for=9001', $html);
-        // And the same choice is on the page as a dialog, the second half of
-        // it a select rather than a page of its own.
+        $this->assertStringContainsString('Link with Donor', $html);
         $this->assertStringContainsString('<dialog id="link-choice"', $html);
-        $this->assertStringContainsString('A new donor', $html);
-        $this->assertStringContainsString('A donor already registered', $html);
-        $this->assertStringContainsString('name="donorMrn"', $html);
-        $this->assertStringContainsString('Free Donor', $html);
-        // Nothing of the old flow: no pair is made from this screen.
-        $this->assertStringNotContainsString(site_url('pairs/new') . '?recipient=9001', $html);
+        $this->assertStringContainsString('Link with a new donor', $html);
+        $this->assertStringContainsString('Link with an existing donor', $html);
+        $this->assertStringContainsString(site_url('pairs/new') . '?recipient=9001', $html);
+        // Nothing of the middle state: there are no potential donors.
+        $this->assertStringNotContainsString('Potential Donor', $html);
     }
 
-    /** And the two pages it used to lead to are gone with it. */
-    public function testTheRecipientsLinkPagesAreGone(): void
+    /** And the two pages it leads to are reachable on their own. */
+    public function testTheRecipientsLinkPagesAreBack(): void
     {
         $this->post('recipients/new', ['mrn' => '9002', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
 
-        $html = $this->get('recipients/9002')->getBody();
-        $this->assertStringNotContainsString('recipients/9002/link', $html);
+        $this->assertStringContainsString('recipients/9002/link', $this->get('recipients/9002')->getBody());
 
-        $routes = service('routes')->getRoutes('get');
-        $this->assertArrayNotHasKey('recipients/([^/]+)/link', $routes);
-        $this->assertArrayNotHasKey('recipients/([^/]+)/link/existing', $routes);
+        // Both are real pages, reachable without the dialog.
+        $this->assertStringContainsString('Link with a new donor', $this->get('recipients/9002/link')->getBody());
+        $this->assertStringContainsString('Choose a donor', $this->get('recipients/9002/link/existing')->getBody());
     }
 
     /** A donor record offers the mirror image of it. */
@@ -324,20 +317,26 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertSame(1, $this->db->table('donors')->countAllResults());
     }
 
-    public function testConsideringSomebodyAlreadyPairedIsRefused(): void
+    public function testAddingSomebodyAlreadyPairedIsRefused(): void
     {
-        $this->post('recipients/new', ['mrn' => '9019', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
+        $this->post('pairs/new', [
+            'rMrn' => '9019', 'dMrn' => '9022',
+            'rName' => 'Layla Test', 'rAge' => '38', 'rBloodType' => 'B',
+            'dName' => 'Their Donor', 'dAge' => '30', 'dBloodType' => 'B',
+        ]);
         $this->post('pairs/new', [
             'rMrn' => '9020', 'dMrn' => '9021',
             'rName' => 'Paired Recipient', 'rAge' => '40', 'rBloodType' => 'A',
             'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
         ]);
 
-        // A donor in a pair is spoken for; considering them for somebody else
-        // would be offering a decision that has already been taken.
-        $this->post('recipients/9019/donors', ['donorMrn' => '9021']);
+        $pairId = (int) $this->db->table('pairs')->where('recipient_mrn', 9019)->get()->getRowArray()['id'];
 
-        $this->dontSeeInDatabase('potential_donors', ['recipient_mrn' => 9019, 'donor_mrn' => 9021]);
+        // A donor in a pair is spoken for; putting them on a second one would
+        // be promising them twice.
+        $this->post('pairs/' . $pairId . '/donors', ['donorMrn' => '9021', 'status' => 'on_hold']);
+
+        $this->dontSeeInDatabase('pairs', ['recipient_mrn' => 9019, 'donor_mrn' => 9021]);
         $this->assertStringContainsString('already in an open pair', (string) session('ui_error'));
     }
 
@@ -1284,14 +1283,17 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'rFirstDialysis' => '11/02/2023',
         ]);
 
+        // The donor's card belongs to their tab, because a pair holds more
+        // than one of them and a save has to say which.
         $this->post('pairs/' . $pairId, [
-            'section'      => 'donor',
+            'section'      => 'pd' . $pairId . '-personal',
             'dName'        => 'Donor Edited',
             'dAge'         => '31',
             'dBloodType'   => 'A',
             'dGender'      => 'Female',
+            'dType'        => 'living_related',
             'dMrp'         => (string) $this->mrpId,
-            'dStatus'      => 'Completed',
+            'dStatus'      => 'Declined',
             'dCoordinator' => 'Coordinator Three',
         ]);
 
@@ -1311,7 +1313,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('donors', [
             'name'   => 'Donor Edited',
             'gender' => 'female',
-            'status' => 'completed',
+            'status' => 'declined',
             'mrp_id' => $this->mrpId,
         ]);
         $this->seeInDatabase('coordinators', ['name' => 'Coordinator Three']);
@@ -2287,10 +2289,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
-     * A donor with a pair has nothing to choose, so Link shows it. A recipient
-     * always has something to choose: another donor.
+     * Either side already in a pair has nothing to choose, so Link shows them
+     * the pair: a pair's further donors are added on the pair's own screen.
      */
-    public function testOnlyADonorIsSentStraightToTheirPair(): void
+    public function testEitherSideIsSentStraightToTheirPair(): void
     {
         $this->post('pairs/new', [
             'rMrn' => '9004', 'dMrn' => '9005',
@@ -2301,8 +2303,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
 
         $this->get('donors/9005/link')->assertRedirectTo(site_url('pairs/' . $pairId));
-        // The recipient has no such page: their choice is on their record.
-        $this->assertStringContainsString('Add Potential Donor', $this->get('recipients/9004')->getBody());
+        $this->get('recipients/9004/link')->assertRedirectTo(site_url('pairs/' . $pairId));
+        // And the record says who, rather than offering to link again.
+        $this->assertStringContainsString('Linked: D', $this->get('recipients/9004')->getBody());
+        $this->assertStringNotContainsString('Link with Donor', $this->get('recipients/9004')->getBody());
     }
 
     /**
@@ -2341,79 +2345,211 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
-     * A recipient's potential donors are tabs, and setting one aside greys it
-     * rather than taking it off the record.
+     * Helper: a pair with one donor, made the way the screens make one.
+     *
+     * @return array{0: int, 1: int} The pair's id, and the link's
      */
-    public function testARecipientsPotentialDonorsAreTabs(): void
+    private function pairWith(string $rMrn, string $dMrn, string $dName = 'Donor'): array
     {
-        $this->post('recipients/new', ['mrn' => '8800', 'name' => 'Tabs Test', 'age' => '44', 'bloodType' => 'A']);
+        $this->post('pairs/new', [
+            'rMrn' => $rMrn, 'dMrn' => $dMrn,
+            'rName' => 'R ' . $rMrn, 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => $dName, 'dAge' => '30', 'dBloodType' => 'A', 'dStatus' => 'Active',
+        ]);
 
-        foreach ([['8801', 'Donor One'], ['8802', 'Donor Two']] as [$dMrn, $dName]) {
-            $this->post('donors/new?for=8800', [
-                'for' => '8800', 'mrn' => $dMrn, 'name' => $dName, 'age' => '33', 'bloodType' => 'A',
-            ]);
-        }
+        $row = $this->db->table('pairs')->where('recipient_mrn', $rMrn)->orderBy('id')->get()->getRowArray();
 
-        // Candidates, not pairs: nothing has been decided yet.
-        $this->assertSame(0, $this->db->table('pairs')->countAllResults());
-        $this->assertSame(2, $this->db->table('potential_donors')->where('recipient_mrn', 8800)->countAllResults());
+        return [(int) $row['id'], (int) $row['id']];
+    }
 
-        $html = $this->get('recipients/8800')->getBody();
-        $this->assertStringContainsString('2 potential donors', $html);
-        $this->assertStringContainsString('donor-1', $html);
-        $this->assertStringContainsString('donor-2', $html);
-        $this->assertStringContainsString('Donor One', $html);
+    /** Adds another donor to a pair, through the pair's own dialog. */
+    private function addPairDonor(int $pairId, string $dMrn, string $dName, string $status = 'on_hold'): int
+    {
+        $pair = $this->db->table('pairs')->where('id', $pairId)->get()->getRowArray();
 
-        // The second tab shows the second donor, in full: their details and
-        // their whole workup, without leaving the recipient's record.
-        $second = $this->get('recipients/8800?donor=2')->getBody();
-        $this->assertStringContainsString('Donor Two', $second);
-        $this->assertStringContainsString('Required Lab Tests', $second);
+        $this->post('donors/new?pair=' . $pair['recipient_mrn'], [
+            'pair' => (string) $pair['recipient_mrn'], 'mrn' => $dMrn, 'name' => $dName,
+            'age' => '33', 'bloodType' => 'A',
+            'donorStatus' => $status === 'on_hold' ? 'On Hold' : ucfirst($status),
+        ]);
 
-        $first = $this->db->table('potential_donors')->where('recipient_mrn', 8800)->orderBy('id')->get()->getRowArray();
+        $row = $this->db->table('pairs')
+            ->where('recipient_mrn', $pair['recipient_mrn'])
+            ->where('donor_mrn', $dMrn)
+            ->get()
+            ->getRowArray();
 
-        // It asks before setting anybody aside.
-        $this->assertStringContainsString(
-            'set to Declined',
-            $this->get('recipients/8800/donors/' . $first['id'] . '/delink')->getBody()
-        );
-        $this->seeInDatabase('potential_donors', ['id' => $first['id'], 'status' => 'active']);
-
-        $this->post('recipients/8800/donors/' . $first['id'] . '/delink');
-
-        $this->seeInDatabase('potential_donors', ['id' => $first['id'], 'status' => 'declined']);
-
-        $html = $this->get('recipients/8800?donor=1')->getBody();
-        $this->assertStringContainsString('tab--delinked', $html);
-        $this->assertStringContainsString('cannot be changed', $html);
-        // Read-only: the tab that was set aside has nothing left to press.
-        $this->assertStringNotContainsString('/delink"', $html);
-        $this->assertStringNotContainsString('Pair up', $html);
+        return (int) $row['id'];
     }
 
     /**
-     * A potential donor reads the way everything else on the record does.
-     *
-     * The recipient first — who they are, their workup, their notes — and the
-     * donors under them, each as the same three cards the pair screen uses
-     * rather than a block of read-only text.
+     * A pair's donors are tabs, and delinking one archives it rather than
+     * taking it off the pair.
      */
-    public function testAPotentialDonorIsShownAsCardsBelowTheRecord(): void
+    public function testAPairsDonorsAreTabs(): void
     {
-        $this->post('recipients/new', ['mrn' => '8870', 'name' => 'Cards Test', 'age' => '44', 'bloodType' => 'A']);
-        $this->post('donors/new?for=8870', ['for' => '8870', 'mrn' => '8871', 'name' => 'Candidate', 'age' => '33', 'bloodType' => 'A']);
+        [$pairId] = $this->pairWith('8800', '8801', 'Donor One');
+        $second   = $this->addPairDonor($pairId, '8802', 'Donor Two');
 
-        $html = $this->get('recipients/8870')->getBody();
+        $this->assertSame(2, $this->db->table('pairs')->where('recipient_mrn', 8800)->countAllResults());
+
+        $html = $this->get('pairs/' . $pairId)->getBody();
+        $this->assertStringContainsString('2 donors', $html);
+        $this->assertStringContainsString('Donor-1', $html);
+        $this->assertStringContainsString('Donor-2', $html);
+        $this->assertStringContainsString('Donor One', $html);
+
+        // The second tab shows the second donor, in full: their details and
+        // their whole workup, without leaving the pair.
+        $tab = $this->get('pairs/' . $pairId . '?donor=2')->getBody();
+        $this->assertStringContainsString('Donor Two', $tab);
+        $this->assertStringContainsString('Required Lab Tests', $tab);
+
+        // It asks before taking anybody off, and a reserve is asked once.
+        $ask = $this->get('pairs/' . $pairId . '/donors/' . $second . '/delink')->getBody();
+        $this->assertStringContainsString('This pair has finished with Donor Two', $ask);
+        $this->assertStringNotContainsString('Take the pair apart', $ask);
+        $this->seeInDatabase('pairs', ['id' => $second, 'status' => 'on_hold']);
+
+        $this->post('pairs/' . $pairId . '/donors/' . $second . '/delink');
+
+        // Archived is the link closing; the donor's own word is untouched.
+        $this->seeInDatabase('pairs', ['id' => $second, 'status' => 'closed']);
+        $this->seeInDatabase('donors', ['mrn' => 8802, 'status' => 'on_hold']);
+
+        $html = $this->get('pairs/' . $pairId . '?donor=2')->getBody();
+        $this->assertStringContainsString('tab--delinked', $html);
+        $this->assertStringContainsString('cannot be changed', $html);
+        // Read-only: the archived tab has nothing left to press.
+        $this->assertStringNotContainsString('/delink"', $html);
+    }
+
+    /**
+     * One pair, one donor it is going ahead with.
+     *
+     * The way to another is to stand the current one down and raise them, or
+     * to swap. Setting a second active outright is refused wherever it is
+     * tried — the tab's own control, and the card behind it.
+     */
+    public function testAPairMayHaveOnlyOneActiveDonor(): void
+    {
+        [$pairId] = $this->pairWith('8920', '8921', 'The Donor');
+        $second   = $this->addPairDonor($pairId, '8922', 'The Reserve');
+
+        $this->post('pairs/' . $pairId . '/donors/' . $second . '/status', ['status' => 'active']);
+
+        $this->seeInDatabase('donors', ['mrn' => 8922, 'status' => 'on_hold']);
+        $this->assertStringContainsString('already has an active donor', (string) session('ui_error'));
+
+        // Nor through the donor's own card.
+        $this->post('pairs/' . $pairId, [
+            'section' => 'pd' . $second . '-personal',
+            'dName' => 'The Reserve', 'dBloodType' => 'A', 'dStatus' => 'Active', 'dType' => 'living_related',
+        ]);
+        $this->seeInDatabase('donors', ['mrn' => 8922, 'status' => 'on_hold']);
+
+        // And the tab's own control does not offer what it would refuse.
+        $html   = $this->get('pairs/' . $pairId . '?donor=2')->getBody();
+        $picker = substr($html, (int) strpos($html, 'id="tab-status"'));
+        $picker = substr($picker, 0, (int) strpos($picker, '</select>'));
+        $this->assertStringNotContainsString('value="active"', $picker);
+        $this->assertStringContainsString('value="on_hold"', $picker);
+
+        // Stand the first down, and the way is open.
+        [$first] = $this->pairLinks(8920);
+        $this->post('pairs/' . $pairId . '/donors/' . $first . '/status', ['status' => 'on_hold']);
+        $this->post('pairs/' . $pairId . '/donors/' . $second . '/status', ['status' => 'active']);
+
+        $this->seeInDatabase('donors', ['mrn' => 8921, 'status' => 'on_hold']);
+        $this->seeInDatabase('donors', ['mrn' => 8922, 'status' => 'active']);
+        // Nobody was archived by it: both are still the pair's donors.
+        $this->dontSeeInDatabase('pairs', ['recipient_mrn' => 8920, 'status' => 'closed']);
+    }
+
+    /**
+     * Swapping is the other way, and not the same one: it finishes with the
+     * donor swapped out, and only the active one can be swapped.
+     */
+    public function testSwappingArchivesTheDonorItSwapsOut(): void
+    {
+        [$pairId] = $this->pairWith('8930', '8931', 'Going Ahead');
+        $second   = $this->addPairDonor($pairId, '8932', 'In Reserve');
+        [$first]  = $this->pairLinks(8930);
+
+        // Not offered on a reserve, and refused if posted anyway.
+        $this->assertStringNotContainsString('tab-swap-form', $this->get('pairs/' . $pairId . '?donor=2')->getBody());
+        $this->post('pairs/' . $pairId . '/donors/' . $second . '/swap', ['toId' => (string) $first]);
+        $this->assertStringContainsString('going ahead with can be swapped', (string) session('ui_error'));
+
+        $this->post('pairs/' . $pairId . '/donors/' . $first . '/swap', ['toId' => (string) $second]);
+
+        // The one swapped out is archived with the word they had; the one
+        // swapped to is the pair's donor now.
+        $this->seeInDatabase('pairs', ['id' => $first, 'status' => 'closed']);
+        $this->seeInDatabase('donors', ['mrn' => 8931, 'status' => 'active']);
+        $this->seeInDatabase('donors', ['mrn' => 8932, 'status' => 'active']);
+
+        $html = $this->get('pairs/' . $pairId . '?donor=1')->getBody();
+        $this->assertStringContainsString('Swapped for In Reserve', $html);
+        $this->assertStringContainsString('tab--delinked', $html);
+    }
+
+    /**
+     * Delinking the donor a pair is going ahead with asks the further
+     * question, and taking the pair apart puts everybody back on their list.
+     */
+    public function testDelinkingTheActiveDonorCanTakeThePairApart(): void
+    {
+        [$pairId] = $this->pairWith('8940', '8941', 'Only Donor');
+        [$first]  = $this->pairLinks(8940);
+
+        $ask = $this->get('pairs/' . $pairId . '/donors/' . $first . '/delink')->getBody();
+        $this->assertStringContainsString('Carry on with another donor', $ask);
+        $this->assertStringContainsString('Take the pair apart', $ask);
+
+        $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'dissolve'])
+            ->assertRedirectTo(site_url('recipients/8940'));
+
+        $this->seeInDatabase('pairs', ['id' => $first, 'status' => 'closed']);
+
+        // Both are free again, and offered their own way back.
+        $this->assertStringContainsString('Link with Donor', $this->get('recipients/8940')->getBody());
+        $this->assertStringContainsString('Link with Recipient', $this->get('donors/8941')->getBody());
+
+        // And the pair's screen is still there, as the record of it.
+        $this->assertStringContainsString('Archived', $this->get('pairs/' . $pairId)->getBody());
+    }
+
+    /**
+     * A pair's donor reads the way everything else on the pair does.
+     *
+     * The pair first, then the recipient — who they are, their workup, their
+     * notes — and the donors under them, each as the same three cards.
+     */
+    public function testAPairsDonorIsShownAsCardsBelowTheRecipient(): void
+    {
+        [$pairId] = $this->pairWith('8870', '8871', 'The Donor');
+
+        // The dash is written as a character in some of these headings and as
+        // an entity in others, and which is which is not what this is about.
+        $html = str_replace('—', '&mdash;', $this->get('pairs/' . $pairId)->getBody());
 
         $titles = [
-            'Personal Information',
+            'Pair Details',
+            'Recipient &mdash; Personal Information',
             'Required Lab Tests',
-            'Clinical Notes',
-            'Potential Donors',
+            'Recipient &mdash; Clinical Notes',
             'Donor &mdash; Personal Information',
             'Donor &mdash; Required Lab Tests',
             'Donor &mdash; Clinical Notes',
         ];
+
+        // The donors' own card heads the tabs, above the first of them.
+        $this->assertLessThan(
+            (int) strpos($html, '>Donor &mdash; Personal Information</h2>'),
+            (int) strpos($html, '>Donors</h2>'),
+            'the tabs come before the first donor on them'
+        );
 
         $at = -1;
 
@@ -2423,31 +2559,26 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             $this->assertGreaterThan($at, $next, $title . ' comes after the card before it');
             $at = $next;
         }
-
-        // The donor's own record is reached through their cards, not a button.
-        $this->assertStringNotContainsString('Open donor record', $html);
     }
 
     /** And each of those cards is edited and saved on its own. */
-    public function testEachOfAPotentialDonorsCardsSavesOnItsOwn(): void
+    public function testEachOfAPairsDonorCardsSavesOnItsOwn(): void
     {
-        $this->post('recipients/new', ['mrn' => '8880', 'name' => 'Edit Test', 'age' => '44', 'bloodType' => 'A']);
-        $this->post('donors/new?for=8880', ['for' => '8880', 'mrn' => '8881', 'name' => 'Candidate', 'age' => '33', 'bloodType' => 'A']);
-
-        $id = (int) $this->db->table('potential_donors')->get()->getRowArray()['id'];
+        [$pairId] = $this->pairWith('8880', '8881', 'The Donor');
+        [$id]     = $this->pairLinks(8880);
 
         // Closed until a card is opened, and opened one at a time.
-        $this->assertStringContainsString('edit=pd' . $id . '-personal', $this->get('recipients/8880')->getBody());
+        $this->assertStringContainsString('edit=pd' . $id . '-personal', $this->get('pairs/' . $pairId)->getBody());
 
-        $open = $this->get('recipients/8880?donor=1&edit=pd' . $id . '-personal')->getBody();
+        $open = $this->get('pairs/' . $pairId . '?donor=1&edit=pd' . $id . '-personal')->getBody();
         $this->assertStringContainsString('name="section" value="pd' . $id . '-personal"', $open);
         $this->assertStringContainsString('name="dName"', $open);
 
-        $this->post('recipients/8880', [
+        $this->post('pairs/' . $pairId, [
             'section' => 'pd' . $id . '-personal',
             'dName'   => 'Renamed', 'dCity' => 'Jeddah', 'dBloodType' => 'B',
             'dRelationship' => 'Brother', 'dStatus' => 'Active', 'dType' => 'living_related',
-        ])->assertRedirectTo(site_url('recipients/8880') . '?donor=1');
+        ])->assertRedirectTo(site_url('pairs/' . $pairId) . '?donor=1');
 
         $this->seeInDatabase('donors', [
             'mrn' => 8881, 'name' => 'Renamed', 'city' => 'Jeddah',
@@ -2455,236 +2586,99 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         ]);
 
         // The notes card writes only the notes.
-        $this->post('recipients/8880', ['section' => 'pd' . $id . '-notes', 'dNotes' => 'Seen in clinic.']);
+        $this->post('pairs/' . $pairId, ['section' => 'pd' . $id . '-notes', 'dNotes' => 'Seen in clinic.']);
         $this->seeInDatabase('donors', ['mrn' => 8881, 'name' => 'Renamed', 'notes' => 'Seen in clinic.']);
     }
 
-    /** A candidate who was set aside is shown, and not edited. */
-    public function testASetAsidePotentialDonorHasNoEditLinks(): void
+    /** An archived donor is shown, and not edited. */
+    public function testAnArchivedDonorHasNoEditLinks(): void
     {
-        $this->post('recipients/new', ['mrn' => '8890', 'name' => 'Frozen', 'age' => '44', 'bloodType' => 'A']);
-        $this->post('donors/new?for=8890', ['for' => '8890', 'mrn' => '8891', 'name' => 'Candidate', 'age' => '33', 'bloodType' => 'A']);
+        [$pairId] = $this->pairWith('8890', '8891', 'The Donor');
+        $second   = $this->addPairDonor($pairId, '8892', 'The Reserve');
 
-        $id = (int) $this->db->table('potential_donors')->get()->getRowArray()['id'];
-        $this->post('recipients/8890/donors/' . $id . '/delink');
+        $this->post('pairs/' . $pairId . '/donors/' . $second . '/delink');
 
-        $html = $this->get('recipients/8890?donor=1')->getBody();
+        $html = $this->get('pairs/' . $pairId . '?donor=2')->getBody();
         $this->assertStringContainsString('Donor &mdash; Personal Information', $html);
-        $this->assertStringNotContainsString('edit=pd' . $id . '-', $html);
+        $this->assertStringNotContainsString('edit=pd' . $second . '-', $html);
 
         // And a post naming one of its cards changes nothing.
-        $this->post('recipients/8890', ['section' => 'pd' . $id . '-notes', 'dNotes' => 'Should not land.']);
-        $this->dontSeeInDatabase('donors', ['mrn' => 8891, 'notes' => 'Should not land.']);
+        $this->post('pairs/' . $pairId, ['section' => 'pd' . $second . '-notes', 'dNotes' => 'Should not land.']);
+        $this->dontSeeInDatabase('donors', ['mrn' => 8892, 'notes' => 'Should not land.']);
     }
 
     /** The status beside a tab's name is a word, and only a word. */
     public function testATabsStatusIsPlainText(): void
     {
-        $this->post('recipients/new', ['mrn' => '8810', 'name' => 'Plain', 'age' => '44', 'bloodType' => 'A']);
-        $this->post('donors/new?for=8810', ['for' => '8810', 'mrn' => '8811', 'name' => 'D', 'age' => '33', 'bloodType' => 'A']);
+        [$pairId] = $this->pairWith('8810', '8811', 'D');
+        [$id]     = $this->pairLinks(8810);
 
-        $html = $this->get('recipients/8810')->getBody();
+        $this->assertStringContainsString('<span class="tab-status">Active</span>', $this->get('pairs/' . $pairId)->getBody());
 
-        $this->assertStringContainsString('<span class="tab-status">Active</span>', $html);
+        $this->post('pairs/' . $pairId . '/donors/' . $id . '/status', ['status' => 'on_hold']);
 
-        $id = (int) $this->db->table('potential_donors')->get()->getRowArray()['id'];
-        $this->post('recipients/8810/donors/' . $id . '/status', ['status' => 'on_hold']);
-
-        $this->seeInDatabase('potential_donors', ['id' => $id, 'status' => 'on_hold']);
-        $this->assertStringContainsString('<span class="tab-status">On Hold</span>', $this->get('recipients/8810')->getBody());
+        $this->seeInDatabase('donors', ['mrn' => 8811, 'status' => 'on_hold']);
+        $this->assertStringContainsString('<span class="tab-status">On Hold</span>', $this->get('pairs/' . $pairId)->getBody());
     }
 
-    /**
-     * Adding a potential donor adds nobody to the Donors List and makes no
-     * pair. That is the whole point of the middle state.
-     */
-    public function testAPotentialDonorIsNotOnTheRegisterUntilThePairIsMade(): void
+    /** Somebody already on the register joins a pair without being re-entered. */
+    public function testAnExistingDonorCanBeAddedToAPair(): void
     {
-        $this->post('recipients/new', ['mrn' => '8820', 'name' => 'Waiting', 'age' => '44', 'bloodType' => 'A']);
-        $this->post('donors/new?for=8820', [
-            'for' => '8820', 'mrn' => '8821', 'name' => 'Candidate', 'age' => '33', 'bloodType' => 'A',
-        ])->assertRedirectTo(site_url('recipients/8820') . '?donor=1');
+        [$pairId] = $this->pairWith('8850', '8851', 'The Donor');
+        $this->post('donors/new', ['mrn' => '8852', 'name' => 'On The Register', 'age' => '30', 'bloodType' => 'A']);
 
-        $this->seeInDatabase('donors', ['mrn' => 8821, 'is_listed' => 0]);
-        $this->assertSame(0, $this->db->table('pairs')->countAllResults());
-        // Not in the table the Donors List is built from.
-        $this->assertStringNotContainsString(
-            'donors/8821',
-            $this->get('donors')->getBody()
+        $this->post('pairs/' . $pairId . '/donors', ['donorMrn' => '8852', 'status' => 'on_hold']);
+
+        $this->seeInDatabase('pairs', ['recipient_mrn' => 8850, 'donor_mrn' => 8852, 'status' => 'on_hold']);
+        $this->seeInDatabase('donors', ['mrn' => 8852, 'status' => 'on_hold', 'is_listed' => 1]);
+        // And never as a second active one.
+        $this->post('pairs/' . $pairId . '/donors', ['donorMrn' => '8852', 'status' => 'active']);
+        $this->seeInDatabase('donors', ['mrn' => 8852, 'status' => 'on_hold']);
+    }
+
+    /** A donor entered for a pair joins it, and the pair's screen comes back. */
+    public function testADonorEnteredForAPairJoinsIt(): void
+    {
+        [$pairId] = $this->pairWith('8820', '8821', 'The Donor');
+
+        $this->post('donors/new?pair=8820', [
+            'pair' => '8820', 'mrn' => '8822', 'name' => 'Entered For It',
+            'age' => '33', 'bloodType' => 'A', 'donorStatus' => 'On Hold',
+        ])->assertRedirectTo(site_url('pairs/' . $pairId) . '?donor=2');
+
+        $this->seeInDatabase('pairs', ['recipient_mrn' => 8820, 'donor_mrn' => 8822, 'status' => 'on_hold']);
+        // On the register from the start: there is nobody to keep off it now.
+        $this->seeInDatabase('donors', ['mrn' => 8822, 'is_listed' => 1]);
+        // The form does not offer the word the pair would refuse.
+        $this->assertStringNotContainsString('value="Active"', $this->get('donors/new?pair=8820')->getBody());
+    }
+
+    /** Any of a pair's links opens the same pair, at that donor's tab. */
+    public function testAnyLinkOpensTheSamePair(): void
+    {
+        [$pairId] = $this->pairWith('8860', '8861', 'The Donor');
+        $second   = $this->addPairDonor($pairId, '8862', 'The Reserve');
+
+        $html = $this->get('pairs/' . $second)->getBody();
+
+        // The same pair, with both tabs on it, opened at the one asked for.
+        $this->assertStringContainsString('2 donors', $html);
+        $this->assertStringContainsString('The Reserve', $html);
+        $this->assertStringContainsString('aria-selected="true"', $html);
+        $this->assertMatchesRegularExpression('/aria-selected="true"\s+href="[^"]*\?donor=2"/', $html);
+        // And the pair's own cards are the pair's, whichever link opened it.
+        $this->assertStringContainsString('edit=pair', $html);
+    }
+
+    /** The links of one recipient's pair, oldest first. */
+    private function pairLinks(int $recipientMrn): array
+    {
+        return array_map(
+            static fn (array $row): int => (int) $row['id'],
+            $this->db->table('pairs')->where('recipient_mrn', $recipientMrn)->orderBy('id')->get()->getResultArray()
         );
-
-        // Pair up is what puts them on it. The Donors List itself shows only
-        // donors who are free, so a paired one is off it again for that other
-        // reason — what changed here is that they are on the register at all.
-        $id = (int) $this->db->table('potential_donors')->get()->getRowArray()['id'];
-        $this->post('recipients/8820/donors/' . $id . '/pair');
-
-        $this->seeInDatabase('donors', ['mrn' => 8821, 'is_listed' => 1]);
     }
 
-    /**
-     * Pair up is the decision the list was leading to: one pair, every other
-     * candidate set aside, and the pair's own screen.
-     */
-    public function testPairUpMakesThePairAndSetsTheRestAside(): void
-    {
-        $this->post('recipients/new', ['mrn' => '8830', 'name' => 'Decider', 'age' => '44', 'bloodType' => 'A']);
-
-        foreach (['8831', '8832', '8833'] as $dMrn) {
-            $this->post('donors/new?for=8830', [
-                'for' => '8830', 'mrn' => $dMrn, 'name' => 'Donor ' . $dMrn, 'age' => '33', 'bloodType' => 'A',
-            ]);
-        }
-
-        $rows   = $this->db->table('potential_donors')->where('recipient_mrn', 8830)->orderBy('id')->get()->getResultArray();
-        $chosen = $rows[1];
-
-        $this->post('recipients/8830/donors/' . $chosen['id'] . '/pair');
-
-        $pair = $this->db->table('pairs')->where('recipient_mrn', 8830)->get()->getRowArray();
-        $this->assertNotNull($pair);
-        $this->assertSame('8832', (string) $pair['donor_mrn']);
-        $this->assertSame(1, $this->db->table('pairs')->countAllResults());
-
-        $this->seeInDatabase('potential_donors', ['id' => $chosen['id'], 'status' => 'active']);
-        $this->seeInDatabase('potential_donors', ['id' => $rows[0]['id'], 'status' => 'declined']);
-        $this->seeInDatabase('potential_donors', ['id' => $rows[2]['id'], 'status' => 'declined']);
-    }
-
-    /** And it is the pair's screen that opens, not another step. */
-    public function testPairUpGoesStraightToThePair(): void
-    {
-        $this->post('recipients/new', ['mrn' => '8840', 'name' => 'Decider', 'age' => '44', 'bloodType' => 'A']);
-        $this->post('donors/new?for=8840', ['for' => '8840', 'mrn' => '8841', 'name' => 'D', 'age' => '33', 'bloodType' => 'A']);
-
-        $id = (int) $this->db->table('potential_donors')->get()->getRowArray()['id'];
-        $pairId = null;
-
-        $this->post('recipients/8840/donors/' . $id . '/pair');
-        $pairId = (int) $this->db->table('pairs')->get()->getRowArray()['id'];
-
-        $this->post('recipients/8840/donors/' . $id . '/pair')
-            ->assertRedirectTo(site_url('pairs/' . $pairId));
-    }
-
-    /**
-     * A pair does not end the list: the others stay, and the pair can be moved
-     * to one of them.
-     *
-     * Being passed over is not a decision about that donor, so the way back is
-     * open. Being delinked by hand is, so it is not.
-     */
-    public function testThePairCanBeSwitchedToAnotherPotentialDonor(): void
-    {
-        $this->post('recipients/new', ['mrn' => '8900', 'name' => 'Switcher', 'age' => '44', 'bloodType' => 'A']);
-
-        foreach ([['8901', 'First Donor'], ['8902', 'Second Donor'], ['8903', 'Turned Down']] as [$dMrn, $dName]) {
-            $this->post('donors/new?for=8900', [
-                'for' => '8900', 'mrn' => $dMrn, 'name' => $dName, 'age' => '33', 'bloodType' => 'A',
-            ]);
-        }
-
-        $rows = $this->db->table('potential_donors')->where('recipient_mrn', 8900)->orderBy('id')->get()->getResultArray();
-
-        // One is turned down by hand before anything is paired.
-        $this->post('recipients/8900/donors/' . $rows[2]['id'] . '/delink');
-
-        $this->post('recipients/8900/donors/' . $rows[0]['id'] . '/pair');
-
-        // Passed over, with the reason recorded; turned down stays turned down.
-        $this->seeInDatabase('potential_donors', ['id' => $rows[1]['id'], 'status' => 'declined', 'aside_reason' => 'superseded']);
-        $this->seeInDatabase('potential_donors', ['id' => $rows[2]['id'], 'status' => 'declined', 'aside_reason' => 'delinked']);
-
-        // The whole list is still on the screen, and the one passed over can
-        // be switched to; the one delinked cannot.
-        $html = $this->get('recipients/8900?donor=2')->getBody();
-        $this->assertStringContainsString('Second Donor', $html);
-        $this->assertStringContainsString('Switch to this donor', $html);
-
-        $frozen = $this->get('recipients/8900?donor=3')->getBody();
-        $this->assertStringContainsString('Turned Down', $frozen);
-        $this->assertStringNotContainsString('Switch to this donor', $frozen);
-        $this->assertStringNotContainsString('Pair up', $frozen);
-
-        // Switching moves the pair and closes the old one.
-        $this->post('recipients/8900/donors/' . $rows[1]['id'] . '/pair');
-
-        $pairs = $this->db->table('pairs')->where('recipient_mrn', 8900)->orderBy('id')->get()->getResultArray();
-        $this->assertCount(2, $pairs);
-        $this->assertSame('closed', $pairs[0]['status']);
-        $this->assertSame('8901', (string) $pairs[0]['donor_mrn']);
-        $this->assertStringContainsString('Switched to Second Donor', (string) $pairs[0]['closed_reason']);
-        $this->assertNotSame('closed', $pairs[1]['status']);
-        $this->assertSame('8902', (string) $pairs[1]['donor_mrn']);
-
-        // And the two candidates have swapped places.
-        $this->seeInDatabase('potential_donors', ['id' => $rows[1]['id'], 'status' => 'active', 'aside_reason' => null]);
-        $this->seeInDatabase('potential_donors', ['id' => $rows[0]['id'], 'status' => 'declined', 'aside_reason' => 'superseded']);
-    }
-
-    /** What was switched away from is kept, and shown where it is asked for. */
-    public function testThePairingHistoryIsOnTheRecipientsRecord(): void
-    {
-        $this->post('recipients/new', ['mrn' => '8910', 'name' => 'Archivist', 'age' => '44', 'bloodType' => 'A']);
-
-        foreach ([['8911', 'Was Paired'], ['8912', 'Is Paired']] as [$dMrn, $dName]) {
-            $this->post('donors/new?for=8910', [
-                'for' => '8910', 'mrn' => $dMrn, 'name' => $dName, 'age' => '33', 'bloodType' => 'A',
-            ]);
-        }
-
-        $rows = $this->db->table('potential_donors')->where('recipient_mrn', 8910)->orderBy('id')->get()->getResultArray();
-
-        // Nothing to archive until there has been a pair.
-        $this->assertStringNotContainsString('Pairing history', $this->get('recipients/8910')->getBody());
-
-        $this->post('recipients/8910/donors/' . $rows[0]['id'] . '/pair');
-        $this->post('recipients/8910/donors/' . $rows[1]['id'] . '/pair');
-
-        $html = $this->get('recipients/8910')->getBody();
-
-        $this->assertStringContainsString('Pairing history', $html);
-        $this->assertStringContainsString('2 pairs', $html);
-        // Newest first: who it is now, then who it was.
-        $this->assertLessThan(
-            strpos($html, 'Was Paired'),
-            strpos($html, 'Is Paired'),
-            'the current pair comes before the one it replaced'
-        );
-        $this->assertStringContainsString('Current pair', $html);
-        $this->assertStringContainsString('Switched to Is Paired.', $html);
-    }
-
-    /** Somebody already on the register can be considered without re-entering them. */
-    public function testAnExistingDonorCanBeAddedAsACandidate(): void
-    {
-        $this->post('recipients/new', ['mrn' => '8850', 'name' => 'Collector', 'age' => '44', 'bloodType' => 'A']);
-        $this->post('donors/new', ['mrn' => '8851', 'name' => 'On The Register', 'age' => '30', 'bloodType' => 'A']);
-
-        $this->post('recipients/8850/donors', ['donorMrn' => '8851'])
-            ->assertRedirectTo(site_url('recipients/8850') . '?donor=1');
-
-        $this->seeInDatabase('potential_donors', ['recipient_mrn' => 8850, 'donor_mrn' => 8851, 'status' => 'active']);
-        // Already listed, and they stay listed: nothing about them changed.
-        $this->seeInDatabase('donors', ['mrn' => 8851, 'is_listed' => 1]);
-        $this->assertSame(0, $this->db->table('pairs')->countAllResults());
-    }
-
-    /**
-     * A pair made by any other door still shows as a tab, because the two were
-     * considered together however the pair came about.
-     */
-    public function testAPairMadeElsewhereStillShowsAsATab(): void
-    {
-        $this->post('pairs/new', [
-            'rMrn' => '8860', 'dMrn' => '8861',
-            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
-            'dName' => 'Through Add Pair', 'dAge' => '30', 'dBloodType' => 'A',
-        ]);
-
-        $this->seeInDatabase('potential_donors', ['recipient_mrn' => 8860, 'donor_mrn' => 8861]);
-        $this->assertStringContainsString('Through Add Pair', $this->get('recipients/8860')->getBody());
-    }
 
     /** Every record screen offers its own sheet, and the sheet has the record on it. */
     public function testARecordPrintsAsItsOwnSheet(): void
@@ -3148,6 +3142,50 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('value="tone-teal" checked', $edit);
         // The anchor the Edit link aims at is on the card it names.
         $this->assertStringContainsString('id="lab-' . $lab['id'] . '"', $edit);
+    }
+
+    /**
+     * An answer carries no colour until somebody gives it one.
+     *
+     * A colour on a medical record means something, so it is said on purpose:
+     * the card shows the words plain, and only the answers that were coloured
+     * come out coloured.
+     */
+    public function testAnAnswerIsPlainUntilAColourIsChosen(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4097', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('recipients/4097/labs');
+        $lab = $this->db->table('labs')->where('person_mrn', 4097)->get()->getRowArray();
+
+        $this->post('recipients/4097', [
+            'section' => 'labs',
+            'labs'    => [[
+                'id' => $lab['id'], 'name' => 'Courier sample',
+                'answers' => [
+                    'pending'  => ['on' => '1', 'tone' => 'tone-amber'],
+                    'done'     => ['on' => '1'],
+                    'not_done' => ['on' => '1', 'tone' => 'not-a-colour'],
+                ],
+            ]],
+        ]);
+
+        $stored = json_decode(
+            (string) $this->db->table('labs')->where('id', $lab['id'])->get()->getRowArray()['answer_set'],
+            true
+        );
+        $tones = array_column($stored, 'tone', 'key');
+
+        // Only the one that was picked, and a colour nobody has is stored as
+        // nothing rather than as the platform's own guess.
+        $this->assertSame('tone-amber', $tones['pending']);
+        $this->assertSame('', $tones['done']);
+        $this->assertSame('', $tones['not_done']);
+
+        $html = $this->get('recipients/4097')->getBody();
+        $this->assertStringContainsString('data-lab-status="pending" data-lab-tone="tone-amber"', $html);
+        $this->assertStringContainsString('data-lab-status="done" data-lab-tone=""', $html);
+        // The coloured one is tinted on the card; the plain ones are not.
+        $this->assertStringContainsString('lab-status-btn--tinted tone-amber', $html);
     }
 
     /** A date-shaped thing that is not a date is refused, not a stack trace. */

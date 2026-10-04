@@ -22,14 +22,15 @@ use CodeIgniter\Database\Seeder;
  *
  * What there is to look at:
  *
- *   980101  four donors, one of each ending — an Active one, one On Hold, one
- *           already Declined, and one already delinked and greyed. This is the
- *           tabs screen with everything on it at once.
- *   980201  two donors, both Active: the ordinary case, and the one to press
- *           Delink on to watch a tab go grey.
+ *   980101  four donors, one of each ending — the Active one, one On Hold,
+ *           one Declined, and one already archived and greyed. This is a
+ *           pair's tabs with everything on them at once.
+ *   980201  two donors, one Active and one On Hold: the ordinary case, and
+ *           the one to press Swap on to watch the two change places.
  *   980301  one donor, and three tests added to the record under Other, so
  *           the Add lab card can be seen holding real answers.
- *   980401  no donors at all, to see the screen with nothing but the button.
+ *   980401  no donors at all, to see a recipient with nothing but the
+ *           Link with Donor button.
  *
  * Nothing here is offered for exchange: this fixture is about one recipient's
  * donors, and the exchange screen has a fixture of its own.
@@ -41,10 +42,12 @@ class MultiDonorDemoSeeder extends Seeder
     public const MRN_TO   = 980999;
 
     /**
-     * [recipient mrn, name, group, [[donor mrn, name, group, relationship, pair status]]]
+     * [recipient mrn, name, group, [[donor mrn, name, group, relationship, status]]]
      *
-     * A pair status of `closed` is a link that was delinked: the tab is grey
-     * and the donor reads Declined, which is what delinking leaves behind.
+     * The status is the donor's own, and one donor to a pair may hold Active —
+     * that is the rule the screen is built around, so the fixture keeps it.
+     * `closed` is not a status but the archived mode: the link is finished
+     * with, the tab is grey, and the word the donor was given stands.
      */
     private const RECIPIENTS = [
         [980101, 'Mishal Al-Harthy', 'A', [
@@ -55,7 +58,7 @@ class MultiDonorDemoSeeder extends Seeder
         ]],
         [980201, 'Ghadah Al-Shamrani', 'O', [
             [980211, 'Nouf Al-Shamrani',  'O', 'Sister', 'active'],
-            [980212, 'Majed Al-Shamrani', 'O', 'Son',    'active'],
+            [980212, 'Majed Al-Shamrani', 'O', 'Son',    'on_hold'],
         ]],
         [980301, 'Abdullah Al-Qarni', 'B', [
             [980311, 'Hind Al-Qarni', 'B', 'Wife', 'active'],
@@ -66,13 +69,29 @@ class MultiDonorDemoSeeder extends Seeder
     /**
      * Tests added to 980301's own record, under Other.
      *
-     * [name, status, comment] — three answers from three different halves of
-     * the list, so the colours can be seen next to each other.
+     * [name, answers, status, comment] — a test added under Other says what it
+     * answers, so each of these is given a set of its own, and only some of
+     * them a colour: an answer carries none until somebody picks one.
      */
     private const ADDED_TESTS = [
-        ['Ultrasound Doppler Hepatic Vein', 'acceptable',     'Reported normal on 12/09/2026.'],
-        ['Bone densitometry',               'pending',        'Booked for next week.'],
-        ['Genetic panel (Alport)',          'not_applicable', 'No family history.'],
+        [
+            'Ultrasound Doppler Hepatic Vein',
+            [['not_done', 'Not done', ''], ['acceptable', 'Acceptable', 'tone-emerald'], ['abnormal', 'Abnormal', 'tone-red']],
+            'acceptable',
+            'Reported normal on 12/09/2026.',
+        ],
+        [
+            'Bone densitometry',
+            [['not_done', 'Not done', ''], ['pending', 'Pending', 'tone-amber'], ['done', 'Done', '']],
+            'pending',
+            'Booked for next week.',
+        ],
+        [
+            'Genetic panel (Alport)',
+            [['not_done', 'Not done', ''], ['applicable', 'Applicable', ''], ['not_applicable', 'Not applicable', '']],
+            'not_applicable',
+            'No family history.',
+        ],
     ];
 
     public function run(): void
@@ -83,23 +102,11 @@ class MultiDonorDemoSeeder extends Seeder
             $this->recipient($rMrn, $rName, $rGroup, $organ);
 
             foreach ($donors as [$dMrn, $dName, $dGroup, $relationship, $status]) {
-                // A delinked donor is Declined; that is what delinking leaves.
-                $donorStatus = $status === 'closed' || $status === 'declined' ? 'declined' : 'active';
+                // An archived donor keeps the word they were given; the one
+                // in the fixture was declined before the pair let them go.
+                $donorStatus = $status === 'closed' ? 'declined' : $status;
 
                 $this->donor($dMrn, $dName, $dGroup, $organ, $relationship, $donorStatus);
-
-                // The candidate row is what the recipient's tabs are built
-                // from; the pair is what one of them became. A closed pair is
-                // a candidate who was set aside.
-                if ($this->db->table('potential_donors')->getWhere(['donor_mrn' => $dMrn])->getRowArray() === null) {
-                    $this->db->table('potential_donors')->insert([
-                        'recipient_mrn' => $rMrn,
-                        'donor_mrn'     => $dMrn,
-                        'status'        => $status === 'closed' || $status === 'declined' ? 'declined' : 'active',
-                        'created_at'    => date('Y-m-d H:i:s'),
-                        'updated_at'    => date('Y-m-d H:i:s'),
-                    ]);
-                }
 
                 if ($this->db->table('pairs')->getWhere(['donor_mrn' => $dMrn])->getRowArray() !== null) {
                     continue;
@@ -110,7 +117,7 @@ class MultiDonorDemoSeeder extends Seeder
                     'donor_mrn'     => $dMrn,
                     'status'        => $status,
                     'relationship'  => $relationship,
-                    'closed_reason' => $status === 'closed' ? 'Delinked from the recipient.' : null,
+                    'closed_reason' => $status === 'closed' ? 'Delinked from the pair.' : null,
                     'created_at'    => date('Y-m-d H:i:s'),
                     'updated_at'    => date('Y-m-d H:i:s'),
                 ]);
@@ -131,7 +138,7 @@ class MultiDonorDemoSeeder extends Seeder
 
         $order = model(LabModel::class)->lastSortOrder($organ, 'recipient');
 
-        foreach (self::ADDED_TESTS as [$name, $status, $comment]) {
+        foreach (self::ADDED_TESTS as [$name, $answers, $status, $comment]) {
             if ($this->db->table('labs')->getWhere(['name' => $name, 'person_mrn' => $mrn])->getRowArray() !== null) {
                 continue;
             }
@@ -143,6 +150,10 @@ class MultiDonorDemoSeeder extends Seeder
                 'person_type'   => 'recipient',
                 'person_mrn'    => $mrn,
                 'result_type'   => 'custom',
+                'answer_set'    => json_encode(array_map(
+                    static fn (array $a): array => ['key' => $a[0], 'label' => $a[1], 'tone' => $a[2]],
+                    $answers
+                ), JSON_UNESCAPED_UNICODE),
                 'sort_order'    => ++$order,
                 'is_active'     => 1,
                 'created_at'    => date('Y-m-d H:i:s'),

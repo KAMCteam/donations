@@ -36,18 +36,30 @@ $card     = static fn (string $name): string => 'pd' . $tab['id'] . '-' . $name;
 $editable = fn (string $name): bool => ! $tab['archived'] && $editing === $card($name);
 $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
 ?>
-<div class="card card--pad">
+<?php // Folded away when it is in the road, and open when the screen arrives.
+      // Shut, the summary keeps the name and the status, which are what
+      // anybody scans this card for.
+      //
+      // The summary has to be the first thing in the card, so the form starts
+      // under it rather than around it — the head holds a link and no fields,
+      // so there is nothing in it the form wants. ?>
+<details class="card card--pad card-fold" open>
+    <summary class="card-head card-fold-head">
+        <span class="card-fold-mark" aria-hidden="true"><?= ui_icon('chevron') ?></span>
+        <div class="section-head">
+            <div class="role-badge role-badge--donor">D</div>
+            <h2 class="card-title">Donor &mdash; Personal Information</h2>
+        </div>
+        <?= view('ui/partials/card_fold_facts', [
+            'name'      => (string) $v['dName'],
+            'statusKey' => (string) $v['dStatus'],
+        ], ['saveData' => false]) ?>
+        <?php if (! $editable('personal') && ! $tab['archived']): ?>
+            <a class="btn-edit" href="<?= esc($editUrl('personal')) ?>"><?= ui_icon('edit') ?>Edit</a>
+        <?php endif; ?>
+    </summary>
     <form method="post" action="<?= esc($viewUrl) ?>">
         <?= csrf_field() ?>
-        <div class="card-head">
-            <div class="section-head">
-                <div class="role-badge role-badge--donor">D</div>
-                <h2 class="card-title">Donor &mdash; Personal Information</h2>
-            </div>
-            <?php if (! $editable('personal') && ! $tab['archived']): ?>
-                <a class="btn-edit" href="<?= esc($editUrl('personal')) ?>"><?= ui_icon('edit') ?>Edit</a>
-            <?php endif; ?>
-        </div>
         <fieldset class="card-fields"<?= $editable('personal') ? '' : ' disabled' ?>>
             <?php if ($editable('personal')): ?>
                 <input type="hidden" name="section" value="<?= esc($card('personal')) ?>">
@@ -154,7 +166,7 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
             </div>
         <?php endif; ?>
     </form>
-</div>
+</details>
 
 <form method="post" action="<?= esc($viewUrl) ?>">
     <?= csrf_field() ?>

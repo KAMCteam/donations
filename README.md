@@ -492,17 +492,27 @@ those answer. Because an answer somebody invented cannot be a value in an
 ENUM, `lab_results.status` is a `VARCHAR(60)`; keys for invented answers are
 slugs prefixed `c_`, which is what keeps them from colliding with ours.
 
-### The pair's workups fold
+### Cards that fold
 
-A workup is seventy-odd cards — a screenful and a half between whoever is
-reading the pair and the donors underneath it. On the pair's screen both
-workups, the recipient's and the open donor tab's, are `<details>`: shut when
-the screen opens, with the line that says how each is going still on it, and
+A card with a fold is a `<details>` with its head as the `<summary>`: the whole
+head is the control, so there is no small target to find, and it works with
+scripting off. Two kinds have one.
+
+**The pair's workups.** A workup is seventy-odd cards — a screenful and a half
+between whoever is reading the pair and the donors underneath it. On the pair's
+screen both workups, the recipient's and the open donor tab's, are shut when
+the screen opens, with the line that says how each is going still on them, and
 the card being edited open because that is the card somebody came for.
-
 `ui/partials/lab_tests` takes `foldable`, so this is the pair's arrangement and
 not a change to the workup itself. The record screens keep theirs open — what
 is under them is a notes box, not the point of the screen.
+
+**The personal details**, on the record screens and on the pair, each donor tab
+included. These start **open**: the details are what a record is, and a record
+that opens shut would be asking to be opened before it could be read. Shut,
+the summary keeps the two things anybody scans the card for — the name and the
+status — and drops them again when it opens, where the card says both in its
+own fields.
 
 ### Status: three facts, not one
 

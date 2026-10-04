@@ -77,10 +77,10 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
     $groups[DatabaseSeeder::CUSTOM_GROUP] = [];
 }
 ?>
-<<?= $box ?> class="card card--pad<?= $foldable ? ' lab-fold' : '' ?>" data-lab-section<?= $foldable && $open ? ' open' : '' ?>>
-    <<?= $head ?> class="card-head<?= $foldable ? ' lab-fold-head' : '' ?>">
+<<?= $box ?> class="card card--pad<?= $foldable ? ' card-fold' : '' ?>" data-lab-section<?= $foldable && $open ? ' open' : '' ?>>
+    <<?= $head ?> class="card-head<?= $foldable ? ' card-fold-head' : '' ?>">
         <?php if ($foldable): ?>
-            <span class="lab-fold-mark" aria-hidden="true"><?= ui_icon('chevron') ?></span>
+            <span class="card-fold-mark" aria-hidden="true"><?= ui_icon('chevron') ?></span>
         <?php endif; ?>
         <div class="lab-head">
             <div>

@@ -598,7 +598,7 @@
   .lab-answer-act:hover { color: var(--slate-600); }
   .lab-answer-act--danger:hover { color: #b91c1c; }
   .lab-answer-add:hover { border-color: var(--slate-300); background-color: var(--slate-50); }
-  .lab-fold-head:hover .lab-fold-mark { color: var(--slate-600); }
+  .card-fold-head:hover .card-fold-mark { color: var(--slate-600); }
 }
 
 /* ---- Responsive ---- */
@@ -643,19 +643,24 @@
 /* A card that opens and closes. The whole head is the control, so there is no
    small target to find, and the line that says how the workup is going stays
    on the screen while it is shut. */
-.lab-fold-head {
+.card-fold-head {
   cursor: pointer;
   list-style: none;
   user-select: none;
 }
-.lab-fold-head::-webkit-details-marker { display: none; }
-.lab-fold-head::marker { content: ''; }
+/* With the fold in front of it, the heading is the first thing that can take
+   the space; without this it sits wherever an evenly spread row puts it. */
+.card-fold-head > .card-title,
+.card-fold-head > .section-head,
+.card-fold-head > .lab-head { margin-right: auto; }
+.card-fold-head::-webkit-details-marker { display: none; }
+.card-fold-head::marker { content: ''; }
 
 /* Shut, the head is the whole card, so the margin under it would be a gap
    under nothing. */
-.lab-fold:not([open]) > .lab-fold-head { margin-bottom: 0; }
+.card-fold:not([open]) > .card-fold-head { margin-bottom: 0; }
 
-.lab-fold-mark {
+.card-fold-mark {
   display: inline-flex;
   flex: none;
   color: var(--slate-400);
@@ -663,7 +668,31 @@
   transition-timing-function: var(--ease);
   transition-duration: var(--dur);
 }
-.lab-fold[open] > .lab-fold-head > .lab-fold-mark { transform: rotate(180deg); }
+.card-fold[open] > .card-fold-head > .card-fold-mark { transform: rotate(180deg); }
+
+/* What a folded card still says about itself: who it is about, and where they
+   stand. Only while it is shut — open, the card says both in its own fields,
+   and saying them twice would be reading the card twice. */
+.card-fold-facts {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  /* The free space goes here, so the heading stays beside the fold rather than
+     drifting into the middle of the line the way an evenly spread row does. */
+  margin-left: auto;
+}
+.card-fold[open] > .card-fold-head .card-fold-facts { display: none; }
+
+.card-fold-name {
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  font-weight: 600;
+  color: var(--slate-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .card-fields {
   border: 0;

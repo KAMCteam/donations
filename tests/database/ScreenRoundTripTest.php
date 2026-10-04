@@ -1474,8 +1474,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $html = $this->get('pairs/' . $pairId)->getBody();
 
         // Both of them — the recipient's and the open donor tab's.
-        $this->assertSame(2, substr_count($html, '<details class="card card--pad lab-fold"'));
-        $this->assertStringNotContainsString('lab-fold" data-lab-section open', $html);
+        $this->assertSame(2, substr_count($html, '<details class="card card--pad card-fold" data-lab-section>'));
         // Shut, and still saying where the workup stands.
         $this->assertStringContainsString('of 74 completed', $html);
 
@@ -1489,7 +1488,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     {
         $this->post('recipients/new', ['mrn' => '8952', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
 
-        $this->assertStringNotContainsString('lab-fold', $this->get('recipients/8952')->getBody());
+        $this->assertStringNotContainsString('card-fold" data-lab-section', $this->get('recipients/8952')->getBody());
     }
 
     // ---- Saying what is wrong, once, and before Save -----------------------
@@ -1549,6 +1548,47 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         // A saved record's number is not editable, so there is nothing to ask.
         $this->post('recipients/new', ['mrn' => '4233', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
         $this->assertStringNotContainsString('data-mrn', $this->get('recipients/4233?edit=personal')->getBody());
+    }
+
+    /**
+     * The personal details fold too, and keep the two things worth scanning.
+     *
+     * They start open, because the details are what a record is; shut, the
+     * summary still says who it is about and where they stand.
+     */
+    public function testThePersonalDetailsFoldAndKeepTheNameAndStatus(): void
+    {
+        $this->post('recipients/new', [
+            'mrn' => '8960', 'name' => 'Folded Recipient', 'age' => '40',
+            'bloodType' => 'A', 'status' => 'on_hold',
+        ]);
+        $this->post('donors/new', [
+            'mrn' => '8961', 'name' => 'Folded Donor', 'age' => '30',
+            'bloodType' => 'A', 'donorStatus' => 'Declined',
+        ]);
+        [$pairId] = $this->pairWith('8962', '8963', 'Paired Donor');
+
+        foreach (['recipients/8960', 'donors/8961', 'pairs/' . $pairId] as $screen) {
+            $html = $this->get($screen)->getBody();
+
+            // Open when the screen arrives, every one of them.
+            $this->assertStringContainsString('<details class="card card--pad card-fold" open>', $html, $screen);
+            $this->assertStringNotContainsString('class="card card--pad card-fold">', $html, $screen);
+            $this->assertStringContainsString('class="card-head card-fold-head"', $html, $screen);
+        }
+
+        // What a shut card still says: the name, and where they stand.
+        $recipient = $this->get('recipients/8960')->getBody();
+        $this->assertStringContainsString('<span class="card-fold-name">Folded Recipient</span>', $recipient);
+        $this->assertStringContainsString('>On Hold</span>', $recipient);
+
+        $donor = $this->get('donors/8961')->getBody();
+        $this->assertStringContainsString('<span class="card-fold-name">Folded Donor</span>', $donor);
+        $this->assertStringContainsString('>Declined</span>', $donor);
+
+        // The pair says it for both of them, on each card.
+        $pair = $this->get('pairs/' . $pairId)->getBody();
+        $this->assertSame(2, substr_count($pair, 'card-fold-facts'), 'the recipient and the open donor tab');
     }
 
     // ---- Paired exchange ---------------------------------------------------

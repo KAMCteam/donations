@@ -103,13 +103,22 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             <input type="hidden" name="pair" value="<?= esc($forPair) ?>">
         <?php endif; ?>
 
-        <div class="card card--pad">
-            <div class="card-head">
+        <?php // Folded away when it is in the road, and open when the screen
+              // arrives: the details are what a record is. Shut, the summary
+              // keeps the name and the status, which are what anybody scans
+              // this card for. ?>
+        <details class="card card--pad card-fold" open>
+            <summary class="card-head card-fold-head">
+                <span class="card-fold-mark" aria-hidden="true"><?= ui_icon('chevron') ?></span>
                 <h2 class="card-title">Personal Information</h2>
+                <?= view('ui/partials/card_fold_facts', [
+                    'name'      => (string) $v['name'],
+                    'statusKey' => (string) ($isRecipient ? $v['status'] : $v['donorStatus']),
+                ], ['saveData' => false]) ?>
                 <?php if (! $editable('personal')): ?>
                     <a class="btn-edit" href="<?= esc($editUrl('personal')) ?>"><?= ui_icon('edit') ?>Edit</a>
                 <?php endif; ?>
-            </div>
+            </summary>
             <fieldset class="card-fields"<?= $editable('personal') ? '' : ' disabled' ?>>
             <?php if ($mode !== 'add' && $editable('personal')): ?>
                 <input type="hidden" name="section" value="personal">
@@ -361,7 +370,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                     <button type="submit" class="btn-save">Save</button>
                 </div>
             <?php endif; ?>
-        </div>
+        </details>
 
         <?= view('ui/partials/lab_tests', [
             'tests'     => $labTests,

@@ -199,12 +199,74 @@
 }
 
 /* ---- The table --------------------------------------------------------
-   Fourteen columns at their widest, so the cells give up the register's
-   roomier padding and nothing wraps that reads worse wrapped. */
+   Fifteen columns at their widest is wider than any screen, and a report
+   somebody has to pan sideways through is a report they read half of. So the
+   table is laid out to the width it has: `fixed`, with a share per column set
+   in a `<colgroup>` on the page, and cells that wrap rather than push. The
+   register's roomier padding goes with it — at fifteen columns the padding is
+   a column of its own. */
+
+.report-table {
+  table-layout: fixed;
+  width: 100%;
+}
 
 .report-table td,
-.report-table th { padding-left: 0.6rem; padding-right: 0.6rem; }
+.report-table th {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
 
+/* A file number or a phone is one long word, and one long word is the one
+   thing that can still push a fixed column open. Headings are words somebody
+   reads, so they wrap between them and never inside one — "Relationship"
+   broken across two lines is not a heading. */
+.report-table td { overflow-wrap: anywhere; }
+.report-table th { overflow-wrap: normal; }
+
+.report-table th {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.report-table td {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.report-table td:first-child,
+.report-table th:first-child { padding-left: 1rem; padding-right: 0.5rem; }
+.report-table td:last-child,
+.report-table th:last-child  { padding-right: 1rem; }
+
+/* A date is ten characters and reads worse broken across two lines, so it
+   keeps its line; everything else gives way around it. */
 .report-table td.mono { white-space: nowrap; }
+.report-table td.cell-name { min-width: 0; }
+.report-table .badge,
+.report-table .role-tag { white-space: nowrap; }
 
-.report-table td.cell-name { min-width: 9rem; }
+/* On a narrower desktop the columns are tight enough that the few things
+   holding their own line — a date, a tag — are what would spill. They give way
+   first: a date on two lines is read, a date half under the next column is
+   not. */
+@media (max-width: 85rem) {
+  .report-table td.mono,
+  .report-table .badge,
+  .report-table .role-tag { white-space: normal; }
+  /* And a heading breaks inside a word only here, and only when the word
+     would otherwise hang over the column next to it. */
+  .report-table th { overflow-wrap: break-word; }
+}
+
+/* Fifteen columns do not fit a phone whatever is done to them, so below the
+   width where they can, the table goes back to being panned. */
+@media (max-width: 64rem) {
+  .report-table { min-width: 64rem; }
+  .report-table td,
+  .report-table th { overflow-wrap: normal; }
+}

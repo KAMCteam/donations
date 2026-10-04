@@ -139,7 +139,36 @@ foreach ($choices['labs'] as $lab) {
         <?php if ($rows === []): ?>
             <div class="empty-state">No records match these filters.</div>
         <?php else: ?>
+            <?php
+            // The table is laid out rather than left to find its own width:
+            // fifteen columns at their widest is wider than any screen, and a
+            // report somebody has to pan sideways through is a report they
+            // read half of. Each column is given a share of the width here, so
+            // what is long gets room and what is four characters wide does not
+            // take any — and whichever subset the Columns filter leaves, the
+            // shares still add up to the whole table.
+            // Wide enough for the longest word in the heading as well as for
+            // what is under it: a column narrower than its own name reads as a
+            // mistake however little is in it.
+            $share = [
+                'mrn' => 7, 'name' => 9, 'age' => 4, 'recordType' => 7,
+                'bloodGroup' => 5, 'mrp' => 5, 'gender' => 6, 'phone' => 8,
+                'dialysisType' => 7, 'firstDialysis' => 8, 'entryDate' => 8,
+                'related' => 11, 'relationship' => 9, 'status' => 8,
+                'donationType' => 8, 'crossmatchDate' => 9, 'organ' => 6,
+            ];
+            $total = 0;
+
+            foreach ($columns as [$key, $heading]) {
+                $total += $share[$key] ?? 6;
+            }
+            ?>
             <table class="table list-table report-table">
+                <colgroup>
+                    <?php foreach ($columns as [$key, $heading]): ?>
+                        <col style="width:<?= round((($share[$key] ?? 6) / max($total, 1)) * 100, 2) ?>%">
+                    <?php endforeach; ?>
+                </colgroup>
                 <thead>
                     <tr>
                         <?php foreach ($columns as [$key, $heading]): ?>

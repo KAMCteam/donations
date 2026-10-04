@@ -599,6 +599,19 @@ whether or not it is ticked: there is nothing to show.
 Related Donor/Recipient is a list, not a single name: a recipient may hold
 several donors, and the cell names each one with their MRN.
 
+#### The table is laid out, not left to find its own width
+
+Fifteen columns at their widest is wider than any screen, and a report somebody
+has to pan sideways through is a report they read half of. So the table is
+`table-layout: fixed` at the width it has, with a share per column written into
+a `<colgroup>` on the page: what is long gets room, what is four characters
+wide does not take any, and whichever subset the Columns filter leaves, the
+shares still add up to the whole table. Cells wrap instead of pushing; a date
+and a status tag hold their line until the screen is narrow enough that holding
+it would spill, and below the width where fifteen columns can fit at all —
+a phone — the table goes back to being panned, because nothing else would
+help there.
+
 Both exports print the rows the filters chose and no others, which is the point
 of exporting from here rather than from a register. **General** is the table as
 it stands, in the columns showing at the time. **Internal** is that table

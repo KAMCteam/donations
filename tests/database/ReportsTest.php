@@ -164,6 +164,41 @@ final class ReportsTest extends CIUnitTestCase
 
     // ---- The columns the record type has -----------------------------------
 
+    /**
+     * The table is laid out to the width it has, so nothing is read sideways.
+     *
+     * Fifteen columns at their widest is wider than any screen, and a report
+     * somebody has to pan through is a report they read half of.
+     */
+    public function testTheTableIsLaidOutToFitTheScreen(): void
+    {
+        $html = $this->get('reports')->getBody();
+
+        // A share per column, as a colgroup — and whichever subset the Columns
+        // filter leaves, the shares still add up to the whole table.
+        $this->assertStringContainsString('<colgroup>', $html);
+
+        preg_match_all('/<col style="width:([0-9.]+)%">/', $html, $m);
+        $this->assertCount(count($this->headings($html)), $m[1], 'one share per column');
+        $this->assertEqualsWithDelta(100, array_sum(array_map('floatval', $m[1])), 0.5);
+
+        // And the same holds for a narrower set.
+        $donor = $this->get('reports?type=donor')->getBody();
+        preg_match_all('/<col style="width:([0-9.]+)%">/', $donor, $d);
+        $this->assertCount(count($this->headings($donor)), $d[1]);
+        $this->assertEqualsWithDelta(100, array_sum(array_map('floatval', $d[1])), 0.5);
+        $this->assertLessThan(count($m[1]), count($d[1]), 'the donor set is the narrower one');
+    }
+
+    /** The headings of the table on a page, in order. */
+    private function headings(string $html): array
+    {
+        preg_match('/<thead>.*?<\/thead>/s', $html, $head);
+        preg_match_all('/<th>(.*?)<\/th>/s', $head[0] ?? '', $m);
+
+        return $m[1];
+    }
+
     public function testTheRecordTypeDecidesTheColumns(): void
     {
         $mixed = $this->get('reports')->getBody();

@@ -150,5 +150,4 @@ $filterQuery = static function () use ($btFilter, $statusFilter, $searchQuery): 
         <?php endif; ?>
     </div>
 </div>
-<?= view('ui/partials/delete_dialog', [], ['saveData' => false]) ?>
 <?= $this->endSection() ?>

@@ -182,5 +182,4 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
         <?php endif; ?>
     </div>
 </div>
-<?= view('ui/partials/delete_dialog', [], ['saveData' => false]) ?>
 <?= $this->endSection() ?>

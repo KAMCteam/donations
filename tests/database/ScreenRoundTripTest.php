@@ -2,6 +2,7 @@
 
 use App\Database\Seeds\DatabaseSeeder;
 use App\Libraries\UiStore;
+use CodeIgniter\Exceptions\PageNotFoundException;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
@@ -2114,28 +2115,41 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         ] as $list => $deleteUrl) {
             $html = $this->get($list)->getBody();
 
-            $this->assertStringContainsString(site_url($deleteUrl), $html, "{$list} should offer delete");
-            // One dialog for the whole list, filled in by whichever row asked.
-            $this->assertSame(1, substr_count($html, 'id="confirm-delete"'));
+            // The question is beside the button that asks it, one per row,
+            // and it posts to the address the button used to lead to.
+            $this->assertStringContainsString('formaction="' . site_url($deleteUrl) . '"', $html, "{$list} should offer delete");
+            $this->assertStringContainsString('class="confirm-title"', $html, "{$list} should ask first");
         }
     }
 
     /**
-     * The button asks first, and asks on a page of its own.
+     * The button asks first, over the list it was pressed on.
      *
-     * A GET that deletes goes off when a browser prefetches the link, which on
-     * a patient register is not recoverable — so GET only ever renders the
-     * question.
+     * It used to ask on a page of its own, which meant pressing a bin by
+     * accident lost the list. And the address only answers to a post: a GET
+     * that deletes goes off when a browser prefetches the link, which on a
+     * patient register is not recoverable.
      */
-    public function testTheDeleteLinkAsksRatherThanDeletes(): void
+    public function testTheDeleteButtonAsksOverTheListItWasPressedOn(): void
     {
         $this->post('recipients/new', ['mrn' => '9205', 'name' => 'Layla Test', 'age' => '38', 'bloodType' => 'B']);
 
-        $html = $this->get('recipients/9205/delete')->getBody();
+        $html = $this->get('recipients')->getBody();
 
         $this->assertStringContainsString('Delete Layla Test?', $html);
         $this->assertStringContainsString('cannot be undone', $html);
+        // A dialog, not a screen of its own, and the opener links to it.
+        $this->assertMatchesRegularExpression('/<dialog class="dialog" id="(confirm-[0-9a-f]+)"/', $html);
+        $this->assertStringContainsString('data-dialog="confirm-', $html);
         $this->seeInDatabase('recipients', ['mrn' => 9205]);
+
+        // There is no page behind it any more: the address answers to a post
+        // and to nothing else.
+        try {
+            $this->get('recipients/9205/delete');
+            $this->fail('the delete address should not answer a GET');
+        } catch (PageNotFoundException) {
+        }
     }
 
     /** Posting it removes the record, and the workup with it. */
@@ -2832,10 +2846,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('Donor Two', $tab);
         $this->assertStringContainsString('Required Lab Tests', $tab);
 
-        // It asks before taking anybody off, and a reserve is asked once.
-        $ask = $this->get('pairs/' . $pairId . '/donors/' . $second . '/delink')->getBody();
-        $this->assertStringContainsString('This pair has finished with Donor Two', $ask);
-        $this->assertStringNotContainsString('Take the pair apart', $ask);
+        // It asks before taking anybody off, on the pair itself, and a
+        // reserve is asked once.
+        $this->assertStringContainsString('This pair has finished with Donor Two', $tab);
+        $this->assertStringNotContainsString('Take the pair apart', $tab);
         $this->seeInDatabase('pairs', ['id' => $second, 'status' => 'on_hold']);
 
         $this->post('pairs/' . $pairId . '/donors/' . $second . '/delink');
@@ -2923,8 +2937,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         [$pairId] = $this->pairWith('8940', '8941', 'Only Donor');
         [$first]  = $this->pairLinks(8940);
 
-        $ask = $this->get('pairs/' . $pairId . '/donors/' . $first . '/delink')->getBody();
-        $this->assertStringContainsString('Carry on with another donor', $ask);
+        $ask = $this->get('pairs/' . $pairId)->getBody();
+        $this->assertStringContainsString('Connect with another donor', $ask);
         $this->assertStringContainsString('Take the pair apart', $ask);
 
         $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'dissolve'])
@@ -2938,6 +2952,39 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         // And the pair's screen is still there, as the record of it.
         $this->assertStringContainsString('Archived', $this->get('pairs/' . $pairId)->getBody());
+    }
+
+    /**
+     * Carrying on means carrying on with somebody.
+     *
+     * The option says the next donor is set to Active, so it is: the pair has
+     * lost the one it was going ahead with and a pair with donors on it is
+     * going ahead with one of them.
+     */
+    public function testCarryingOnRaisesTheNextDonorToActive(): void
+    {
+        [$pairId] = $this->pairWith('8970', '8971', 'The Donor');
+        $this->addPairDonor($pairId, '8972', 'The Reserve');
+        [$first]  = $this->pairLinks(8970);
+
+        $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'carry-on']);
+
+        // The one taken off is archived; the reserve is the pair's donor now.
+        $this->seeInDatabase('pairs', ['id' => $first, 'status' => 'closed']);
+        $this->seeInDatabase('donors', ['mrn' => 8972, 'status' => 'active']);
+        $this->assertStringContainsString('The Reserve is the donor it is going ahead with now', (string) session('ui_notice'));
+    }
+
+    /** With nobody left to raise, the pair simply has no active donor. */
+    public function testCarryingOnWithNobodyLeftRaisesNobody(): void
+    {
+        [$pairId] = $this->pairWith('8973', '8974', 'Only Donor');
+        [$first]  = $this->pairLinks(8973);
+
+        $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'carry-on']);
+
+        $this->seeInDatabase('pairs', ['id' => $first, 'status' => 'closed']);
+        $this->assertStringNotContainsString('going ahead with now', (string) session('ui_notice'));
     }
 
     /**
@@ -3762,11 +3809,9 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         ]);
         $this->seeInDatabase('lab_results', ['lab_id' => $lab['id']]);
 
-        // It asks first.
-        $this->assertStringContainsString(
-            'This cannot be undone.',
-            $this->get('recipients/4034/labs/' . $lab['id'] . '/delete')->getBody()
-        );
+        // It asks first, in a dialog under the card rather than on a screen
+        // of its own.
+        $this->assertStringContainsString('This cannot be undone.', $this->get('recipients/4034')->getBody());
         $this->seeInDatabase('labs', ['id' => $lab['id']]);
 
         $this->post('recipients/4034/labs/' . $lab['id'] . '/delete');

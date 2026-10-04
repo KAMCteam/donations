@@ -16,7 +16,11 @@ use App\Libraries\UiStore;
  * workup. The point of the screen is comparing them, and comparing means not
  * having to leave the pair to see one of them.
  *
- * Two buttons end a donor's part in the pair, and they are not the same.
+ * Two buttons end a donor's part in the pair, and they are not the same. Each
+ * asks before it does anything, in a dialog over the pair rather than on a
+ * screen of its own: the pair is what somebody is deciding about, so taking it
+ * off the display to ask was taking away the answer.
+ *
  * **Delink** archives this one: the tab stays, read-only, because a donor the
  * pair worked up and did not go ahead with is part of what happened. Pressed
  * on the active donor it asks the further question — whether the pair carries
@@ -104,6 +108,7 @@ $swapTo = array_values(array_filter(
                 <p class="tab-note">This is the donor the pair is going ahead with.</p>
             <?php endif; ?>
 
+            <?php $delinkId = 'confirm-delink-' . (int) $tab['id']; ?>
             <div class="tab-panel-head">
                 <div>
                     <div class="eyebrow">Donor-<?= (int) $tab['number'] ?> &middot; <?= esc($donor['id']) ?></div>
@@ -132,9 +137,43 @@ $swapTo = array_values(array_filter(
                             </form>
                         <?php endif; ?>
 
-                        <?php // The question is asked on the page it leads to. ?>
-                        <a class="btn-outline btn-outline--danger" href="<?= $pairUrl ?>/donors/<?= esc($tab['id']) ?>/delink"><?= ui_icon('unlink') ?>Delink</a>
+                        <?php // The question is asked over the pair, in the
+                              // dialog below, rather than on a screen that
+                              // takes the pair off the display to ask it. ?>
+                        <a class="btn-outline btn-outline--danger" href="#<?= esc($delinkId) ?>" data-dialog="<?= esc($delinkId) ?>"><?= ui_icon('unlink') ?>Delink</a>
                     </div>
+
+                    <?php // Delinking a donor the pair is holding in reserve
+                          // archives that donor and nothing else. Delinking
+                          // the one it is going ahead with can mean either of
+                          // two things, and the difference is the whole pair,
+                          // so that one is asked which. ?>
+                    <?= view('ui/partials/confirm_dialog', [
+                        'id'      => $delinkId,
+                        'title'   => 'Delink ' . $donor['name'] . '?',
+                        'detail'  => $tab['isActive']
+                            ? $donor['name'] . ' is the donor this pair is going ahead with. Taking them off it '
+                                . 'archives their tab either way — it stays here, read-only, with the status they '
+                                . 'have now. What happens to the pair is the question.'
+                            : 'This pair has finished with ' . $donor['name'] . '. Their tab stays here, read-only, '
+                                . 'with the status they have now — and their own record is untouched, so they go '
+                                . 'back to the register and can be linked again from their own screen.',
+                        'action'  => $pairUrl . '/donors/' . rawurlencode((string) $tab['id']) . '/delink',
+                        'confirmVerb' => 'Delink donor',
+                        'confirmIcon' => 'unlink',
+                        'confirmChoices' => $tab['isActive'] ? [
+                            [
+                                'value' => 'carry-on',
+                                'label' => 'Connect with another donor',
+                                'hint'  => 'The donor will be automatically set to "Active" status.',
+                            ],
+                            [
+                                'value' => 'dissolve',
+                                'label' => 'Take the pair apart',
+                                'hint'  => 'The recipient goes back to the waitlist and the Donor back to the Donors list.',
+                            ],
+                        ] : [],
+                    ], ['saveData' => false]) ?>
                 <?php endif; ?>
             </div>
 

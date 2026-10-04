@@ -793,6 +793,13 @@
 .dialog {
   border: 0;
   padding: 0;
+  /* A dialog sits where the thing it is about is — inside a row of a table, a
+     card, a form — and the top layer does not stop it inheriting from there.
+     So it says its own text: an urgent row's red and its right alignment were
+     reading straight through into the question it asked. */
+  text-align: left;
+  font-weight: 400;
+  font-size: var(--text-base);
   /* The reset zeroes every margin, which takes the UA's `margin: auto` with
      it — and that is what centres a modal dialog. */
   margin: auto;
@@ -801,7 +808,7 @@
   max-width: min(32rem, calc(100vw - 2rem));
   width: 100%;
   background-color: #fff;
-  color: inherit;
+  color: var(--slate-800);
 }
 .dialog::backdrop { background-color: rgb(15 23 42 / 0.45); }
 
@@ -1452,10 +1459,23 @@
   transition-duration: var(--dur);
 }
 
-.confirm { margin: 0; }
-/* In a dialog the form is the panel, so it carries the padding; on the
-   fallback page the card already has it. */
-.dialog .confirm { padding: 1.5rem; }
+/* The panel of a question: it is the dialog's whole content, so it carries the
+   padding. */
+.confirm { margin: 0; padding: 1.5rem; }
+
+/* Without scripting, the button that asks is a link to the dialog's own id and
+   this is what shows it: a panel over the screen, in the middle, with no
+   backdrop because there is no modal to have one. Cancel clears the address
+   and it goes again. */
+.dialog:target {
+  display: block;
+  position: fixed;
+  inset: 0;
+  width: min(32rem, calc(100vw - 2rem));
+  height: fit-content;
+  margin: auto;
+  z-index: 60;
+}
 .confirm-title {
   font-size: var(--text-lg);
   line-height: var(--lh-lg);
@@ -1472,6 +1492,47 @@
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 1.5rem;
+}
+
+/* A question with more than one answer: delinking the donor a pair is going
+   ahead with, where what happens to the pair is the real question. Each answer
+   is a line of its own, with what it would do under it — they used to run
+   together on one line, which read as one sentence saying two things. */
+.confirm-choices {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.confirm-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+.confirm-choice:hover { border-color: var(--slate-300); background-color: var(--slate-50); }
+.confirm-choice input { margin-top: 0.1875rem; flex: none; }
+.confirm-choice:has(input:checked) {
+  border-color: var(--primary);
+  background-color: var(--slate-50);
+}
+
+.confirm-choice-label {
+  display: block;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  font-weight: 600;
+  color: var(--slate-800);
+}
+.confirm-choice-hint {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--slate-500);
 }
 
 /* What just happened, above the page it happened on.

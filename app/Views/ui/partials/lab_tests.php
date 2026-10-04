@@ -60,6 +60,12 @@ $open     = $editing || ($open ?? false);
 $box  = $foldable ? 'details' : 'div';
 $head = $foldable ? 'summary' : 'div';
 
+// The custom tests on this card that can be taken off it, and the question
+// each one asks first. The dialogs are rendered under the card: they cannot
+// go inside the fieldset, because a control in a disabled one is disabled
+// whatever form it belongs to, and the card is disabled while it is read.
+$removable = [];
+
 // The check list's own groups, in its own order. The index has to keep
 // running across them — the form posts one flat array of tests, so a card's
 // position in it is what ties its fields together, not the group it is under.
@@ -330,9 +336,16 @@ $groupBar = static function (array $p): void {
                 <?php if ($custom && $removeLabUrl !== null): ?>
                     <?php // Theirs to add, theirs to take away — at the foot of
                           // the card, after everything it holds. The question is
-                          // asked on the page it leads to, so this is a link. ?>
+                          // asked over the card rather than on a screen of its
+                          // own, so this opens the dialog under it. ?>
+                    <?php
+                    $removeAction = $removeLabUrl . '/' . $test['id'] . '/delete';
+                    $removeId     = 'confirm-' . substr(sha1($removeAction), 0, 10);
+
+                    $removable[$removeId] = ['action' => $removeAction, 'name' => (string) $test['name']];
+                    ?>
                     <div class="lab-remove">
-                        <a class="lab-remove-link" href="<?= esc($removeLabUrl) ?>/<?= esc($test['id']) ?>/delete"><?= ui_icon('trash') ?>Remove this test</a>
+                        <a class="lab-remove-link" href="#<?= esc($removeId) ?>" data-dialog="<?= esc($removeId) ?>"><?= ui_icon('trash') ?>Remove this test</a>
                     </div>
                 <?php endif; ?>
             </div>
@@ -341,6 +354,17 @@ $groupBar = static function (array $p): void {
     </div>
     <?php endforeach; ?>
     </fieldset>
+
+    <?php foreach ($removable as $removeId => $removeThis): ?>
+        <?= view('ui/partials/confirm_dialog', [
+            'id'     => $removeId,
+            'title'  => 'Remove ' . ($removeThis['name'] === '' ? 'this test' : $removeThis['name']) . '?',
+            'detail' => 'This test was added to this record, so only this record has it. It will be '
+                . 'removed along with the answer and the comment on it. This cannot be undone.',
+            'action' => $removeThis['action'],
+            'confirmVerb' => 'Remove test',
+        ], ['saveData' => false]) ?>
+    <?php endforeach; ?>
 
     <?php if ($editing && $viewUrl !== null): ?>
         <div class="card-actions">

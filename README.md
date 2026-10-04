@@ -254,8 +254,15 @@ Exactly two things archive a donor:
 
 | | What happens |
 | --- | --- |
-| **Delink** | Available on every live tab. On a reserve it archives that donor and nothing else. On the active one it asks the further question: carry on with another donor, or take the pair apart. |
+| **Delink** | Available on every live tab. On a reserve it archives that donor and nothing else. On the active one it asks the further question: **Connect with another donor**, which raises the next of the pair's own to Active, or **Take the pair apart**. |
 | **A swap** | The donor swapped out is archived, and the one swapped to is the pair's. |
+
+Connecting with another donor is not a question left hanging: the pair has lost
+the donor it was going ahead with, and a pair with donors on it is going ahead
+with one of them, so the next one that is neither archived nor already active
+is set to Active — the order they were taken on in, which is the order the tabs
+are in. With nobody left to raise, the pair simply has no active donor, which
+is allowed; two is what is not.
 
 Taking the pair apart closes every link at once: the recipient goes back to the
 waiting list, every donor back to the register, and the pair's screen stays
@@ -522,6 +529,39 @@ nothing to do with the same-named test on another. A catalogue row's
 those answer. Because an answer somebody invented cannot be a value in an
 ENUM, `lab_results.status` is a `VARCHAR(60)`; keys for invented answers are
 slugs prefixed `c_`, which is what keeps them from colliding with ours.
+
+### Asking before taking something away
+
+Every delete asks first, and asks **over the screen it was pressed on**. It
+used to ask on a page: pressing a bin by accident left the list, loaded a
+screen with one question on it, and finding the way back was the apology. Those
+pages — `ui/confirm_delete` and `ui/delink_donor` — are gone, and the addresses
+behind them answer to a post and to nothing else. A GET that deletes goes off
+the moment a browser prefetches the link, which on a patient register is not
+recoverable.
+
+What asks is `ui/partials/confirm_dialog`, one `<dialog>` per thing that can be
+taken away, sitting beside the button that opens it: a row's bin on each of the
+three lists, **Remove this test** at the foot of a test somebody added, and
+**Delink** on a pair's donor tab. The delink one is the question with two
+answers, each a line of its own:
+
+| | What it does |
+| --- | --- |
+| **Connect with another donor** | The donor will be automatically set to "Active" status. |
+| **Take the pair apart** | The recipient goes back to the waitlist and the Donor back to the Donors list. |
+
+Two things make a dialog able to live anywhere. Its button belongs to
+`confirm-post` — an empty form in the layout, beside `lab-add` — and carries
+its own `formaction`, because a form cannot sit inside another and these sit
+inside the card's, inside a table cell. And the dialog says its own text
+(alignment, weight, colour): the top layer does not stop it inheriting from
+where it stands, and an urgent row's red was reading straight through into the
+question it asked.
+
+With scripting off the opener is a link to the dialog's own id and `:target`
+shows the panel over the screen; the button posts, Cancel clears the address.
+So the pages are gone without anything going with them.
 
 ### Cards that fold
 

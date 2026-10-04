@@ -607,42 +607,38 @@ class Ui extends BaseController
     /**
      * The three lists' delete button, for all three of them.
      *
-     * GET asks, POST does. Never the other way round: a GET that deletes goes
-     * off on its own the moment a browser prefetches the link or something
-     * crawls the page, and on a patient register that is not recoverable.
+     * Post only. A GET that deletes goes off on its own the moment a browser
+     * prefetches the link or something crawls the page, and on a patient
+     * register that is not recoverable.
      *
-     * The question is a page of its own so it is still asked with JavaScript
-     * off; the lists open the same question as a dialog when it is on.
+     * The question is asked before the post, in a dialog over the screen the
+     * button is on. It used to be a page: pressing a bin by accident left the
+     * list and loaded a screen, and finding the way back was the apology.
      */
-    public function deleteRecipient(?string $mrn = null): string|RedirectResponse
+    public function deleteRecipient(?string $mrn = null): RedirectResponse
     {
         return $this->confirmThenDelete(
             $this->store->findRecipient($mrn),
-            'recipients/' . rawurlencode((string) $mrn) . '/delete',
             site_url('recipients'),
             'recipient',
             fn (): string => $this->store->deleteRecipient($mrn)
         );
     }
 
-    public function deleteDonor(?string $mrn = null): string|RedirectResponse
+    public function deleteDonor(?string $mrn = null): RedirectResponse
     {
         return $this->confirmThenDelete(
             $this->store->findDonor($mrn),
-            'donors/' . rawurlencode((string) $mrn) . '/delete',
             site_url('donors'),
             'donor',
             fn (): string => $this->store->deleteDonor($mrn)
         );
     }
 
-    public function deletePair(?string $id = null): string|RedirectResponse
+    public function deletePair(?string $id = null): RedirectResponse
     {
-        $pair = $this->store->findPair($id);
-
         return $this->confirmThenDelete(
-            $pair,
-            'pairs/' . rawurlencode((string) $id) . '/delete',
+            $this->store->findPair($id),
             site_url('pairs'),
             'pair',
             fn (): string => $this->store->deletePair($id)
@@ -650,18 +646,17 @@ class Ui extends BaseController
     }
 
     /**
-     * Ask on GET, act on POST, and say what happened either way.
+     * Does it, and says what happened.
      *
      * @param array<string, mixed>|null $record  Null when there is nothing to delete
      * @param callable(): string        $delete  Returns '' or why it was refused
      */
     private function confirmThenDelete(
         ?array $record,
-        string $action,
         string $listUrl,
         string $kind,
         callable $delete
-    ): string|RedirectResponse {
+    ): RedirectResponse {
         if ($record === null) {
             return redirect()->to($listUrl);
         }
@@ -669,19 +664,6 @@ class Ui extends BaseController
         $name = $kind === 'pair'
             ? 'Pair #' . $record['id']
             : (string) $record['name'];
-
-        if (strtolower($this->request->getMethod()) !== 'post') {
-            return view('ui/confirm_delete', [
-                'title'   => 'Delete ' . $name,
-                'navPage' => '',
-                'organ'   => $this->store->organ(),
-                'name'    => $name,
-                'kind'    => $kind,
-                'detail'  => $this->deleteDetail($kind, $record),
-                'action'  => site_url($action),
-                'backUrl' => $listUrl,
-            ]);
-        }
 
         $error = $delete();
 
@@ -691,23 +673,6 @@ class Ui extends BaseController
         );
 
         return redirect()->to($listUrl);
-    }
-
-    /** What exactly goes, spelled out before anyone presses the button. */
-    private function deleteDetail(string $kind, array $record): string
-    {
-        if ($kind === 'pair') {
-            $recipient = $this->store->findRecipient($record['recipientId']);
-            $donor     = $this->store->findDonor($record['donorId']);
-
-            return 'The link between ' . ($recipient['name'] ?? 'MRN ' . $record['recipientId'])
-                . ' and ' . ($donor['name'] ?? 'MRN ' . $record['donorId'])
-                . ' will be removed. Both records stay on the register, with their '
-                . 'workups, and each can be matched again.';
-        }
-
-        return 'MRN ' . $record['id'] . '. The record and its whole lab workup '
-            . 'will be removed. This cannot be undone.';
     }
 
     /**
@@ -778,7 +743,7 @@ class Ui extends BaseController
      * altogether — and that second answer puts the recipient back on the
      * waiting list and every donor back on the register.
      */
-    public function delinkPairDonor(string $id, string $linkId): string|RedirectResponse
+    public function delinkPairDonor(string $id, string $linkId): RedirectResponse
     {
         [$pair, $back, $tab] = $this->pairDonorTab($id, $linkId);
 
@@ -790,23 +755,6 @@ class Ui extends BaseController
             return redirect()->to($back);
         }
 
-        $action = site_url('pairs/' . rawurlencode($pair['id']) . '/donors/' . rawurlencode($linkId) . '/delink');
-
-        if (strtolower($this->request->getMethod()) !== 'post') {
-            return view('ui/delink_donor', [
-                'title'    => 'Delink ' . $tab['name'],
-                'navPage'  => '',
-                'organ'    => $this->store->organ(),
-                'pair'     => $pair,
-                'tab'      => $tab,
-                // Only the active donor is asked the second question: a
-                // reserve leaving does not take the pair with it.
-                'isActive' => (bool) $tab['isActive'],
-                'action'   => $action,
-                'backUrl'  => $back,
-            ]);
-        }
-
         $dissolve = $tab['isActive'] && $this->request->getPost('outcome') === 'dissolve';
         $error    = $dissolve
             ? $this->store->dissolvePair($pair['recipientId'], 'The pair was dissolved from ' . $tab['name'] . "'s tab.")
@@ -816,10 +764,21 @@ class Ui extends BaseController
             return redirect()->to($back)->with('ui_error', $error);
         }
 
-        return redirect()->to($dissolve ? site_url('recipients/' . rawurlencode($pair['recipientId'])) : $back)
-            ->with('ui_notice', $dissolve
-                ? 'The pair has been taken apart. ' . $pair['recipientName'] . ' is back on the waiting list.'
-                : $tab['name'] . ' has been archived on this pair.');
+        if ($dissolve) {
+            return redirect()->to(site_url('recipients/' . rawurlencode($pair['recipientId'])))
+                ->with('ui_notice', 'The pair has been taken apart. ' . $pair['recipientName'] . ' is back on the waiting list.');
+        }
+
+        // Carrying on means carrying on with somebody: the donor the pair was
+        // going ahead with has gone, so the next of its own takes their place
+        // rather than leaving the pair with nobody and nothing said about it.
+        $raised = $tab['isActive'] ? $this->store->raiseNextDonor($pair['recipientId']) : '';
+
+        return redirect()->to($back)->with(
+            'ui_notice',
+            $tab['name'] . ' has been archived on this pair.'
+                . ($raised === '' ? '' : ' ' . $raised . ' is the donor it is going ahead with now.')
+        );
     }
 
     /**
@@ -877,7 +836,7 @@ class Ui extends BaseController
     }
 
     /** And takes one away again, asking first. */
-    public function removePairDonorLab(string $id, string $linkId, string $labId): string|RedirectResponse
+    public function removePairDonorLab(string $id, string $linkId, string $labId): RedirectResponse
     {
         [$pair, $back, $tab] = $this->pairDonorTab($id, $linkId);
 
@@ -893,8 +852,6 @@ class Ui extends BaseController
             'donor',
             $tab['donorId'],
             (int) $labId,
-            'pairs/' . rawurlencode($pair['id']) . '/donors/' . rawurlencode($linkId)
-                . '/labs/' . rawurlencode($labId) . '/delete',
             $back . '&edit=pd' . $tab['id'] . '-labs'
         );
     }
@@ -1001,18 +958,17 @@ class Ui extends BaseController
      * Whatever was recorded against it goes with it, and there is no undo, so
      * it is worth a question.
      */
-    public function removeLab(string $personType, string $mrn, string $labId): string|RedirectResponse
+    public function removeLab(string $personType, string $mrn, string $labId): RedirectResponse
     {
         return $this->confirmRemoveLab(
             $personType,
             $mrn,
             (int) $labId,
-            $personType . 's/' . rawurlencode($mrn) . '/labs/' . rawurlencode($labId) . '/delete',
             $this->labScreenUrl($personType, $mrn)
         );
     }
 
-    public function removePairLab(string $id, string $side, string $labId): string|RedirectResponse
+    public function removePairLab(string $id, string $side, string $labId): RedirectResponse
     {
         [$pair, $personType, $mrn] = $this->pairSide($id, $side);
 
@@ -1024,32 +980,17 @@ class Ui extends BaseController
             $personType,
             $mrn,
             (int) $labId,
-            'pairs/' . rawurlencode($pair['id']) . '/labs/' . rawurlencode($side) . '/' . rawurlencode($labId) . '/delete',
             site_url('pairs/' . rawurlencode($pair['id'])) . '?edit=' . ($side === 'recipient' ? 'rlabs' : 'dlabs')
         );
     }
 
-    /** The one confirmation, whichever screen asked for it. */
-    private function confirmRemoveLab(string $personType, string $mrn, int $labId, string $action, string $backUrl): string|RedirectResponse
+    /** The one removal, whichever screen asked for it. */
+    private function confirmRemoveLab(string $personType, string $mrn, int $labId, string $backUrl): RedirectResponse
     {
         $lab = $this->store->customLab($mrn, $personType, $labId);
 
         if ($lab === null) {
             return redirect()->to($backUrl);
-        }
-
-        if (strtolower($this->request->getMethod()) !== 'post') {
-            return view('ui/confirm_delete', [
-                'title'   => 'Remove ' . $lab['name'],
-                'navPage' => '',
-                'organ'   => $this->store->organ(),
-                'name'    => $lab['name'],
-                'kind'    => 'test',
-                'detail'  => 'This test was added to this record, so only this record has it. '
-                    . 'It will be removed along with the answer and the comment on it. This cannot be undone.',
-                'action'  => site_url($action),
-                'backUrl' => $backUrl,
-            ]);
         }
 
         $removed = $this->store->removeCustomLab($mrn, $personType, $labId);

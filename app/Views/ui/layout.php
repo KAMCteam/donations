@@ -153,6 +153,12 @@ $navItems = [
           // its own `formaction`, so one form serves every workup on a page. ?>
     <form id="lab-add" method="post" hidden><?= csrf_field() ?></form>
 
+    <?php // And the form every "Are you sure?" answers to, for the same
+          // reason: the dialogs that ask sit wherever the thing they are about
+          // is, which is often already inside a form. Each button carries its
+          // own `formaction`, so one form serves every question on a page. ?>
+    <form id="confirm-post" method="post" hidden><?= csrf_field() ?></form>
+
     <script src="<?= base_url('assets/ui/js/ui.js') ?>"></script>
 </body>
 

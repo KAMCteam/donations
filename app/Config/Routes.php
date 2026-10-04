@@ -49,18 +49,18 @@ $routes->match(['get', 'post'], 'recipients/new', 'Ui::addRecipient');
 $routes->get('recipients/(:segment)/link', 'Ui::linkRecipient/$1');
 $routes->post('recipients/(:segment)/link/existing', 'Ui::linkRecipientExisting/$1');
 $routes->post('recipients/(:segment)/labs', 'Ui::addLab/recipient/$1');
-$routes->match(['get', 'post'], 'recipients/(:segment)/labs/(:num)/delete', 'Ui::removeLab/recipient/$1/$2');
+$routes->post('recipients/(:segment)/labs/(:num)/delete', 'Ui::removeLab/recipient/$1/$2');
 $routes->get('recipients/(:segment)/print', 'Ui::printRecipient/$1');
-$routes->match(['get', 'post'], 'recipients/(:segment)/delete', 'Ui::deleteRecipient/$1');
+$routes->post('recipients/(:segment)/delete', 'Ui::deleteRecipient/$1');
 $routes->match(['get', 'post'], 'recipients/(:segment)', 'Ui::recipient/$1');
 
 $routes->get('donors', 'Ui::donors');
 $routes->get('donors/print', 'Ui::printDonors');
 $routes->match(['get', 'post'], 'donors/new', 'Ui::addDonor');
 $routes->post('donors/(:segment)/labs', 'Ui::addLab/donor/$1');
-$routes->match(['get', 'post'], 'donors/(:segment)/labs/(:num)/delete', 'Ui::removeLab/donor/$1/$2');
+$routes->post('donors/(:segment)/labs/(:num)/delete', 'Ui::removeLab/donor/$1/$2');
 $routes->get('donors/(:segment)/print', 'Ui::printDonor/$1');
-$routes->match(['get', 'post'], 'donors/(:segment)/delete', 'Ui::deleteDonor/$1');
+$routes->post('donors/(:segment)/delete', 'Ui::deleteDonor/$1');
 $routes->get('donors/(:segment)/link', 'Ui::linkDonor/$1');
 $routes->post('donors/(:segment)/link/existing', 'Ui::linkDonorExisting/$1');
 $routes->match(['get', 'post'], 'donors/(:segment)', 'Ui::donor/$1');
@@ -73,16 +73,16 @@ $routes->match(['get', 'post'], 'pairs/new', 'Ui::addPair');
 // comes straight back to it, at the tab it was pressed on. There is no page
 // of their own: the tabs are on the pair.
 $routes->post('pairs/(:segment)/donors', 'Ui::addPairDonor/$1');
-$routes->match(['get', 'post'], 'pairs/(:segment)/donors/(:num)/delink', 'Ui::delinkPairDonor/$1/$2');
+$routes->post('pairs/(:segment)/donors/(:num)/delink', 'Ui::delinkPairDonor/$1/$2');
 $routes->post('pairs/(:segment)/donors/(:num)/swap', 'Ui::swapPairDonor/$1/$2');
 // A donor's workup is edited where it is read, so adding and removing a test
 // they added for themselves comes back to the pair's screen too.
 $routes->post('pairs/(:segment)/donors/(:num)/labs', 'Ui::addPairDonorLab/$1/$2');
-$routes->match(['get', 'post'], 'pairs/(:segment)/donors/(:num)/labs/(:num)/delete', 'Ui::removePairDonorLab/$1/$2/$3');
+$routes->post('pairs/(:segment)/donors/(:num)/labs/(:num)/delete', 'Ui::removePairDonorLab/$1/$2/$3');
 $routes->post('pairs/(:segment)/labs/(:segment)', 'Ui::addPairLab/$1/$2');
-$routes->match(['get', 'post'], 'pairs/(:segment)/labs/(:segment)/(:num)/delete', 'Ui::removePairLab/$1/$2/$3');
+$routes->post('pairs/(:segment)/labs/(:segment)/(:num)/delete', 'Ui::removePairLab/$1/$2/$3');
 $routes->get('pairs/(:segment)/print', 'Ui::printPair/$1');
-$routes->match(['get', 'post'], 'pairs/(:segment)/delete', 'Ui::deletePair/$1');
+$routes->post('pairs/(:segment)/delete', 'Ui::deletePair/$1');
 $routes->match(['get', 'post'], 'pairs/(:segment)', 'Ui::pair/$1');
 
 // Paired exchange. `build` is one address for the screen and its four

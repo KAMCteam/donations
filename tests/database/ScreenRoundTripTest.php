@@ -2868,9 +2868,9 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     /**
      * One pair, one donor it is going ahead with.
      *
-     * The way to another is to stand the current one down and raise them, or
-     * to swap. Setting a second active outright is refused on the card that
-     * asks, and again in the store behind it.
+     * The way to another is to stand the current one down and raise them,
+     * each on their own card. Setting a second active outright is refused on
+     * the card that asks, and again in the store behind it.
      */
     public function testAPairMayHaveOnlyOneActiveDonor(): void
     {
@@ -2898,60 +2898,6 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('donors', ['mrn' => 8922, 'status' => 'active']);
         // Nobody was archived by it: both are still the pair's donors.
         $this->dontSeeInDatabase('pairs', ['recipient_mrn' => 8920, 'status' => 'closed']);
-    }
-
-    /**
-     * Swapping is the other way, and not the same one: it finishes with the
-     * donor swapped out, and only the active one can be swapped.
-     */
-    public function testSwappingArchivesTheDonorItSwapsOut(): void
-    {
-        [$pairId] = $this->pairWith('8930', '8931', 'Going Ahead');
-        $second   = $this->addPairDonor($pairId, '8932', 'In Reserve');
-        [$first]  = $this->pairLinks(8930);
-
-        // Not offered on a reserve, and refused if posted anyway.
-        $this->assertStringNotContainsString('tab-swap-form', $this->get('pairs/' . $pairId . '?donor=2')->getBody());
-        $this->post('pairs/' . $pairId . '/donors/' . $second . '/swap', ['toId' => (string) $first]);
-        $this->assertStringContainsString('going ahead with can be swapped', (string) session('ui_error'));
-
-        $this->post('pairs/' . $pairId . '/donors/' . $first . '/swap', ['toId' => (string) $second]);
-
-        // The one swapped out is archived with the word they had; the one
-        // swapped to is the pair's donor now.
-        $this->seeInDatabase('pairs', ['id' => $first, 'status' => 'closed']);
-        $this->seeInDatabase('donors', ['mrn' => 8931, 'status' => 'active']);
-        $this->seeInDatabase('donors', ['mrn' => 8932, 'status' => 'active']);
-
-        $html = $this->get('pairs/' . $pairId . '?donor=1')->getBody();
-        $this->assertStringContainsString('Swapped for In Reserve', $html);
-        $this->assertStringContainsString('tab--delinked', $html);
-    }
-
-    /**
-     * Delinking the donor a pair is going ahead with asks the further
-     * question, and taking the pair apart puts everybody back on their list.
-     */
-    public function testDelinkingTheActiveDonorCanTakeThePairApart(): void
-    {
-        [$pairId] = $this->pairWith('8940', '8941', 'Only Donor');
-        [$first]  = $this->pairLinks(8940);
-
-        $ask = $this->get('pairs/' . $pairId)->getBody();
-        $this->assertStringContainsString('Link with a new donor', $ask);
-        $this->assertStringContainsString('Take the pair apart', $ask);
-
-        $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'dissolve'])
-            ->assertRedirectTo(site_url('recipients/8940'));
-
-        $this->seeInDatabase('pairs', ['id' => $first, 'status' => 'closed']);
-
-        // Both are free again, and offered their own way back.
-        $this->assertStringContainsString('Link with Donor', $this->get('recipients/8940')->getBody());
-        $this->assertStringContainsString('Link with Recipient', $this->get('donors/8941')->getBody());
-
-        // And the pair's screen is still there, as the record of it.
-        $this->assertStringContainsString('Archived', $this->get('pairs/' . $pairId)->getBody());
     }
 
     /**

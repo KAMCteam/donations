@@ -806,38 +806,6 @@ class Ui extends BaseController
         return redirect()->to($back)->with('ui_notice', $archived);
     }
 
-    /**
-     * Swaps the donor the pair is going ahead with for another of its own.
-     *
-     * Only ever pressed on the active donor — swapping a reserve would be
-     * swapping nothing — and the one swapped out is archived rather than
-     * stood down, because a swap says the pair has finished with them.
-     */
-    public function swapPairDonor(string $id, string $linkId): RedirectResponse
-    {
-        [$pair, $back, $tab] = $this->pairDonorTab($id, $linkId);
-
-        if ($pair === null) {
-            return redirect()->to(site_url('pairs'));
-        }
-
-        if ($tab === null) {
-            return redirect()->to($back);
-        }
-
-        $toId  = trim((string) $this->request->getPost('toId'));
-        $error = $this->store->swapPairDonor($pair['recipientId'], $linkId, $toId);
-
-        if ($error !== '') {
-            return redirect()->to($back)->with('ui_error', $error);
-        }
-
-        $to = $this->store->pairDonor($pair['recipientId'], $toId);
-
-        return redirect()->to($this->pairDonorUrl($pair['recipientId'], (string) ($to['donorId'] ?? '')))
-            ->with('ui_notice', 'This pair is going ahead with ' . ($to['name'] ?? 'the new donor') . ' now.');
-    }
-
     /** Adds a blank test to one of the pair's donors, without leaving the screen. */
     public function addPairDonorLab(string $id, string $linkId): RedirectResponse
     {
@@ -2088,7 +2056,7 @@ class Ui extends BaseController
         if ($status === 'active' && $this->store->hasActiveDonor($pair['recipientId'], $linkId)) {
             return redirect()->back()->withInput()->with(
                 'ui_error',
-                'This pair already has an active donor. Stand them down first, or swap.'
+                'This pair already has an active donor. Stand them down first.'
             );
         }
 

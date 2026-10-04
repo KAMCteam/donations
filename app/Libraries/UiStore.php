@@ -1368,7 +1368,7 @@ final class UiStore
         }
 
         if ($status === 'active' && $this->hasActiveDonor($recipientMrn)) {
-            return 'This pair already has an active donor. Stand them down first, or swap.';
+            return 'This pair already has an active donor. Stand them down first.';
         }
 
         if ($this->pairs->openPairForDonor($donorMrn) !== null) {
@@ -1412,7 +1412,7 @@ final class UiStore
         }
 
         if ($status === 'active' && $this->hasActiveDonor($recipientMrn, $id)) {
-            return 'This pair already has an active donor. Stand them down first, or swap.';
+            return 'This pair already has an active donor. Stand them down first.';
         }
 
         $this->donors->update((int) $tab['donorId'], ['status' => $status]);
@@ -1465,43 +1465,6 @@ final class UiStore
         foreach ($tabs as $tab) {
             $this->pairs->close((int) $tab['id'], trim($reason) === '' ? 'The pair was dissolved.' : trim($reason));
         }
-
-        return '';
-    }
-
-    /**
-     * Swaps the donor a pair is going ahead with for another of its own.
-     *
-     * The difference from standing one down and raising the other: a swap says
-     * the first one is finished with. Their tab is archived — kept, read-only,
-     * with the word they were given still on it — and the one swapped to is
-     * the pair's active donor from that moment.
-     */
-    public function swapPairDonor(string $recipientMrn, string $fromId, string $toId): string
-    {
-        $from = $this->pairDonor($recipientMrn, $fromId);
-        $to   = $this->pairDonor($recipientMrn, $toId);
-
-        if ($from === null || $to === null) {
-            return 'That donor is not on this pair.';
-        }
-
-        if (! $from['isActive']) {
-            return 'Only the donor the pair is going ahead with can be swapped.';
-        }
-
-        if ($to['archived'] || $to['id'] === $from['id']) {
-            return 'Choose another of this pair\'s donors to swap to.';
-        }
-
-        $this->donors->update((int) $to['donorId'], ['status' => 'active']);
-        $this->mirrorLinkStatus((int) $to['id'], 'active');
-        // Archived without being argued with: the word they were given is
-        // theirs, and the swap is a fact about the pair, not about them.
-        $this->pairs->close(
-            (int) $from['id'],
-            'Swapped for ' . ($to['name'] !== '' ? $to['name'] : 'MRN ' . $to['donorId']) . '.'
-        );
 
         return '';
     }

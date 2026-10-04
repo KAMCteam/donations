@@ -16,18 +16,20 @@ use App\Libraries\UiStore;
  * workup. The point of the screen is comparing them, and comparing means not
  * having to leave the pair to see one of them.
  *
- * Two buttons end a donor's part in the pair, and they are not the same. Each
- * asks before it does anything, in a dialog over the pair rather than on a
- * screen of its own: the pair is what somebody is deciding about, so taking it
- * off the display to ask was taking away the answer.
+ * **Delink** ends a donor's part in the pair, and asks before it does
+ * anything, in a dialog over the pair rather than on a screen of its own: the
+ * pair is what somebody is deciding about, so taking it off the display to ask
+ * was taking away the answer.
  *
- * **Delink** archives this one: the tab stays, read-only, because a donor the
- * pair worked up and did not go ahead with is part of what happened. Pressed
- * on the active donor it asks the further question — whether the pair carries
- * on with somebody else, or comes apart altogether. **Swap** is only ever on
- * the active donor: it archives them and raises another of the pair's own in
- * their place, which is the difference between changing your mind and
- * finishing with somebody.
+ * It archives this donor: the tab stays, read-only, because a donor the pair
+ * worked up and did not go ahead with is part of what happened. Pressed on the
+ * active donor it asks the further question — who takes their place, or
+ * whether the pair comes apart altogether.
+ *
+ * Raising one of the pair's own reserves is not a button of its own any more:
+ * the word a donor is on is a field on their card, so standing one down and
+ * raising another is two edits, in the place every other fact about them is
+ * edited.
  *
  * Archived is a mode and not a status: the word the donor was given stays on
  * their tab, because being finished with by this pair says nothing about them.
@@ -54,18 +56,13 @@ $tabUrl  = static fn (array $t): string => site_url('pairs/' . rawurlencode($pai
 $statusWord = static fn (string $status): string => UiStore::PERSON_STATUS_OPTIONS[$status] ?? $status;
 
 // Whether the pair has the donor it is going ahead with. While it has, nobody
-// else can be set active — standing that one down comes first, or swapping.
+// else can be set active — standing that one down comes first.
 $hasActive = false;
 
 foreach ($tabs as $t) {
     $hasActive = $hasActive || $t['isActive'];
 }
 
-// Who a swap can swap to: this pair's other donors, the archived apart.
-$swapTo = array_values(array_filter(
-    $tabs,
-    static fn (array $t): bool => ! $t['archived'] && ! $t['isActive']
-));
 ?>
 <div class="card card--pad donor-tabs">
     <div class="card-head">
@@ -121,22 +118,6 @@ $swapTo = array_values(array_filter(
                               // Personal Information card below with the rest
                               // of them; a second control for it in the head
                               // was the same answer in two places. ?>
-                        <?php if ($tab['isActive'] && $swapTo !== []): ?>
-                            <?php // Only ever on the active donor: swapping a
-                                  // reserve would be swapping nothing. ?>
-                            <form method="post" action="<?= $pairUrl ?>/donors/<?= esc($tab['id']) ?>/swap" class="inline-form tab-swap-form">
-                                <?= csrf_field() ?>
-                                <label class="sr-only" for="tab-swap">Swap to</label>
-                                <select id="tab-swap" name="toId" class="input">
-                                    <?php foreach ($swapTo as $other): ?>
-                                        <option value="<?= esc($other['id']) ?>">Donor-<?= (int) $other['number'] ?> &mdash; <?= esc($other['name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <button type="submit" class="btn-outline"
-                                        data-confirm="Swap this pair to the donor chosen? <?= esc($donor['name']) ?> will be archived on this pair, with the status they have now."><?= ui_icon('shuffle14') ?>Swap</button>
-                            </form>
-                        <?php endif; ?>
-
                         <?php // The question is asked over the pair, in the
                               // dialog below, rather than on a screen that
                               // takes the pair off the display to ask it. ?>

@@ -229,19 +229,21 @@ Add donor.
 The word a donor is on is set in one place — that field, on their Personal
 Information card, where it sits with the rest of their details. The tab's head
 carried a second control for the same answer beside **Delink**; it is gone, and
-with it the `pairs/{id}/donors/{n}/status` post it made. **Swap** and
-**Delink** stay there, because neither is a field: they are things done to the
-link, not facts about the donor.
+with it the `pairs/{id}/donors/{n}/status` post it made — and later **Swap**
+and its own post went the same way, for the same reason. **Delink** is what is
+left in that head, because it is not a field: it is a thing done to the link,
+not a fact about the donor.
 
-There are two ways to change which donor that is, and they are not the same:
+Changing which donor that is, is **moving the words about**, each on its own
+card: stand the current one down to On Hold or Declined, then set another to
+Active. Nobody is archived; both are still the pair's donors and either can be
+taken back up.
 
-- **Move the words about,** each on its own card. Stand the current one down to
-  On Hold or Declined, then set another to Active. Nobody is archived; both are still the pair's
-  donors and either can be taken back up.
-- **Swap**, which is only ever offered on the active donor — swapping a reserve
-  would be swapping nothing. The one swapped out is **archived**: finished with,
-  kept read-only, with the word they were given still on their tab. The one
-  swapped to is the pair's donor from that moment.
+There was a **Swap** beside Delink that did it in one press, archiving the
+donor swapped out. It is gone, with its route and its store method: the word a
+donor is on is a field on their card, so the two edits are made where every
+other fact about them is edited, and a press that archived somebody sat one
+button away from a press that did not.
 
 #### Archived is a mode, not a status
 
@@ -250,12 +252,9 @@ were given — archiving is the pair's doing and says nothing about them — and
 because the link is closed they are free again: their own record is editable,
 they are back on the Donors List, and they can be linked to somebody else.
 
-Exactly two things archive a donor:
-
-| | What happens |
-| --- | --- |
-| **Delink** | Available on every live tab. On a reserve it archives that donor and nothing else. On the active one it asks the pair's own future, in three answers. |
-| **A swap** | The donor swapped out is archived, and the one swapped to is the pair's. |
+One thing archives a donor: **Delink**, available on every live tab. On a
+reserve it archives that donor and nothing else. On the active one it asks the
+pair's own future, in three answers.
 
 Delinking the **active** donor is the pair's own future, so the dialog says so
 first — taking this donor off takes the pair apart unless another is linked in
@@ -269,8 +268,9 @@ their place — and then asks which:
 
 The donor being delinked is archived whichever is answered; what the answer
 decides is whether anybody takes their place. A donor the pair already has in
-reserve is not on that list — the list is of donors free on the register, and
-raising one of the pair's own is what **Swap** is for.
+reserve is not on that list — the list is of donors free on the register.
+Raising one of the pair's own is standing this one down and setting that one
+Active, on their cards, which archives nobody.
 
 Taking the pair apart closes every link at once: the recipient goes back to the
 waiting list, every donor back to the register, and the pair's screen stays
@@ -278,8 +278,7 @@ with every tab on it archived — which is where anybody asking what happened
 goes. Nothing is deleted.
 
 An archived tab carries its own dates and the reason it ended, so the tabs are
-the history: *Linked 30/09/2026, archived 04/10/2026. Swapped for Nouf
-Al-Shamrani.* There is no separate archive, because `pairs` **is** the log —
+the history: *Linked 30/09/2026, archived 04/10/2026. Delinked from the pair.* There is no separate archive, because `pairs` **is** the log —
 one row per link ever made, and closing one is how a link ends.
 
 #### Where it is stored

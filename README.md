@@ -381,7 +381,7 @@ column was only ever filled from the recipient form's Hospital box, so with
 that gone nothing could write it and nothing showed it.
 
 Added since: `birth_date` on both registers, `dialysis_type` on recipients, and
-an Entry Date the screens collect rather than only show. The three sections
+an Entry Date the recipient screens collect rather than only show. The three sections
 below say what each is for.
 
 ### Donor type
@@ -391,7 +391,8 @@ answer:
 
 | Screen | Offers |
 | --- | --- |
-| Add Donor | Living · Deceased |
+| Add Donor, and a donor's record while they are in no pair | Living · Deceased |
+| A linked donor's record | all four |
 | Add Pair, pair profile | Living Related · Living Unrelated · Deceased |
 
 Relatedness is a question about a donor *and* a recipient, so it can only be
@@ -399,9 +400,16 @@ answered where both are in view. Registering a donor on their own records
 `living`, which is the same kind of donation with that part not yet known —
 not a fourth kind. One column, `donation_type`, holds all four.
 
-A saved donor record offers the full list rather than the two the add screen
-asks, so a donor registered through a pair as Living Related is not silently
-downgraded to Living by someone opening their record.
+What decides the list on a donor's record is the pairing, not whether the
+record is new: a donor nobody is paired with is offered the two, because
+"related" has nobody to be related *to*. Linked, they are offered all four,
+which is also where the answer is worth giving.
+
+The one exception is the type the record already holds. A donor archived off a
+pair comes back onto the register still saying Living Related; that answer
+stays on their list, selected, so no save on another card quietly rewrites what
+happened to them. It is their own answer being kept, not a fifth option being
+offered — the other pair type is still not on the list.
 
 ### The workup is the check list
 
@@ -619,6 +627,14 @@ the record is kept.
 record opens on today, which is almost always right, and somebody entering a
 patient who arrived last week can say so. Nothing else moves it — editing any
 other card used to re-date the record to the day of the edit.
+
+It is the **recipient's** field and only theirs. A recipient's entry date is a
+fact about the wait — the score is worked out from it — where a donor's was
+only the day the register took their row, which is bookkeeping and not one of
+their details. So no donor screen shows it: not Add Donor, not their record,
+not their tab on a pair, and the mixed report leaves the cell empty for a donor
+row the way it already leaves the dialysis ones. `donors.registered_on` stays,
+written once when the record is made and never asked about again.
 
 ### Reports
 

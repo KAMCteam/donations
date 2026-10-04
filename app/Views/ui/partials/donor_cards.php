@@ -141,10 +141,6 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
                         <input type="text" id="f-d-relationship" name="dRelationship" class="input" value="<?= esc($v['dRelationship']) ?>" placeholder="e.g. Brother">
                     </div>
                     <div>
-                        <label class="field-label" for="f-d-entry">Entry Date</label>
-                        <?= view('ui/partials/date_field', ['id' => 'f-d-entry', 'name' => 'dEntryDate', 'value' => $v['dEntryDate'], 'past' => true], ['saveData' => false]) ?>
-                    </div>
-                    <div>
                         <?php // The donor's own, and the same fact the tab
                               // above sets: a pair goes ahead with one donor,
                               // so Active is left off while somebody else

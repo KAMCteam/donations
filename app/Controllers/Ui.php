@@ -526,9 +526,10 @@ class Ui extends BaseController
             return redirect()->to(site_url('recipients/' . rawurlencode($person['id'])));
         }
 
+        // No entry date: the register dates a donor when it takes them on and
+        // the screens do not ask, so nothing here can move it.
         $fields = array_merge($base, [
             'type'             => 'donor',
-            'dateRegistered'   => (string) $this->request->getPost('dateRegistered'),
             'donationType'     => (string) $this->request->getPost('donationType'),
             'relationship'     => $person['relationship'] ?? '',
             'donorGender'      => (string) $this->request->getPost('donorGender'),
@@ -2131,7 +2132,7 @@ class Ui extends BaseController
             return redirect()->to($back);
         }
 
-        $error = $this->futureDateError(['dBirthDate', 'dEntryDate']);
+        $error = $this->futureDateError(['dBirthDate']);
 
         if ($error !== '') {
             return redirect()->back()->withInput()->with('ui_error', $error);
@@ -2162,7 +2163,6 @@ class Ui extends BaseController
             'donorMrp'         => $post('dMrp'),
             'donorStatus'      => $post('dStatus'),
             'donorCoordinator' => $post('dCoordinator'),
-            'dateRegistered'   => $post('dEntryDate'),
         ]);
 
         if ($status !== '') {
@@ -2194,9 +2194,6 @@ class Ui extends BaseController
             'dMrp'          => (string) ($donor['donorMrp'] ?? ''),
             'dCoordinator'  => (string) ($donor['donorCoordinator'] ?? ''),
             'dStatus'       => (string) ($donor['donorStatus'] ?? 'On Hold'),
-            'dEntryDate'    => ($donor['dateRegistered'] ?? '') === ''
-                ? ''
-                : UiStore::isoToDMY((string) $donor['dateRegistered']),
             'dNotes'        => (string) ($donor['notes'] ?? ''),
         ];
     }

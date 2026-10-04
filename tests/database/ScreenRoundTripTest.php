@@ -3890,6 +3890,102 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->fail("no card for {$test}");
     }
 
+    // ---- A donor's own facts ----------------------------------------------
+
+    /**
+     * Related to whom? A donor nobody is paired with is Living or Deceased.
+     *
+     * Living Related and Living Unrelated are statements about a donor *and a
+     * recipient*. With no recipient they have nothing to be true of, so the
+     * record does not offer them until the donor is linked — on Add Donor,
+     * which never had a recipient, and now on a saved record that has none
+     * either.
+     */
+    public function testAnUnlinkedDonorIsOnlyOfferedTheTwoRegisterTypes(): void
+    {
+        $this->post('donors/new', ['mrn' => '7301', 'name' => 'Free Donor', 'age' => '33', 'bloodType' => 'B']);
+
+        $html = $this->get('donors/7301?edit=personal')->getBody();
+
+        $this->assertStringContainsString('<option value="living"', $html);
+        $this->assertStringContainsString('<option value="deceased"', $html);
+        $this->assertStringNotContainsString('<option value="living_related"', $html);
+        $this->assertStringNotContainsString('<option value="living_unrelated"', $html);
+    }
+
+    /** Linked, the question has a recipient to be about, so all four are. */
+    public function testALinkedDonorIsOfferedEveryType(): void
+    {
+        $this->pairWith('7302', '7303', 'Linked Donor');
+
+        $html = $this->get('donors/7303?edit=personal')->getBody();
+
+        foreach (['living', 'living_related', 'living_unrelated', 'deceased'] as $type) {
+            $this->assertStringContainsString('<option value="' . $type . '"', $html);
+        }
+    }
+
+    /**
+     * A donor archived off a pair keeps the type they were given.
+     *
+     * They are nobody's now, so the list is the two — but the answer the
+     * record holds stays on it, or saving another card would quietly rewrite
+     * what happened to them.
+     */
+    public function testATypeTheRecordHoldsStaysOnTheListWhenTheDonorIsFree(): void
+    {
+        $this->post('donors/new', ['mrn' => '7304', 'name' => 'Was Related', 'age' => '33', 'bloodType' => 'B']);
+        $this->db->table('donors')->where('mrn', 7304)->update(['donation_type' => 'living_related']);
+
+        $html = $this->get('donors/7304?edit=personal')->getBody();
+
+        $this->assertStringContainsString('<option value="living_related" selected>', $html);
+        // Still not the other one: only what the record actually says.
+        $this->assertStringNotContainsString('<option value="living_unrelated"', $html);
+    }
+
+    /**
+     * The entry date is the register's bookkeeping, not one of the donor's
+     * details, so no donor screen shows it any more.
+     */
+    public function testNoDonorScreenAsksForAnEntryDate(): void
+    {
+        $this->post('donors/new', ['mrn' => '7305', 'name' => 'Dated Donor', 'age' => '33', 'bloodType' => 'B']);
+        [$pairId] = $this->pairWith('7306', '7307', 'Paired Donor');
+
+        foreach (['donors/new', 'donors/7305?edit=personal'] as $screen) {
+            $html = $this->get($screen)->getBody();
+
+            $this->assertStringNotContainsString('name="dateRegistered"', $html, $screen);
+            $this->assertStringNotContainsString('>Entry Date<', $html, $screen);
+        }
+
+        // On the pair, the one left is the recipient's: the donor tab asks
+        // for nothing of the kind.
+        $pair = $this->get('pairs/' . $pairId . '?edit=dpersonal')->getBody();
+
+        $this->assertStringNotContainsString('name="dEntryDate"', $pair);
+        $this->assertStringNotContainsString('f-d-entry', $pair);
+        $this->assertSame(1, substr_count($pair, '>Entry Date<'), "the recipient's, and only theirs");
+
+        // The recipient's own is untouched: theirs is a fact about the wait.
+        $this->assertStringContainsString('name="dateRegistered"', $this->get('recipients/new')->getBody());
+    }
+
+    /** And saving a donor's card leaves the date the register gave them. */
+    public function testSavingADonorLeavesTheDateTheRegisterGaveThem(): void
+    {
+        $this->post('donors/new', ['mrn' => '7308', 'name' => 'Dated Donor', 'age' => '33', 'bloodType' => 'B']);
+        $this->db->table('donors')->where('mrn', 7308)->update(['registered_on' => '2024-03-04']);
+
+        $this->post('donors/7308', [
+            'section' => 'personal', 'name' => 'Dated Donor', 'bloodType' => 'B',
+            'donationType' => 'living', 'donorStatus' => 'On Hold',
+        ]);
+
+        $this->seeInDatabase('donors', ['mrn' => 7308, 'registered_on' => '2024-03-04']);
+    }
+
     // ---- MRP -------------------------------------------------------------
 
     public function testAddingAnMrpStoresIt(): void

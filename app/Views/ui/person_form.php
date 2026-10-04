@@ -322,14 +322,29 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                             <?= view('ui/partials/coordinator_field', ['id' => 'f-donor-coordinator', 'name' => 'donorCoordinator', 'value' => $v['donorCoordinator'], 'coordinators' => $coordinators], ['saveData' => false]) ?>
                         </div>
                         <div>
-                            <?php // Living or deceased is all this screen can ask: whether a
-                                  // living donor is related is a question about them and a
-                                  // recipient, and there is no recipient here. A saved record
-                                  // offers the full list, so a "Living Related" set on a pair
-                                  // screen is not silently downgraded by opening this one. ?>
+                            <?php // Living or deceased is all this screen can ask while the
+                                  // donor is nobody's: whether a living donor is *related* is
+                                  // a question about them and a recipient, and without a
+                                  // recipient there is nothing for the word to be true of.
+                                  // Linked, the full list is theirs — that is the screen the
+                                  // answer belongs to.
+                                  //
+                                  // A type the record already holds stays on the list even
+                                  // when it is not one of the two, so a donor archived off a
+                                  // pair still reads as what they were and no save on another
+                                  // card quietly rewrites it. ?>
+                            <?php
+                            $typeOptions = $linked === null
+                                ? UiStore::DONATION_TYPES_ON_REGISTER
+                                : array_keys(UiStore::DONATION_TYPES);
+
+                            if (! in_array($v['donationType'], $typeOptions, true) && isset(UiStore::DONATION_TYPES[$v['donationType']])) {
+                                $typeOptions[] = $v['donationType'];
+                            }
+                            ?>
                             <label class="field-label" for="f-donation-type">Donor Type</label>
                             <select id="f-donation-type" name="donationType" class="input">
-                                <?php foreach ($mode === 'add' ? UiStore::DONATION_TYPES_ON_REGISTER : array_keys(UiStore::DONATION_TYPES) as $value): ?>
+                                <?php foreach ($typeOptions as $value): ?>
                                     <option value="<?= esc($value) ?>"<?= $v['donationType'] === $value ? ' selected' : '' ?>><?= esc(UiStore::DONATION_TYPES[$value]) ?></option>
                                 <?php endforeach; ?>
                             </select>
@@ -354,15 +369,6 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                         </div>
                     </div>
 
-                    <div class="form-grid-5">
-                        <div>
-                            <?php // The register has always dated a donor; this
-                                  // is the first screen to show it, and to let
-                                  // it be corrected. ?>
-                            <label class="field-label" for="f-entry">Entry Date</label>
-                            <?= view('ui/partials/date_field', ['id' => 'f-entry', 'name' => 'dateRegistered', 'value' => UiStore::isoToDMY($v['dateRegistered']), 'past' => true], ['saveData' => false]) ?>
-                        </div>
-                    </div>
                 </div>
             <?php endif; ?>
             </fieldset>

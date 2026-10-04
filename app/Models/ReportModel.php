@@ -99,7 +99,11 @@ class ReportModel extends Model
         if ($isRecipient) {
             $builder->select('t.entry_date, t.dialysis_type, t.dialysis_start, NULL AS donation_type, NULL AS own_relationship', false);
         } else {
-            $builder->select('t.registered_on AS entry_date, NULL AS dialysis_type, NULL AS dialysis_start, t.donation_type, t.relationship AS own_relationship', false);
+            // No entry date: a donor's is the register's own bookkeeping and
+            // is not one of their details, so the mixed table leaves the cell
+            // empty for them the way it leaves the dialysis ones. The column
+            // is still what a date range narrows a donor report by.
+            $builder->select('NULL AS entry_date, NULL AS dialysis_type, NULL AS dialysis_start, t.donation_type, t.relationship AS own_relationship', false);
         }
 
         $this->narrow($builder, $f, $isRecipient ? 't.entry_date' : 't.registered_on', $type);

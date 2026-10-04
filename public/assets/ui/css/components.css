@@ -541,6 +541,7 @@
   .lab-name-field:hover { border-color: var(--slate-200); }
   .lab-remove-link:hover { color: #b91c1c; }
   .lab-edit-answers:hover { color: var(--slate-700); }
+  .lab-fold-head:hover .lab-fold-mark { color: var(--slate-600); }
 }
 
 /* ---- Responsive ---- */
@@ -581,6 +582,31 @@
 .card-head .section-head,
 .card-head .lab-head { margin-bottom: 0; }
 .card-head .lab-head { flex: 1; }
+
+/* A card that opens and closes. The whole head is the control, so there is no
+   small target to find, and the line that says how the workup is going stays
+   on the screen while it is shut. */
+.lab-fold-head {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.lab-fold-head::-webkit-details-marker { display: none; }
+.lab-fold-head::marker { content: ''; }
+
+/* Shut, the head is the whole card, so the margin under it would be a gap
+   under nothing. */
+.lab-fold:not([open]) > .lab-fold-head { margin-bottom: 0; }
+
+.lab-fold-mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--slate-400);
+  transition-property: transform;
+  transition-timing-function: var(--ease);
+  transition-duration: var(--dur);
+}
+.lab-fold[open] > .lab-fold-head > .lab-fold-mark { transform: rotate(180deg); }
 
 .card-fields {
   border: 0;

@@ -277,10 +277,13 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             <?php endif; ?>
         </div>
 
+        <?php // Folded shut: the pair's donors are below it, and a workup is a
+              // screenful and a half to scroll past. ?>
         <?= view('ui/partials/lab_tests', [
-            'tests'   => $rLabTests,
-            'field'   => 'rLabs',
-            'editing' => $editable('rlabs'),
+            'tests'    => $rLabTests,
+            'field'    => 'rLabs',
+            'foldable' => true,
+            'editing'  => $editable('rlabs'),
             'editUrl' => $editUrl('rlabs'),
             'viewUrl' => $viewUrl,
             'section' => 'rlabs',
@@ -288,7 +291,10 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             // belonging to their record wherever it is opened.
             'addLabUrl'    => site_url('pairs/' . rawurlencode($pair['id']) . '/labs/recipient'),
             'removeLabUrl' => site_url('pairs/' . rawurlencode($pair['id']) . '/labs/recipient'),
-        ]) ?>
+            // `saveData` false, like every other partial here: CodeIgniter
+            // keeps view data between `view()` calls, and a flag this one
+            // reads with `??` would otherwise be the last caller's.
+        ], ['saveData' => false]) ?>
 
         <div class="card card--pad">
             <div class="card-head">

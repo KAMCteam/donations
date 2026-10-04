@@ -1454,6 +1454,39 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         );
     }
 
+    /**
+     * The pair's workups fold, because what is under them is the point of the
+     * screen.
+     *
+     * Seventy-odd cards is a screenful and a half between whoever is reading
+     * and the pair's donors. Shut, the line that says how the workup is going
+     * is still on the screen; the card it is being edited on is open.
+     */
+    public function testThePairsWorkupsFoldAway(): void
+    {
+        [$pairId] = $this->pairWith('8950', '8951', 'The Donor');
+
+        $html = $this->get('pairs/' . $pairId)->getBody();
+
+        // Both of them — the recipient's and the open donor tab's.
+        $this->assertSame(2, substr_count($html, '<details class="card card--pad lab-fold"'));
+        $this->assertStringNotContainsString('lab-fold" data-lab-section open', $html);
+        // Shut, and still saying where the workup stands.
+        $this->assertStringContainsString('of 74 completed', $html);
+
+        // The card being edited arrives open.
+        $open = $this->get('pairs/' . $pairId . '?edit=rlabs')->getBody();
+        $this->assertStringContainsString('data-lab-section open', $open);
+    }
+
+    /** The record screens are not folded: there is nothing under them to reach. */
+    public function testTheRecordsWorkupDoesNotFold(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8952', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
+
+        $this->assertStringNotContainsString('lab-fold', $this->get('recipients/8952')->getBody());
+    }
+
     // ---- Paired exchange ---------------------------------------------------
 
     /**

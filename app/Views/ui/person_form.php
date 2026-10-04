@@ -368,7 +368,10 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             // Nothing to add a test to until the record exists.
             'addLabUrl'    => $mode === 'add' ? null : site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id']) . '/labs'),
             'removeLabUrl' => $mode === 'add' ? null : site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id']) . '/labs'),
-        ]) ?>
+            // `saveData` false, like every other partial here: CodeIgniter
+            // keeps view data between `view()` calls, and a flag this one
+            // reads with `??` would otherwise be the last caller's.
+        ], ['saveData' => false]) ?>
 
         <div class="card card--pad">
             <div class="card-head">

@@ -234,7 +234,10 @@ foreach ($v as $field => $value) {
             'field'    => 'rLabs',
             'animated' => true,
             'editing'  => ! $fixedIs('recipient'),
-        ]) ?>
+            // `saveData` false, like every other partial here: CodeIgniter
+            // keeps view data between `view()` calls, and a flag this one
+            // reads with `??` would otherwise be the last caller's.
+        ], ['saveData' => false]) ?>
 
         <div class="card card--pad">
             <h2 class="card-title card-title--mb4">Recipient — Clinical Notes</h2>
@@ -342,7 +345,10 @@ foreach ($v as $field => $value) {
             'field'    => 'dLabs',
             'animated' => true,
             'editing'  => ! $fixedIs('donor'),
-        ]) ?>
+            // `saveData` false, like every other partial here: CodeIgniter
+            // keeps view data between `view()` calls, and a flag this one
+            // reads with `??` would otherwise be the last caller's.
+        ], ['saveData' => false]) ?>
 
         <div class="card card--pad">
             <h2 class="card-title card-title--mb4">Donor — Clinical Notes</h2>

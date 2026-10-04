@@ -24,6 +24,8 @@ use App\Libraries\UiStore;
  * @var string|null                $viewUrl    Where Cancel goes.
  * @var string|null                $section    Which card a save is for.
  * @var string                     $labsTitle  The heading, where more than one workup is on the screen.
+ * @var bool                       $foldable   Render it as a card that opens and closes.
+ * @var bool                       $open       Start it open; an edited card always does.
  */
 $animated = $animated ?? false;
 // The add screens have nothing to view yet, so they default to editable with
@@ -43,6 +45,21 @@ $section  = $section ?? null;
 $labsTitle = $labsTitle ?? 'Required Lab Tests';
 $progress = UiStore::labProgress($tests);
 
+// A workup is seventy-odd cards long, which is a screenful and a half between
+// whoever is reading and whatever comes after it. On a screen where what comes
+// after matters — the pair, where the donors are below — the card folds, and
+// the one line that says how the workup is going stays on the screen either
+// way. `<details>` does it, so it works with scripting off.
+//
+// Folded shut unless it is the card being edited: a card you came here to
+// change has to be open when you arrive.
+$foldable = $foldable ?? false;
+$open     = $editing || ($open ?? false);
+// One body, two wrappers. The alternative is writing the whole card twice and
+// letting the copies drift.
+$box  = $foldable ? 'details' : 'div';
+$head = $foldable ? 'summary' : 'div';
+
 // The check list's own groups, in its own order. The index has to keep
 // running across them — the form posts one flat array of tests, so a card's
 // position in it is what ties its fields together, not the group it is under.
@@ -60,8 +77,11 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
     $groups[DatabaseSeeder::CUSTOM_GROUP] = [];
 }
 ?>
-<div class="card card--pad" data-lab-section>
-    <div class="card-head">
+<<?= $box ?> class="card card--pad<?= $foldable ? ' lab-fold' : '' ?>" data-lab-section<?= $foldable && $open ? ' open' : '' ?>>
+    <<?= $head ?> class="card-head<?= $foldable ? ' lab-fold-head' : '' ?>">
+        <?php if ($foldable): ?>
+            <span class="lab-fold-mark" aria-hidden="true"><?= ui_icon('chevron') ?></span>
+        <?php endif; ?>
         <div class="lab-head">
             <div>
                 <h2 class="card-title"><?= $labsTitle ?></h2>
@@ -77,7 +97,7 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
         <?php if (! $editing && $editUrl !== null): ?>
             <a class="btn-edit" href="<?= esc($editUrl) ?>"><?= ui_icon('edit') ?>Edit</a>
         <?php endif; ?>
-    </div>
+    </<?= $head ?>>
 
     <fieldset class="card-fields"<?= $editing ? '' : ' disabled' ?>>
     <?php if ($editing && $section !== null): ?>
@@ -236,4 +256,4 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
             <button type="submit" class="btn-save">Save</button>
         </div>
     <?php endif; ?>
-</div>
+</<?= $box ?>>

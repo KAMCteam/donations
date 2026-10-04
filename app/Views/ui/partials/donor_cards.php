@@ -161,9 +161,12 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
     <?php if ($editable('labs')): ?>
         <input type="hidden" name="section" value="<?= esc($card('labs')) ?>">
     <?php endif; ?>
+    <?php // Folded shut, as the recipient's is: this donor's notes are under
+          // it, and the next donor's tab is a press away. ?>
     <?= view('ui/partials/lab_tests', [
         'tests'        => $labTests,
         'field'        => 'dLabs',
+        'foldable'     => true,
         'animated'     => true,
         'editing'      => $editable('labs'),
         'editUrl'      => $tab['archived'] ? null : $editUrl('labs'),

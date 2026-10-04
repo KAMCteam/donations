@@ -467,6 +467,18 @@ those answer. Because an answer somebody invented cannot be a value in an
 ENUM, `lab_results.status` is a `VARCHAR(60)`; keys for invented answers are
 slugs prefixed `c_`, which is what keeps them from colliding with ours.
 
+### The pair's workups fold
+
+A workup is seventy-odd cards — a screenful and a half between whoever is
+reading the pair and the donors underneath it. On the pair's screen both
+workups, the recipient's and the open donor tab's, are `<details>`: shut when
+the screen opens, with the line that says how each is going still on it, and
+the card being edited open because that is the card somebody came for.
+
+`ui/partials/lab_tests` takes `foldable`, so this is the pair's arrangement and
+not a change to the workup itself. The record screens keep theirs open — what
+is under them is a notes box, not the point of the screen.
+
 ### Status: three facts, not one
 
 A recipient's status, a donor's, and the Match Status of a pair were once one

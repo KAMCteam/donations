@@ -415,6 +415,9 @@ class Ui extends BaseController
                 : '',
             'labTests'   => $labTests,
             'mrps'       => $mrps,
+            // The coordinator is chosen from the people registered as one,
+            // not typed: Add MRP is where they are registered.
+            'coordinators' => $this->store->coordinators(),
             // "Link with …" is a link to the choice at its own URL; the
             // screen also carries it as a dialog for when JavaScript is on.
             'linkUrl'         => $person === null ? '' : $links['backUrl'] . '/link',
@@ -1422,6 +1425,7 @@ class Ui extends BaseController
             'navPage'   => '',
             'organ'     => $organ,
             'mrps'      => $mrps,
+            'coordinators' => $this->store->coordinators(),
             'entryDate' => date('Y-m-d'),
             'fixedSide' => $fixedSide,
             'fixed'     => $fixed,
@@ -1707,6 +1711,7 @@ class Ui extends BaseController
             'recipient' => $recipient,
             'donor'     => $donor,
             'mrps'      => $this->store->mrps(),
+            'coordinators' => $this->store->coordinators(),
             'entryDate' => $recipient['dateRegistered'] ?? date('Y-m-d'),
             'editing'   => $this->openSection($sections),
             'rLabTests' => $recipient['labTests'] ?? [],

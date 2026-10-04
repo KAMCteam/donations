@@ -431,13 +431,18 @@ final class UiStore
     }
 
     /**
-     * Every coordinator, for the same reason.
+     * The coordinators a record can be given, for the select that offers them.
+     *
+     * Active ones only: deactivating somebody on Add MRP is saying they are
+     * not to be assigned any more, and a list that went on offering them would
+     * be ignoring that. A record that already names them keeps them — the
+     * control adds the name back at the bottom rather than dropping it.
      *
      * @return list<array<string, mixed>>
      */
     public function coordinators(): array
     {
-        return $this->coordinators->orderBy('name')->findAll();
+        return $this->coordinators->where('is_active', 1)->orderBy('name')->findAll();
     }
 
     public function setOrgan(string $organ): void
@@ -1021,6 +1026,16 @@ final class UiStore
         }
 
         $this->mrp->update((int) $row['id'], ['is_active' => $active ? 1 : 0]);
+
+        // A coordinator is two rows — the directory's and the one the records
+        // point at — so deactivating has to reach both, or they would go on
+        // being offered on every record screen.
+        if ($row['kind'] === MrpModel::COORDINATOR) {
+            $this->coordinators
+                ->where('name', $row['name'])
+                ->set(['is_active' => $active ? 1 : 0])
+                ->update();
+        }
 
         return '';
     }

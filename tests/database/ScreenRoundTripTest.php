@@ -1379,6 +1379,81 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         ]);
     }
 
+    /**
+     * The coordinator is chosen from the people registered as one.
+     *
+     * It was a text box, which asked somebody to remember a colleague's name
+     * and spell it the way the last person did — and registered a second
+     * coordinator quietly when they did not.
+     */
+    public function testTheCoordinatorIsChosenFromTheRegistered(): void
+    {
+        $this->post('mrp', ['id' => 'C-7001', 'kind' => 'coordinator', 'name' => 'First Coordinator']);
+        $this->post('mrp', ['id' => 'C-7002', 'kind' => 'coordinator', 'name' => 'Second Coordinator']);
+        // A doctor is not one of them: the list is coordinators.
+        $this->post('mrp', ['id' => 'D-7003', 'kind' => 'doctor', 'name' => 'A Doctor']);
+
+        $this->post('recipients/new', ['mrn' => '4220', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
+
+        $html = $this->get('recipients/4220?edit=personal')->getBody();
+
+        $this->assertStringContainsString('<select id="f-coordinator" name="coordinator"', $html);
+        $this->assertStringNotContainsString('<input type="text" id="f-coordinator"', $html);
+
+        // The list is coordinators. A doctor is on the MRP select beside it,
+        // which is why this reads the one control rather than the page.
+        $picker = substr($html, (int) strpos($html, 'id="f-coordinator"'));
+        $picker = substr($picker, 0, (int) strpos($picker, '</select>'));
+
+        $this->assertStringContainsString('>First Coordinator</option>', $picker);
+        $this->assertStringContainsString('>Second Coordinator</option>', $picker);
+        $this->assertStringNotContainsString('A Doctor', $picker);
+
+        // And choosing one stores the row that already exists rather than a
+        // second one under the same name.
+        $this->post('recipients/4220', [
+            'section' => 'personal', 'name' => 'R', 'age' => '40', 'bloodType' => 'A',
+            'coordinator' => 'Second Coordinator',
+        ]);
+
+        $this->assertSame(2, $this->db->table('coordinators')->countAllResults());
+        $id = (int) $this->db->table('coordinators')->where('name', 'Second Coordinator')->get()->getRowArray()['id'];
+        $this->seeInDatabase('recipients', ['mrn' => 4220, 'coordinator_id' => $id]);
+    }
+
+    /**
+     * Deactivating a coordinator stops them being offered, and leaves the
+     * records that already name them alone.
+     */
+    public function testADeactivatedCoordinatorIsKeptButNotOffered(): void
+    {
+        $this->post('mrp', ['id' => 'C-7004', 'kind' => 'coordinator', 'name' => 'Was A Coordinator']);
+        $this->post('recipients/new', ['mrn' => '4221', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
+        $this->post('recipients/4221', [
+            'section' => 'personal', 'name' => 'R', 'age' => '40', 'bloodType' => 'A',
+            'coordinator' => 'Was A Coordinator',
+        ]);
+
+        $mrpId = (int) $this->db->table('mrp')->where('code', 'C-7004')->get()->getRowArray()['id'];
+        $this->post('mrp/' . $mrpId . '/active', ['active' => '0']);
+
+        // Both rows, because a coordinator is two of them.
+        $this->seeInDatabase('coordinators', ['name' => 'Was A Coordinator', 'is_active' => 0]);
+
+        // Gone from a record that has nobody…
+        $this->post('recipients/new', ['mrn' => '4222', 'name' => 'Other', 'age' => '40', 'bloodType' => 'A']);
+        $this->assertStringNotContainsString(
+            'Was A Coordinator',
+            $this->get('recipients/4222?edit=personal')->getBody()
+        );
+
+        // …and still on the record that named them, said in so many words.
+        $this->assertStringContainsString(
+            'Was A Coordinator &mdash; no longer registered',
+            $this->get('recipients/4221?edit=personal')->getBody()
+        );
+    }
+
     // ---- Paired exchange ---------------------------------------------------
 
     /**

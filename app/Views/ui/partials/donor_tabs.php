@@ -39,6 +39,7 @@ use App\Libraries\UiStore;
  * @var string                     $editing   Which of their cards is open
  * @var list<array<string, mixed>> $offerable Donors the Add dialog can offer
  * @var list<array{id: string, name: string}> $mrps
+ * @var list<array<string, mixed>> $coordinators Everyone registered as one
  * @var callable                   $ageNote
  */
 $pairUrl = site_url('pairs/' . rawurlencode($pair['id']));
@@ -161,6 +162,7 @@ $swapTo = array_values(array_filter(
                     'viewUrl'  => $tabUrl($tab),
                     'labUrl'   => $pairUrl . '/donors/' . rawurlencode($tab['id']) . '/labs',
                     'mrps'     => $mrps,
+                    'coordinators' => $coordinators,
                     'ageNote'  => $ageNote,
                     'hasActive' => $hasActive,
                 ], ['saveData' => false]) ?>

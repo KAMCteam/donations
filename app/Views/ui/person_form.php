@@ -190,7 +190,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                         </div>
                         <div>
                             <label class="field-label" for="f-coordinator">Recipient Coordinator</label>
-                            <input type="text" id="f-coordinator" name="coordinator" class="input" value="<?= esc($v['coordinator']) ?>" placeholder="Choose Coordinator">
+                            <?= view('ui/partials/coordinator_field', ['id' => 'f-coordinator', 'name' => 'coordinator', 'value' => $v['coordinator'], 'coordinators' => $coordinators], ['saveData' => false]) ?>
                         </div>
                     </div>
 
@@ -319,7 +319,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                         </div>
                         <div>
                             <label class="field-label" for="f-donor-coordinator">Donor Coordinator</label>
-                            <input type="text" id="f-donor-coordinator" name="donorCoordinator" class="input" value="<?= esc($v['donorCoordinator']) ?>" placeholder="Choose Coordinator">
+                            <?= view('ui/partials/coordinator_field', ['id' => 'f-donor-coordinator', 'name' => 'donorCoordinator', 'value' => $v['donorCoordinator'], 'coordinators' => $coordinators], ['saveData' => false]) ?>
                         </div>
                         <div>
                             <?php // Living or deceased is all this screen can ask: whether a

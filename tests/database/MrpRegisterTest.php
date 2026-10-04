@@ -105,8 +105,14 @@ final class MrpRegisterTest extends CIUnitTestCase
 
         $html = $this->get('recipients/new')->getBody();
 
-        $this->assertStringContainsString('Dr. Offered', $html);
-        $this->assertStringNotContainsString('Not Offered', $html);
+        // The MRP control, not the page: a coordinator is on the screen too,
+        // in the Coordinator select beside it, which is where they belong.
+        $picker = substr($html, (int) strpos($html, 'id="f-mrp"'));
+        $picker = substr($picker, 0, (int) strpos($picker, '</select>'));
+
+        $this->assertStringContainsString('Dr. Offered', $picker);
+        $this->assertStringNotContainsString('Not Offered', $picker);
+        $this->assertStringContainsString('Not Offered', $html);
     }
 
     public function testAnIdCannotBeRegisteredTwice(): void

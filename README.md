@@ -605,6 +605,15 @@ take. A coordinator registered here also gets a row in `coordinators`, which is
 what `recipients.coordinator_id` and `donors.coordinator_id` point at — without
 both, somebody registered here could not be assigned to anybody.
 
+The **Coordinator** field on every record, pair and donor card is a select of
+those people — not a text box. A box asked somebody to remember a colleague's
+name and spell it the way the last person did, and registered a second
+coordinator under the misspelling when they did not. **Deactivate** reaches
+both rows, so somebody stood down stops being offered; a record that already
+names them keeps them, shown at the foot of the list as *— no longer
+registered*, rather than quietly becoming nobody the next time the card is
+saved.
+
 **Search**, beside the MRP ID, is the hospital directory. A user is not
 invented on this screen: they already exist in the directory with an ID, and
 the right way to add one is to look them up by it. The directory is not
@@ -674,10 +683,12 @@ Two consequences worth knowing:
   filter in SQL, and the dashboard's "most urgent" panel is the top of the same
   query. A recipient with no dialysis date scores nothing and shows a dash,
   which is what the original did.
-- **A coordinator is registered by being typed.** The design collects the
-  coordinator as free text and has no screen that registers one, but the column
-  is a foreign key. Typing a name looks it up and creates it if it is new, so
-  `coordinators` fills from use. Typing the same name twice reuses the row.
+- **A coordinator was registered by being typed.** The design collected the
+  coordinator as free text and had no screen that registered one, so typing a
+  name created it. Add MRP registers them now, and the field is a select of the
+  people it registered. The name is still what the field posts — `UiStore` turns
+  it into `coordinator_id` on the way in and back on the way out — so a name
+  chosen from the list is one the table already holds.
 
 ### Not wired up yet
 

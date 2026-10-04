@@ -183,7 +183,7 @@ $ageNote = static function (string $birthDate, string $storedAge): string {
                     </div>
                     <div>
                         <label class="field-label" for="f-r-coordinator">Recipient Coordinator</label>
-                        <input type="text" id="f-r-coordinator" name="rCoordinator" class="input" value="<?= esc($v['rCoordinator']) ?>" placeholder="Choose Coordinator">
+                        <?= view('ui/partials/coordinator_field', ['id' => 'f-r-coordinator', 'name' => 'rCoordinator', 'value' => $v['rCoordinator'], 'coordinators' => $coordinators], ['saveData' => false]) ?>
                     </div>
                 </div>
 
@@ -324,7 +324,7 @@ $ageNote = static function (string $birthDate, string $storedAge): string {
                     </div>
                     <div>
                         <label class="field-label" for="f-d-coordinator">Donor Coordinator</label>
-                        <input type="text" id="f-d-coordinator" name="dCoordinator" class="input" value="<?= esc($v['dCoordinator']) ?>" placeholder="Choose Coordinator">
+                        <?= view('ui/partials/coordinator_field', ['id' => 'f-d-coordinator', 'name' => 'dCoordinator', 'value' => $v['dCoordinator'], 'coordinators' => $coordinators], ['saveData' => false]) ?>
                     </div>
                     <div>
                         <?php // The recipient is on this screen, so the finer question can

@@ -2547,8 +2547,11 @@ class Ui extends BaseController
                 isset($row['answers']) && is_array($row['answers'])
                     ? [
                         'answers'       => $row['answers'],
+                        // The box at the foot, and any row the + button added
+                        // beside it before the card was saved.
                         'newAnswer'     => (string) ($row['newAnswer'] ?? ''),
-                        'newAnswerTone' => (string) ($row['newAnswerTone'] ?? UiStore::LAB_TONE_DEFAULT),
+                        'newAnswerTone' => (string) ($row['newAnswerTone'] ?? ''),
+                        'newAnswers'    => is_array($row['newAnswers'] ?? null) ? $row['newAnswers'] : [],
                     ]
                     : []
             );

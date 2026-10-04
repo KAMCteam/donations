@@ -258,16 +258,28 @@ final class UiStore
      * it is how somebody chooses the right one rather than the nicest one.
      */
     public const LAB_TONES = [
-        'tone-emerald'    => 'Good',
-        'tone-red'        => 'Act on this',
-        'tone-amber'      => 'Outstanding',
-        'tone-amber-soft' => 'In progress',
-        'tone-slate'      => 'Neutral',
-        'tone-blue'       => 'Recorded',
-        'tone-blue-soft'  => 'Recorded, soft',
-        'tone-teal'       => 'Noted',
-        'tone-teal-soft'  => 'Noted, soft',
-        'tone-orange'     => 'Needs a look',
+        'tone-red'     => 'Red',
+        'tone-amber'   => 'Yellow',
+        'tone-emerald' => 'Green',
+        'tone-blue'    => 'Blue',
+        'tone-slate'   => 'Gray',
+    ];
+
+    /**
+     * The nine the check list itself uses, as the five on offer.
+     *
+     * The platform's own answers were painted in shades — amber and amber-soft,
+     * teal and teal-soft — which is a distinction worth making on a sheet
+     * somebody else wrote and not one worth asking a coordinator to make. So
+     * the picker offers five colours by their own names, and a shade stored
+     * before that reads as the one it is nearest to.
+     */
+    public const LAB_TONE_ALIAS = [
+        'tone-amber-soft' => 'tone-amber',
+        'tone-orange'     => 'tone-amber',
+        'tone-teal'       => 'tone-emerald',
+        'tone-teal-soft'  => 'tone-emerald',
+        'tone-blue-soft'  => 'tone-blue',
     ];
 
     /** The colour an answer nobody has given a colour to carries. */
@@ -2063,6 +2075,20 @@ final class UiStore
         return isset(self::STATUS_OPTIONS[$status]) ? $status : '';
     }
 
+    /**
+     * One of the five, or '' for no colour at all.
+     *
+     * Everything that reads a colour off a stored answer goes through here, so
+     * a shade written before the palette was cut to five reads as the colour
+     * it is nearest to rather than as nothing.
+     */
+    public static function labTone(string $tone): string
+    {
+        $tone = self::LAB_TONE_ALIAS[$tone] ?? $tone;
+
+        return isset(self::LAB_TONES[$tone]) ? $tone : '';
+    }
+
     /** The three a person's own record may be set to, and nothing else. */
     private function personStatusKey(string $status): string
     {
@@ -2190,7 +2216,11 @@ final class UiStore
                 // colour at all: a colour on it is something the record
                 // decided to say, and one nobody chose would be saying it by
                 // accident.
-                'tone'  => $own ? '' : (self::RESULT_TONE[$key] ?? ''),
+                // A test the record added arrives with the colours the
+                // platform would have given these answers anyway — there is
+                // nothing to be gained by making somebody paint Positive red
+                // — and the picker is there to change them.
+                'tone'  => self::labTone(self::RESULT_TONE[$key] ?? ''),
                 'own'   => false,
             ], $keys);
         }
@@ -2214,9 +2244,7 @@ final class UiStore
                     : (self::RESULT_LABEL[$key] ?? $key),
                 // '' for an answer nobody gave a colour to, which the card
                 // shows plain.
-                'tone'  => isset(self::LAB_TONES[$entry['tone'] ?? ''])
-                    ? (string) $entry['tone']
-                    : '',
+                'tone'  => self::labTone((string) ($entry['tone'] ?? '')),
                 'own'   => $own,
             ];
         }
@@ -2260,11 +2288,10 @@ final class UiStore
             $answers[] = [
                 'key'   => $key,
                 'label' => $own ? mb_substr($label, 0, self::CUSTOM_ANSWER_MAX) : (self::RESULT_LABEL[$key] ?? $key),
-                // Only a colour somebody picked is stored. Nothing picked is
-                // stored as nothing, and the card shows the answer plain.
-                'tone'  => isset(self::LAB_TONES[$entry['tone'] ?? ''])
-                    ? (string) $entry['tone']
-                    : '',
+                // Only a colour somebody picked is stored, as one of the
+                // five. Nothing picked is stored as nothing, and the card
+                // shows the answer plain.
+                'tone'  => self::labTone((string) ($entry['tone'] ?? '')),
             ];
         }
 
@@ -2291,19 +2318,27 @@ final class UiStore
     private function withNewAnswer(array $test): array
     {
         $answers = is_array($test['answers'] ?? null) ? $test['answers'] : [];
-        $label   = trim((string) ($test['newAnswer'] ?? ''));
 
-        if ($label === '') {
-            return $answers;
+        // The box at the foot, and any row the + button added beside it. Both
+        // arrive without a key, because a key is this method's to mint.
+        $fresh = is_array($test['newAnswers'] ?? null) ? $test['newAnswers'] : [];
+        $fresh[] = ['label' => $test['newAnswer'] ?? '', 'tone' => $test['newAnswerTone'] ?? ''];
+
+        foreach ($fresh as $one) {
+            $label = trim((string) (is_array($one) ? ($one['label'] ?? '') : $one));
+
+            if ($label === '') {
+                continue;
+            }
+
+            $key = self::customAnswerKey($label, array_map('strval', array_keys($answers)));
+
+            $answers[$key] = [
+                'on'    => '1',
+                'label' => $label,
+                'tone'  => is_array($one) ? (string) ($one['tone'] ?? '') : '',
+            ];
         }
-
-        $key = self::customAnswerKey($label, array_map('strval', array_keys($answers)));
-
-        $answers[$key] = [
-            'on'    => '1',
-            'label' => $label,
-            'tone'  => (string) ($test['newAnswerTone'] ?? ''),
-        ];
 
         return $answers;
     }

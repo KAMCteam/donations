@@ -103,23 +103,46 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
     <?php if ($editing && $section !== null): ?>
         <input type="hidden" name="section" value="<?= esc($section) ?>">
     <?php endif; ?>
+    <?php if ($editing && $addLabUrl !== null): ?>
+        <?php // The card's default button, so that Enter in one of its boxes
+              // saves the card. Without it the first submit button in the form
+              // is Add lab, and answering a box with Enter added a test. ?>
+        <button type="submit" class="offscreen-submit" tabindex="-1" aria-hidden="true">Save</button>
+    <?php endif; ?>
     <?php foreach ($groups as $groupName => $groupTests): ?>
     <?php // The one group the check list seeds nothing under: it heads the
           // tests this record adds for itself, so it is the one with a button. ?>
     <?php $isCustomGroup = $groupName === DatabaseSeeder::CUSTOM_GROUP; ?>
+    <?php if ($isCustomGroup && $addLabUrl !== null): ?>
+        <?php // Out of the fieldset, which is disabled while the card is being
+              // read: adding a test is not editing this one, so it should not
+              // need the pencil pressed first. It is the last group, so this
+              // closes the fields above it and opens another for its own. ?>
+        </fieldset>
+        <div class="lab-group lab-group--add">
+            <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
+            <?php // While the card is open it belongs to the card's own form,
+                  // so pressing it keeps whatever has been typed into the
+                  // tests above. While the card is being read there is nothing
+                  // to keep, and it belongs to the page's own `lab-add` form
+                  // instead — which is what lets it be pressed at all, the
+                  // card's fields being disabled.
+                  //
+                  // Either way it is not what Enter presses: open, the hidden
+                  // Save above it is the card's default button; closed, this
+                  // one answers to another form altogether. A text box
+                  // answered with Enter used to add a test nobody asked for. ?>
+            <button type="submit" class="btn-add-lab"<?= $editing ? '' : ' form="lab-add"' ?> formaction="<?= esc($addLabUrl) ?>" formnovalidate><?= ui_icon('plus') ?>Add lab</button>
+        </div>
+        <fieldset class="card-fields"<?= $editing ? '' : ' disabled' ?>>
+    <?php endif; ?>
     <div class="lab-group">
-        <?php if ($groupName !== ''): ?>
+        <?php // Its heading is above, with the button, except where there is
+              // no button — a screen with no record to add a test to. ?>
+        <?php if ($groupName !== '' && ! ($isCustomGroup && $addLabUrl !== null)): ?>
             <div class="lab-group-head">
                 <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
-                <?php if ($isCustomGroup && $addLabUrl !== null): ?>
-                    <?php // A plain post: it creates the test and comes back to
-                          // this card, so it needs nothing from the browser. ?>
-                    <button type="submit" class="btn-add-lab" formaction="<?= esc($addLabUrl) ?>" formnovalidate><?= ui_icon('plus') ?>Add lab</button>
-                <?php endif; ?>
             </div>
-        <?php endif; ?>
-        <?php if ($isCustomGroup && $groupTests === []): ?>
-            <p class="lab-group-empty">No tests added. Use <strong>Add lab</strong> for anything the check list has no line for.</p>
         <?php endif; ?>
         <div class="lab-grid">
         <?php foreach ($groupTests as $i => $test): ?>

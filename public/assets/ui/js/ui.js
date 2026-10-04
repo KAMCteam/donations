@@ -163,6 +163,89 @@
       var tick = e.target.closest('.lab-answer-tick input[type="checkbox"]');
       if (tick) tick.closest(".lab-answer").classList.toggle("is-on", tick.checked);
     });
+
+    /* The + beside "Add custom result" puts what is in the box into the list
+       above it, so several can be added before the card is saved; the pencil
+       opens a result's name for typing, and the bin takes the row off the
+       card. None of the three is required: with this file absent the box still
+       adds the one result it holds when the card is saved, and rubbing a name
+       out still removes it, which is how all of it worked before there were
+       buttons to press. */
+    document.addEventListener("click", function (e) {
+      var add = e.target.closest("[data-answer-add]");
+
+      if (add) {
+        addAnswerRow(add.closest("[data-answer-picker]"));
+
+        return;
+      }
+
+      var pencil = e.target.closest("[data-answer-edit]");
+
+      if (pencil) {
+        var name = pencil.closest(".lab-answer").querySelector(".lab-answer-name");
+        if (name) { name.focus(); name.select(); }
+
+        return;
+      }
+
+      var bin = e.target.closest("[data-answer-remove]");
+
+      // Off the card and out of the post, so saving is what makes it true.
+      if (bin) bin.closest(".lab-answer").remove();
+    });
+  }
+
+  /* One row, built from what the box at the foot is holding. It posts under
+     `newAnswers[]` because it has no key yet: the server mints one, the same
+     way it does for the box itself. */
+  function addAnswerRow(picker) {
+    if (!picker) return;
+
+    var box = picker.querySelector(".lab-answer-new .lab-answer-name");
+    var label = box ? box.value.trim() : "";
+    if (label === "") { if (box) box.focus(); return; }
+
+    var tone = picker.querySelector('.lab-answer-new input[type="radio"]:checked');
+    var base = picker.getAttribute("data-base");
+    var at = picker.querySelectorAll("[data-answer-list] .lab-answer").length;
+    var field = base + "[newAnswers][" + at + "]";
+
+    var row = document.createElement("div");
+    row.className = "lab-answer is-on";
+    row.innerHTML =
+      '<label class="lab-answer-tick">' +
+        '<input type="checkbox" checked disabled>' +
+        '<input type="text" class="lab-answer-name" maxlength="40" autocomplete="off" aria-label="Name of this answer">' +
+      "</label>";
+
+    // The name and the colour are set as values rather than written into the
+    // markup, so a result called <b>Positive</b> is a name and not a tag.
+    var name = row.querySelector(".lab-answer-name");
+    name.name = field + "[label]";
+    name.value = label;
+
+    var hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = field + "[tone]";
+    hidden.value = tone ? tone.value : "";
+    row.appendChild(hidden);
+
+    var swatch = document.createElement("span");
+    swatch.className = "tone-swatch " + (hidden.value || "tone-swatch--none");
+    row.appendChild(swatch);
+
+    // The pencil and the bin, copied off a row that already has them so the
+    // icons live in one place — the helper that draws them, in PHP.
+    ["[data-answer-edit]", "[data-answer-remove]"].forEach(function (what) {
+      var from = picker.querySelector(what);
+      if (from) row.appendChild(from.cloneNode(true));
+    });
+
+    picker.querySelector("[data-answer-list]").appendChild(row);
+
+    box.value = "";
+    box.focus();
   }
 
   /* ---- Lab test cards (lab-section.js) ---------------------------------- */

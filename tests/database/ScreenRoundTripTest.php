@@ -353,7 +353,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         $html = $this->get('recipients/8001')->getBody();
 
-        $this->assertSame(3, substr_count($html, 'class="card-fields" disabled'), 'personal, labs and notes');
+        // Four, not three: the workup's fields are in two, with the Other
+        // group's Add lab between them — a button that waited on the pencil
+        // would be a button for editing this card rather than adding another.
+        $this->assertSame(4, substr_count($html, 'class="card-fields" disabled'), 'personal, labs and notes');
         $this->assertSame(3, substr_count($html, 'class="btn-edit"'), 'one Edit per card');
         $this->assertStringNotContainsString('btn-save', $html, 'nothing to save until a card is opened');
     }
@@ -364,7 +367,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         $html = $this->get('recipients/8002?edit=personal')->getBody();
 
-        $this->assertSame(2, substr_count($html, 'class="card-fields" disabled'), 'the other two stay shut');
+        $this->assertSame(3, substr_count($html, 'class="card-fields" disabled'), 'the other two stay shut');
         $this->assertSame(1, substr_count($html, 'name="section" value="personal"'));
         $this->assertSame(1, substr_count($html, 'btn-save'), 'the open card saves itself');
     }
@@ -376,7 +379,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         $html = $this->get('recipients/8003?edit=nonsense')->getBody();
 
-        $this->assertSame(3, substr_count($html, 'class="card-fields" disabled'));
+        $this->assertSame(4, substr_count($html, 'class="card-fields" disabled'));
         $this->assertStringNotContainsString('btn-save', $html);
     }
 
@@ -492,7 +495,9 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $html   = $this->get('pairs/' . $pairId)->getBody();
 
         // Pair details, and each person's information, workup and notes.
-        $this->assertSame(7, substr_count($html, 'class="card-fields" disabled'));
+        // Nine, not seven: each of the two workups has its fields in two,
+        // with the Other group's Add lab standing between them.
+        $this->assertSame(9, substr_count($html, 'class="card-fields" disabled'));
         $this->assertSame(7, substr_count($html, 'class="btn-edit"'));
         $this->assertStringNotContainsString('btn-save', $html);
     }
@@ -3137,11 +3142,42 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     {
         $this->post('recipients/new', ['mrn' => '4030', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
 
-        $html = $this->get('recipients/4030?edit=labs')->getBody();
+        // On the card as it is read, not only once the pencil is pressed:
+        // adding a test is not editing this one.
+        $html = $this->get('recipients/4030')->getBody();
 
         $this->assertStringContainsString('Add lab', $html);
         $this->assertStringContainsString(site_url('recipients/4030') . '/labs', $html);
-        $this->assertStringContainsString('No tests added.', $html);
+        // Under the heading and on its own: the button says what it does.
+        $this->assertStringContainsString('<div class="lab-group lab-group--add">', $html);
+        $this->assertStringNotContainsString('No tests added.', $html);
+
+        // And it answers to the page's own form, so Enter in a box on the card
+        // cannot press it.
+        $this->assertStringContainsString('class="btn-add-lab" form="lab-add"', $html);
+        $this->assertStringContainsString('<form id="lab-add" method="post" hidden>', $html);
+    }
+
+    /**
+     * Enter in one of the card's boxes saves the card; it used to add a test.
+     *
+     * Add lab was the first submit button the form had, which is what a
+     * browser presses when a text box is answered with Enter — so a name typed
+     * and confirmed added a test nobody asked for.
+     */
+    public function testEnterOnAnOpenCardDoesNotAddATest(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4034', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('recipients/4034/labs');
+
+        $html = $this->get('recipients/4034?edit=labs')->getBody();
+
+        // The card's own default button comes before Add lab in the form…
+        $save = strpos($html, 'class="offscreen-submit"');
+        $add  = strpos($html, 'class="btn-add-lab"');
+        $this->assertIsInt($save);
+        $this->assertIsInt($add);
+        $this->assertLessThan($add, $save, 'the card has a default button of its own, first');
     }
 
     /** Added, named, answered and commented on — then read back. */
@@ -3344,18 +3380,24 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'section' => 'labs',
             'labs'    => [[
                 'id' => $lab['id'], 'name' => 'Courier sample',
-                'answers' => ['seen' => ['on' => '1', 'tone' => 'tone-teal'], 'not_seen' => ['on' => '1']],
+                // Green is one of the five on offer; teal is a shade the
+                // palette used to have, and reads as the one it is nearest to.
+                'answers' => [
+                    'seen'     => ['on' => '1', 'tone' => 'tone-emerald'],
+                    'not_seen' => ['on' => '1', 'tone' => 'tone-teal'],
+                ],
             ]],
         ]);
 
         // Read-only: the answers, in their colours, and no picker.
         $view = $this->get('recipients/4081')->getBody();
         $this->assertStringContainsString('data-lab-status="seen"', $view);
-        $this->assertStringContainsString('data-lab-tone="tone-teal"', $view);
+        $this->assertStringContainsString('data-lab-tone="tone-emerald"', $view);
+        $this->assertStringContainsString('data-lab-status="not_seen" data-lab-tone="tone-emerald"', $view);
         $this->assertStringNotContainsString('What this test answers', $view);
         // Every answer wears the colour it was given, not only the one
         // recorded: being able to tell them apart is why they were chosen.
-        $this->assertStringContainsString('lab-status-btn lab-status-btn--tinted tone-teal', $view);
+        $this->assertStringContainsString('lab-status-btn lab-status-btn--tinted tone-emerald', $view);
         // And the saved test carries its own way back into the list.
         $this->assertStringContainsString('recipients/4081?edit=labs#lab-' . $lab['id'] . '"', $view);
         $this->assertStringContainsString('Edit results', $view);
@@ -3366,7 +3408,12 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         // The index is wherever the custom test falls in the workup, which is
         // after everything the check list asks for.
         $this->assertStringContainsString('[answers][seen][on]" value="1" checked', $edit);
-        $this->assertStringContainsString('value="tone-teal" checked', $edit);
+        $this->assertStringContainsString('value="tone-emerald" checked', $edit);
+        // Five colours, by their own names, and a way to take one back off.
+        foreach (['No colour', 'Red', 'Yellow', 'Green', 'Blue', 'Gray'] as $named) {
+            $this->assertStringContainsString('<span class="tone-name">' . $named . '</span>', $edit);
+        }
+        $this->assertStringNotContainsString('tone-teal-soft', $edit);
         // The anchor the Edit link aims at is on the card it names.
         $this->assertStringContainsString('id="lab-' . $lab['id'] . '"', $edit);
     }

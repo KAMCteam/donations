@@ -146,6 +146,13 @@ $navItems = [
         </div>
     </div>
 
+    <?php // The form the Add lab buttons belong to. Empty and out of the way,
+          // because a form cannot sit inside another and these buttons sit
+          // inside the card's: owned by this one, they cannot be what Enter
+          // presses in a box somewhere else on the card. Each button carries
+          // its own `formaction`, so one form serves every workup on a page. ?>
+    <form id="lab-add" method="post" hidden><?= csrf_field() ?></form>
+
     <script src="<?= base_url('assets/ui/js/ui.js') ?>"></script>
 </body>
 

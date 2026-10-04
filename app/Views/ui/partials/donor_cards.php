@@ -173,7 +173,9 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
         'viewUrl'      => $viewUrl,
         'section'      => $card('labs'),
         'labsTitle'    => 'Donor &mdash; Required Lab Tests',
-        'addLabUrl'    => $editable('labs') ? $labUrl : null,
+        // Adding a test is not editing this card, so it does not wait for
+        // the pencil; removing one is, because it takes something away.
+        'addLabUrl'    => $tab['archived'] ? null : $labUrl,
         'removeLabUrl' => $editable('labs') ? $labUrl : null,
     ], ['saveData' => false]) ?>
 </form>

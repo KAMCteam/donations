@@ -454,24 +454,35 @@ the card asks, under **What this test answers**:
   done, Pending, Done, Acceptable, Abnormal, Negative, Positive, Applicable,
   Not applicable, Cleared, Not cleared, Given, Not given, Required, Not
   required, Seen, Not seen.
-- A box at the foot for an answer of their own: type a name, save, and it is
-  on the card with the rest. Renaming it renames the answer; rubbing the name
-  out removes it, which is the same gesture as unticking one of ours.
-- A swatch beside each, opening the colours the check list's own answers use.
-  The palette names what each colour is for — *Act on this*, *Outstanding*,
-  *Recorded* — because a colour on a medical record means something, and a
-  wheel of sixteen million would mean nothing. An answer starts with **no
-  colour**: the swatch is empty until one is picked, and *No colour* is the
-  first thing in the palette so it can be taken back off again. A colour means
-  somebody chose it, which it would not if every answer arrived wearing one.
+- **Add custom result** at the foot: type a name and press **+**, and it joins
+  the list above with a pencil and a bin of its own — so several can be added
+  before the card is saved, renamed, or taken off again. Without `ui.js` the
+  box still adds the one result it holds when the card is saved, and rubbing a
+  name out still removes it, which is how it worked before there were buttons.
+- A swatch beside each, opening five colours — **Red, Yellow, Green, Blue,
+  Gray** — named for themselves, because what a colour means is the test's
+  business and a wheel of sixteen million would mean nothing. *No colour* is
+  first in the palette, so one can be taken back off. The answers arrive
+  wearing the colours the platform would have given them anyway: there is
+  nothing to be gained by asking somebody to paint Positive red.
 
-Ticked answers are the buttons on the card, those with a colour in it and the
-rest plain,
+Once it is saved the test behaves exactly like every other: its answers wear
+their colours, and the one recorded colours the card. Ticked answers are the
+buttons on the card, those with a colour in it and the rest plain,
 and the list itself is only on screen while the card is being edited: once it
 is saved the card shows the chosen answers and nothing else. Its own **Edit
 results**, beside the pill, opens the workup at that card with the ticks,
 the names and the colours as they were left. Until a new test is given any
 answers it offers Not done · Pending · Done, which is what most of them want.
+
+**Add lab** sits under the Other heading rather than beside it, on its own and
+with nothing written under it, and it can be pressed while the card is being
+read: adding a test is not editing this one, so it does not wait for the
+pencil. That puts it outside the card's disabled fieldset — the workup's fields
+are in two, with the button between them — and it answers to a form of the
+page's own, so Enter in one of the card's boxes cannot press it. It used to:
+Add lab was the first submit button the form had, and a name typed and
+confirmed added a test nobody asked for.
 
 The set lives in `labs.answer_set`, JSON, on the test's own row — one set per
 test, so two tests on one record are independent, and a test on one record is

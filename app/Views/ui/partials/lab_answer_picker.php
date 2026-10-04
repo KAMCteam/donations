@@ -10,15 +10,22 @@ use App\Libraries\UiStore;
  * only the person adding it knows whether it says Cleared, or Seen, or
  * something the platform has no word for at all. So this is where they say.
  *
- * Every answer the platform has is offered; ticking one puts it on the card as
- * a button and leaves it there, and the rest disappear when the card is saved.
- * Beside each is a swatch that opens the colours the check list's own answers
- * use — a colour on a medical record means something, so the palette names
- * what each is for rather than offering a wheel, and an answer carries none
- * until one is picked.
+ * Every answer the platform has is offered, each already wearing the colour
+ * the platform would have given it, because there is nothing to be gained by
+ * asking somebody to paint Positive red. Ticking one puts it on the card and
+ * leaves it there; the rest disappear when the card is saved, and the saved
+ * card then behaves like every other: the answers wear their colours and the
+ * one recorded colours the card.
  *
- * Checkboxes and a `<details>` of radios: choosing an answer, choosing its
- * colour and adding one of your own all work with scripting off.
+ * Beside each answer is a swatch opening the five colours — Red, Yellow,
+ * Green, Blue, Gray — named for themselves rather than for what they are
+ * supposed to mean, because what they mean is the test's business.
+ *
+ * Checkboxes and a `<details>` of radios: ticking an answer and choosing its
+ * colour both work with scripting off. The + beside **Add custom result**, and
+ * the pencil and bin on a result somebody wrote, are `ui.js`; without it the
+ * box at the foot still adds one on save and rubbing a name out still removes
+ * it, which is how it worked before there were buttons.
  *
  * @var string                     $base     The field prefix for this test
  * @var string                     $idBase   Unique id stem for its controls
@@ -40,15 +47,12 @@ foreach ($answers as $answer) {
 }
 
 /**
- * The swatch and the palette behind it, for one answer.
+ * The swatch and the five colours behind it, for one answer.
  *
- * An answer starts with no colour at all, and the swatch is empty until one is
- * picked: a colour on a medical record means something, so it is said on
- * purpose or not said. "No colour" is the first thing in the palette, so a
- * colour can be taken back off again.
+ * "No colour" is first, so a colour can be taken back off again.
  */
-$palette = static function (string $name, string $id, string $current) {
-    $current = isset(UiStore::LAB_TONES[$current]) ? $current : '';
+$palette = static function (string $name, string $current) {
+    $current = UiStore::labTone($current);
     ?>
     <details class="tone-picker">
         <summary class="tone-swatch <?= $current === '' ? 'tone-swatch--none' : esc($current) ?>"
@@ -61,11 +65,11 @@ $palette = static function (string $name, string $id, string $current) {
                 <span class="tone-dot tone-dot--none"></span>
                 <span class="tone-name">No colour</span>
             </label>
-            <?php foreach (UiStore::LAB_TONES as $tone => $means): ?>
+            <?php foreach (UiStore::LAB_TONES as $tone => $named): ?>
                 <label class="tone-option">
                     <input type="radio" name="<?= $name ?>" value="<?= esc($tone) ?>"<?= $current === $tone ? ' checked' : '' ?>>
                     <span class="tone-dot <?= esc($tone) ?>"></span>
-                    <span class="tone-name"><?= esc($means) ?></span>
+                    <span class="tone-name"><?= esc($named) ?></span>
                 </label>
             <?php endforeach; ?>
         </div>
@@ -73,27 +77,29 @@ $palette = static function (string $name, string $id, string $current) {
     <?php
 };
 ?>
-<div class="lab-answers">
+<div class="lab-answers" data-answer-picker data-base="<?= esc($base) ?>">
     <div class="lab-answers-head">What this test answers</div>
     <p class="lab-answers-hint">Tick the answers it offers and give each a colour. Only the ticked ones stay on the card after it is saved.</p>
 
-    <div class="lab-answer-list">
+    <div class="lab-answer-list" data-answer-list>
         <?php foreach ($offered as $option): ?>
             <?php
-            $key    = (string) $option['key'];
-            $on     = isset($byKey[$key]);
-            $tone   = (string) ($byKey[$key]['tone'] ?? '');
-            $field  = $base . '[answers][' . $key . ']';
-            $rowId  = $idBase . '-ans-' . $key;
+            $key   = (string) $option['key'];
+            $on = isset($byKey[$key]);
+            // An answer nobody has ticked shows the colour the platform would
+            // give it, so the list arrives coloured and there is nothing to
+            // paint before ticking. One that is ticked shows what it was given
+            // — including no colour at all, if that is what was chosen.
+            $tone = $on
+                ? UiStore::labTone((string) $byKey[$key]['tone'])
+                : UiStore::labTone(UiStore::RESULT_TONE[$key] ?? '');
+            $field = $base . '[answers][' . $key . ']';
+            $rowId = $idBase . '-ans-' . $key;
             ?>
             <div class="lab-answer<?= $on ? ' is-on' : '' ?>">
                 <label class="lab-answer-tick" for="<?= esc($rowId) ?>">
                     <input type="checkbox" id="<?= esc($rowId) ?>" name="<?= $field ?>[on]" value="1"<?= $on ? ' checked' : '' ?>>
                     <?php if ($option['own']): ?>
-                        <?php // Theirs to rename, and theirs to take away: a
-                              // name rubbed out is an answer removed, which is
-                              // the same gesture as unticking it and reads
-                              // better than a second button to press. ?>
                         <input type="text" class="lab-answer-name" name="<?= $field ?>[label]"
                                value="<?= esc($option['label']) ?>" maxlength="<?= UiStore::CUSTOM_ANSWER_MAX ?>"
                                aria-label="Name of this answer" autocomplete="off">
@@ -102,18 +108,28 @@ $palette = static function (string $name, string $id, string $current) {
                         <input type="hidden" name="<?= $field ?>[label]" value="<?= esc($option['label']) ?>">
                     <?php endif; ?>
                 </label>
-                <?php $palette($field . '[tone]', $rowId . '-tone', (string) $tone); ?>
+                <?php $palette($field . '[tone]', $tone); ?>
+                <?php if ($option['own']): ?>
+                    <?php // Theirs to rename and theirs to take away. The
+                          // pencil opens the name for typing; the bin takes
+                          // the row off the card, and saving is what makes
+                          // either of them true. ?>
+                    <button type="button" class="lab-answer-act" data-answer-edit title="Rename this result"><?= ui_icon('edit') ?><span class="sr-only">Rename this result</span></button>
+                    <button type="button" class="lab-answer-act lab-answer-act--danger" data-answer-remove title="Delete this result"><?= ui_icon('trash') ?><span class="sr-only">Delete this result</span></button>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
     </div>
 
-    <?php // One box, always on the card: adding an answer is typing a name and
-          // saving, with no step of its own before the thing you are already
-          // saving. ?>
+    <?php // The box that adds one. Pressing + puts it in the list above and
+          // clears the box, so several can be added before the card is saved;
+          // with scripting off the one in the box is added on save, which is
+          // how this worked before the button existed. ?>
     <div class="lab-answer-new">
-        <label class="sr-only" for="<?= esc($idBase) ?>-new">Add an answer of your own</label>
+        <label class="lab-answer-new-label" for="<?= esc($idBase) ?>-new">Add custom result</label>
         <input type="text" id="<?= esc($idBase) ?>-new" class="lab-answer-name" name="<?= $base ?>[newAnswer]"
-               value="" placeholder="+ Add an answer of your own" maxlength="<?= UiStore::CUSTOM_ANSWER_MAX ?>" autocomplete="off">
-        <?php $palette($base . '[newAnswerTone]', $idBase . '-new-tone', ''); ?>
+               value="" placeholder="Name of the result" maxlength="<?= UiStore::CUSTOM_ANSWER_MAX ?>" autocomplete="off">
+        <?php $palette($base . '[newAnswerTone]', ''); ?>
+        <button type="button" class="lab-answer-add" data-answer-add title="Add this result"><?= ui_icon('plus') ?><span class="sr-only">Add this result</span></button>
     </div>
 </div>

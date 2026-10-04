@@ -2938,7 +2938,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         [$first]  = $this->pairLinks(8940);
 
         $ask = $this->get('pairs/' . $pairId)->getBody();
-        $this->assertStringContainsString('Connect with another donor', $ask);
+        $this->assertStringContainsString('Link with a new donor', $ask);
         $this->assertStringContainsString('Take the pair apart', $ask);
 
         $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'dissolve'])
@@ -2955,36 +2955,60 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
-     * Carrying on means carrying on with somebody.
+     * Linking somebody already on the register in the place being vacated.
      *
-     * The option says the next donor is set to Active, so it is: the pair has
-     * lost the one it was going ahead with and a pair with donors on it is
-     * going ahead with one of them.
+     * The answer says they are set to Active, so they are: the pair has just
+     * lost the donor it was going ahead with, and this is who it is going
+     * ahead with instead.
      */
-    public function testCarryingOnRaisesTheNextDonorToActive(): void
+    public function testDelinkingCanLinkARegisteredDonorInTheirPlace(): void
     {
         [$pairId] = $this->pairWith('8970', '8971', 'The Donor');
-        $this->addPairDonor($pairId, '8972', 'The Reserve');
+        $this->post('donors/new', ['mrn' => '8972', 'name' => 'On The Register', 'age' => '30', 'bloodType' => 'A']);
         [$first]  = $this->pairLinks(8970);
 
-        $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'carry-on']);
+        $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', [
+            'outcome'  => 'existing',
+            'donorMrn' => '8972',
+        ]);
 
-        // The one taken off is archived; the reserve is the pair's donor now.
+        // The one taken off is archived; the one chosen is the pair's donor.
         $this->seeInDatabase('pairs', ['id' => $first, 'status' => 'closed']);
+        $this->seeInDatabase('pairs', ['recipient_mrn' => 8970, 'donor_mrn' => 8972, 'status' => 'active']);
         $this->seeInDatabase('donors', ['mrn' => 8972, 'status' => 'active']);
-        $this->assertStringContainsString('The Reserve is the donor it is going ahead with now', (string) session('ui_notice'));
+        $this->assertStringContainsString('going ahead with On The Register now', (string) session('ui_notice'));
     }
 
-    /** With nobody left to raise, the pair simply has no active donor. */
-    public function testCarryingOnWithNobodyLeftRaisesNobody(): void
+    /** Or entering one who is not on the system yet, which is Add Donor. */
+    public function testDelinkingCanSendYouToAddTheDonorTakingTheirPlace(): void
     {
         [$pairId] = $this->pairWith('8973', '8974', 'Only Donor');
         [$first]  = $this->pairLinks(8973);
 
-        $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'carry-on']);
+        $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'new'])
+            ->assertRedirectTo(site_url('donors/new') . '?pair=8973');
 
         $this->seeInDatabase('pairs', ['id' => $first, 'status' => 'closed']);
-        $this->assertStringNotContainsString('going ahead with now', (string) session('ui_notice'));
+        // And that screen enters them as the pair's donor, because the pair
+        // has nobody active to argue with.
+        $this->assertStringContainsString('value="Active" selected', $this->get('donors/new?pair=8973')->getBody());
+    }
+
+    /** The three answers, in the warning that says why they are asked. */
+    public function testTheDelinkDialogWarnsAndOffersTheThreeAnswers(): void
+    {
+        [$pairId] = $this->pairWith('8975', '8976', 'The Donor');
+        $this->post('donors/new', ['mrn' => '8977', 'name' => 'On The Register', 'age' => '30', 'bloodType' => 'A']);
+
+        $html = $this->get('pairs/' . $pairId)->getBody();
+
+        $this->assertStringContainsString('takes the pair apart', $html);
+        $this->assertStringContainsString('Link with a new donor', $html);
+        $this->assertStringContainsString('Link with an existing donor', $html);
+        $this->assertStringContainsString('Take the pair apart', $html);
+        // The one that needs to know which carries the list.
+        $this->assertStringContainsString('name="donorMrn"', $html);
+        $this->assertStringContainsString('On The Register', $html);
     }
 
     /**

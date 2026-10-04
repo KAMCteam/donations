@@ -1535,6 +1535,17 @@
   color: var(--slate-500);
 }
 
+/* Which one, under the answer that needs to know. */
+.confirm-choice-pick {
+  display: block;
+  margin-top: 0.5rem;
+}
+.confirm-choice-pick .input {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  font-size: var(--text-sm);
+}
+
 /* What just happened, above the page it happened on.
 
    It sits outside `.page`, which is what carries the gutter, so it repeats

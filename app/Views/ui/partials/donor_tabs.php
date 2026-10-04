@@ -148,31 +148,59 @@ $swapTo = array_values(array_filter(
                           // the one it is going ahead with can mean either of
                           // two things, and the difference is the whole pair,
                           // so that one is asked which. ?>
+                    <?php
+                    // The three answers. Two of them keep the pair by putting
+                    // somebody in the place being vacated — one entered now,
+                    // one already on the register — and the third ends it.
+                    // Choosing from the register is only an answer while there
+                    // is somebody free to choose.
+                    $delinkChoices = [];
+
+                    if ($tab['isActive']) {
+                        $delinkChoices[] = [
+                            'value' => 'new',
+                            'label' => 'Link with a new donor',
+                            'hint'  => 'Opens Add Donor for this pair. They join it as the donor it is going ahead with.',
+                        ];
+
+                        if ($offerable !== []) {
+                            $delinkChoices[] = [
+                                'value'  => 'existing',
+                                'label'  => 'Link with an existing donor',
+                                'hint'   => 'Choose from the donors on the register who are not in a pair. They are set to "Active" on this pair.',
+                                'select' => [
+                                    'name'    => 'donorMrn',
+                                    'label'   => 'Donor to link',
+                                    'options' => array_map(static fn (array $free): array => [
+                                        'value' => (string) $free['id'],
+                                        'label' => $free['name'] . ' (' . $free['id'] . ') — ' . $free['bloodType']
+                                            . (($free['age'] ?? 0) > 0 ? ', ' . $free['age'] : ''),
+                                    ], $offerable),
+                                ],
+                            ];
+                        }
+
+                        $delinkChoices[] = [
+                            'value' => 'dissolve',
+                            'label' => 'Take the pair apart',
+                            'hint'  => 'The recipient goes back to the waitlist and the Donor back to the Donors list.',
+                        ];
+                    }
+                    ?>
                     <?= view('ui/partials/confirm_dialog', [
                         'id'      => $delinkId,
                         'title'   => 'Delink ' . $donor['name'] . '?',
                         'detail'  => $tab['isActive']
-                            ? $donor['name'] . ' is the donor this pair is going ahead with. Taking them off it '
-                                . 'archives their tab either way — it stays here, read-only, with the status they '
-                                . 'have now. What happens to the pair is the question.'
+                            ? $donor['name'] . ' is this pair\'s active donor, so taking them off it takes the pair '
+                                . 'apart — unless another donor is linked in their place. Their tab is archived '
+                                . 'either way: it stays here, read-only, with the status they have now.'
                             : 'This pair has finished with ' . $donor['name'] . '. Their tab stays here, read-only, '
                                 . 'with the status they have now — and their own record is untouched, so they go '
                                 . 'back to the register and can be linked again from their own screen.',
                         'action'  => $pairUrl . '/donors/' . rawurlencode((string) $tab['id']) . '/delink',
                         'confirmVerb' => 'Delink donor',
                         'confirmIcon' => 'unlink',
-                        'confirmChoices' => $tab['isActive'] ? [
-                            [
-                                'value' => 'carry-on',
-                                'label' => 'Connect with another donor',
-                                'hint'  => 'The donor will be automatically set to "Active" status.',
-                            ],
-                            [
-                                'value' => 'dissolve',
-                                'label' => 'Take the pair apart',
-                                'hint'  => 'The recipient goes back to the waitlist and the Donor back to the Donors list.',
-                            ],
-                        ] : [],
+                        'confirmChoices' => $delinkChoices,
                     ], ['saveData' => false]) ?>
                 <?php endif; ?>
             </div>

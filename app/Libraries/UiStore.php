@@ -1447,33 +1447,6 @@ final class UiStore
     }
 
     /**
-     * Raises the next of a pair's donors to Active, and says who.
-     *
-     * What "carry on with another donor" means when the one the pair was going
-     * ahead with is taken off it: the pair is still a pair, so somebody on it
-     * is the donor it is going ahead with. The next one that is neither
-     * archived nor already active takes the place — the order they were taken
-     * on in, which is the order the tabs are in.
-     *
-     * '' when there is nobody to raise. A pair can be left with no active
-     * donor; it just cannot be left with two.
-     */
-    public function raiseNextDonor(string $recipientMrn): string
-    {
-        foreach ($this->pairDonors($recipientMrn) as $tab) {
-            if ($tab['archived'] || $tab['isActive']) {
-                continue;
-            }
-
-            if ($this->setPairDonorStatus($recipientMrn, (string) $tab['id'], 'active') === '') {
-                return (string) $tab['name'];
-            }
-        }
-
-        return '';
-    }
-
-    /**
      * Takes the whole pair apart.
      *
      * Every link closes at once, so the recipient goes back to the waiting

@@ -458,7 +458,11 @@ class Ui extends BaseController
                 'relationship'     => $person['relationship'] ?? '',
                 'donorGender'      => $person['donorGender'] ?? 'Male',
                 'donorCoordinator' => $person['donorCoordinator'] ?? '',
-                'donorStatus'      => $person['donorStatus'] ?? 'On Hold',
+                // A donor entered for a pair that has nobody active is being
+                // entered as its donor: that is what the screen was opened
+                // for, so it is the word already in the box.
+                'donorStatus'      => $person['donorStatus']
+                    ?? ($forPair !== '' && ! $this->store->hasActiveDonor($forPair) ? 'Active' : 'On Hold'),
                 'donorMrp'         => $person['donorMrp'] ?? ($mrps[0]['id'] ?? ''),
             ],
         ]);
@@ -739,8 +743,9 @@ class Ui extends BaseController
      *
      * Delinking a donor the pair was only holding in reserve is one decision
      * and takes one question. Delinking the one it was going ahead with is
-     * two: the pair can carry on with somebody else, or it can come apart
-     * altogether — and that second answer puts the recipient back on the
+     * the pair's own future: without another donor in their place the pair
+     * comes apart, so the dialog asks which — somebody entered now, somebody
+     * already on the register, or nobody, which puts the recipient back on the
      * waiting list and every donor back on the register.
      */
     public function delinkPairDonor(string $id, string $linkId): RedirectResponse
@@ -755,8 +760,10 @@ class Ui extends BaseController
             return redirect()->to($back);
         }
 
-        $dissolve = $tab['isActive'] && $this->request->getPost('outcome') === 'dissolve';
-        $error    = $dissolve
+        // Only the active donor's tab asks the question, so only it is read.
+        $outcome = $tab['isActive'] ? (string) $this->request->getPost('outcome') : '';
+
+        $error = $outcome === 'dissolve'
             ? $this->store->dissolvePair($pair['recipientId'], 'The pair was dissolved from ' . $tab['name'] . "'s tab.")
             : $this->store->delinkPairDonor($pair['recipientId'], $linkId);
 
@@ -764,21 +771,39 @@ class Ui extends BaseController
             return redirect()->to($back)->with('ui_error', $error);
         }
 
-        if ($dissolve) {
+        $archived = $tab['name'] . ' has been archived on this pair.';
+
+        if ($outcome === 'dissolve') {
             return redirect()->to(site_url('recipients/' . rawurlencode($pair['recipientId'])))
                 ->with('ui_notice', 'The pair has been taken apart. ' . $pair['recipientName'] . ' is back on the waiting list.');
         }
 
-        // Carrying on means carrying on with somebody: the donor the pair was
-        // going ahead with has gone, so the next of its own takes their place
-        // rather than leaving the pair with nobody and nothing said about it.
-        $raised = $tab['isActive'] ? $this->store->raiseNextDonor($pair['recipientId']) : '';
+        // Somebody already on the register takes the place: the pair has just
+        // lost the donor it was going ahead with, so the one chosen is set to
+        // Active, which is what the answer promised.
+        if ($outcome === 'existing') {
+            $donorMrn = trim((string) $this->request->getPost('donorMrn'));
+            $added    = $this->store->addPairDonor($pair['recipientId'], $donorMrn, 'active');
 
-        return redirect()->to($back)->with(
-            'ui_notice',
-            $tab['name'] . ' has been archived on this pair.'
-                . ($raised === '' ? '' : ' ' . $raised . ' is the donor it is going ahead with now.')
-        );
+            if ($added !== '') {
+                return redirect()->to($back)->with('ui_error', $archived . ' ' . $added);
+            }
+
+            $donor = $this->store->findDonor($donorMrn);
+
+            return redirect()->to($this->pairDonorUrl($pair['recipientId'], $donorMrn))
+                ->with('ui_notice', $archived . ' This pair is going ahead with '
+                    . ($donor['name'] ?? 'the donor linked') . ' now.');
+        }
+
+        // Somebody who is not on the system yet: Add Donor, entered for this
+        // pair, which is the screen that writes them and links them in one go.
+        if ($outcome === 'new') {
+            return redirect()->to(site_url('donors/new') . '?pair=' . rawurlencode($pair['recipientId']))
+                ->with('ui_notice', $archived . ' Enter the donor taking their place.');
+        }
+
+        return redirect()->to($back)->with('ui_notice', $archived);
     }
 
     /**

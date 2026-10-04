@@ -254,15 +254,23 @@ Exactly two things archive a donor:
 
 | | What happens |
 | --- | --- |
-| **Delink** | Available on every live tab. On a reserve it archives that donor and nothing else. On the active one it asks the further question: **Connect with another donor**, which raises the next of the pair's own to Active, or **Take the pair apart**. |
+| **Delink** | Available on every live tab. On a reserve it archives that donor and nothing else. On the active one it asks the pair's own future, in three answers. |
 | **A swap** | The donor swapped out is archived, and the one swapped to is the pair's. |
 
-Connecting with another donor is not a question left hanging: the pair has lost
-the donor it was going ahead with, and a pair with donors on it is going ahead
-with one of them, so the next one that is neither archived nor already active
-is set to Active — the order they were taken on in, which is the order the tabs
-are in. With nobody left to raise, the pair simply has no active donor, which
-is allowed; two is what is not.
+Delinking the **active** donor is the pair's own future, so the dialog says so
+first — taking this donor off takes the pair apart unless another is linked in
+their place — and then asks which:
+
+| | What it does |
+| --- | --- |
+| **Link with a new donor** | Opens Add Donor for this pair. They join it as the donor it is going ahead with: the pair has nobody active at that moment, so **Active** is the word already in the box. |
+| **Link with an existing donor** | A select of the donors on the register who are not in a pair, under the answer itself. The one chosen is set to Active on this pair. |
+| **Take the pair apart** | The recipient goes back to the waitlist, the donors back to the register. |
+
+The donor being delinked is archived whichever is answered; what the answer
+decides is whether anybody takes their place. A donor the pair already has in
+reserve is not on that list — the list is of donors free on the register, and
+raising one of the pair's own is what **Swap** is for.
 
 Taking the pair apart closes every link at once: the recipient goes back to the
 waiting list, every donor back to the register, and the pair's screen stays
@@ -544,11 +552,14 @@ What asks is `ui/partials/confirm_dialog`, one `<dialog>` per thing that can be
 taken away, sitting beside the button that opens it: a row's bin on each of the
 three lists, **Remove this test** at the foot of a test somebody added, and
 **Delink** on a pair's donor tab. The delink one is the question with two
-answers, each a line of its own:
+answers, each a line of its own, under a line saying why it is being asked at
+all — this donor is the pair's active one, and without somebody in their place
+the pair comes apart:
 
 | | What it does |
 | --- | --- |
-| **Connect with another donor** | The donor will be automatically set to "Active" status. |
+| **Link with a new donor** | Add Donor, opened for this pair; they join it as its active donor. |
+| **Link with an existing donor** | A select of the donors free on the register, under the answer; the one chosen is set to Active. |
 | **Take the pair apart** | The recipient goes back to the waitlist and the Donor back to the Donors list. |
 
 Two things make a dialog able to live anywhere. Its button belongs to

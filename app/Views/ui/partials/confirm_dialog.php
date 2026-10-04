@@ -25,9 +25,11 @@
  * @var string $action  Where the answer posts
  * @var string $confirmVerb  What the button says. "Delete" unless told otherwise
  * @var string $confirmIcon  The button's icon
- * @var list<array{value: string, label: string, hint: string}> $confirmChoices
+ * @var list<array{value: string, label: string, hint: string, select?: array}> $confirmChoices
  *      A question with more than one answer — delinking the donor a pair is
- *      going ahead with. Empty for the ordinary "yes or no".
+ *      going ahead with. Empty for the ordinary "yes or no". An answer that
+ *      needs to know *which* carries a `select`: {name, label, options}, each
+ *      option a {value, label}.
  *
  * The three that have defaults are named for this partial and nothing else,
  * because CodeIgniter keeps view data between `view()` calls: a `$choices` of
@@ -53,6 +55,20 @@ $confirmIcon    ??= 'trash';
                         <span>
                             <span class="confirm-choice-label"><?= esc($choice['label']) ?></span>
                             <span class="confirm-choice-hint"><?= esc($choice['hint']) ?></span>
+                            <?php if (isset($choice['select'])): ?>
+                                <?php // Which one, asked where the answer is
+                                      // given. It posts whatever is chosen;
+                                      // the answer beside it is what decides
+                                      // whether anybody reads it. ?>
+                                <span class="confirm-choice-pick">
+                                    <label class="sr-only" for="<?= esc($id . '-' . $choice['value']) ?>"><?= esc($choice['select']['label']) ?></label>
+                                    <select id="<?= esc($id . '-' . $choice['value']) ?>" name="<?= esc($choice['select']['name']) ?>" class="input" form="confirm-post">
+                                        <?php foreach ($choice['select']['options'] as $option): ?>
+                                            <option value="<?= esc($option['value']) ?>"><?= esc($option['label']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </span>
+                            <?php endif; ?>
                         </span>
                     </label>
                 <?php endforeach; ?>

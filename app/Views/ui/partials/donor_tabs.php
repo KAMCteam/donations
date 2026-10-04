@@ -9,7 +9,8 @@ use App\Libraries\UiStore;
  * is the donor it is going ahead with — the Active one, and there is never
  * more than one — and the rest are being held: On Hold while they are still a
  * possibility, Declined once they are not. Both are still the pair's donors,
- * and either can be taken back up by moving the words around.
+ * and either can be taken back up by moving the words around — on the donor's
+ * own card, where the word they are on is one of their fields.
  *
  * Opening a tab shows that donor in full, here: who they are, and their whole
  * workup. The point of the screen is comparing them, and comparing means not
@@ -110,22 +111,11 @@ $swapTo = array_values(array_filter(
                 </div>
                 <?php if (! $tab['archived']): ?>
                     <div class="header-actions">
-                        <?php // The three words, from the tab itself. Active is
-                              // left off while somebody else holds it: a pair
-                              // goes ahead with one donor, so the way to this
-                              // one is to stand that one down, or to swap. ?>
-                        <form method="post" action="<?= $pairUrl ?>/donors/<?= esc($tab['id']) ?>/status" class="inline-form tab-status-form">
-                            <?= csrf_field() ?>
-                            <label class="sr-only" for="tab-status">Status</label>
-                            <select id="tab-status" name="status" class="input" data-auto-submit>
-                                <?php foreach (UiStore::PERSON_STATUS_OPTIONS as $value => $label): ?>
-                                    <?php if ($value === 'active' && $hasActive && ! $tab['isActive']) { continue; } ?>
-                                    <option value="<?= esc($value) ?>"<?= $tab['status'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <button type="submit" class="btn-outline">Set</button>
-                        </form>
-
+                        <?php // No status control here. The word a donor is on
+                              // is one of their own fields, asked on their
+                              // Personal Information card below with the rest
+                              // of them; a second control for it in the head
+                              // was the same answer in two places. ?>
                         <?php if ($tab['isActive'] && $swapTo !== []): ?>
                             <?php // Only ever on the active donor: swapping a
                                   // reserve would be swapping nothing. ?>

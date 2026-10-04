@@ -2699,6 +2699,21 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         return [(int) $row['id'], (int) $row['id']];
     }
 
+    /**
+     * Moves one of a pair's donors to a status, the only way the screens do:
+     * their own Personal Information card on the pair.
+     */
+    private function setPairDonorStatus(int $pairId, int $linkId, string $name, string $status): void
+    {
+        $this->post('pairs/' . $pairId, [
+            'section'    => 'pd' . $linkId . '-personal',
+            'dName'      => $name,
+            'dBloodType' => 'A',
+            'dType'      => 'living_related',
+            'dStatus'    => $status,
+        ]);
+    }
+
     /** Adds another donor to a pair, through the pair's own dialog. */
     private function addPairDonor(int $pairId, string $dMrn, string $dName, string $status = 'on_hold'): int
     {
@@ -2765,37 +2780,30 @@ final class ScreenRoundTripTest extends CIUnitTestCase
      * One pair, one donor it is going ahead with.
      *
      * The way to another is to stand the current one down and raise them, or
-     * to swap. Setting a second active outright is refused wherever it is
-     * tried — the tab's own control, and the card behind it.
+     * to swap. Setting a second active outright is refused on the card that
+     * asks, and again in the store behind it.
      */
     public function testAPairMayHaveOnlyOneActiveDonor(): void
     {
         [$pairId] = $this->pairWith('8920', '8921', 'The Donor');
         $second   = $this->addPairDonor($pairId, '8922', 'The Reserve');
 
-        $this->post('pairs/' . $pairId . '/donors/' . $second . '/status', ['status' => 'active']);
+        $this->setPairDonorStatus($pairId, $second, 'The Reserve', 'Active');
 
         $this->seeInDatabase('donors', ['mrn' => 8922, 'status' => 'on_hold']);
         $this->assertStringContainsString('already has an active donor', (string) session('ui_error'));
 
-        // Nor through the donor's own card.
-        $this->post('pairs/' . $pairId, [
-            'section' => 'pd' . $second . '-personal',
-            'dName' => 'The Reserve', 'dBloodType' => 'A', 'dStatus' => 'Active', 'dType' => 'living_related',
-        ]);
-        $this->seeInDatabase('donors', ['mrn' => 8922, 'status' => 'on_hold']);
-
-        // And the tab's own control does not offer what it would refuse.
-        $html   = $this->get('pairs/' . $pairId . '?donor=2')->getBody();
-        $picker = substr($html, (int) strpos($html, 'id="tab-status"'));
+        // And the card does not offer what it would refuse.
+        $html   = $this->get('pairs/' . $pairId . '?donor=2&edit=pd' . $second . '-personal')->getBody();
+        $picker = substr($html, (int) strpos($html, 'id="f-d-status"'));
         $picker = substr($picker, 0, (int) strpos($picker, '</select>'));
-        $this->assertStringNotContainsString('value="active"', $picker);
-        $this->assertStringContainsString('value="on_hold"', $picker);
+        $this->assertStringNotContainsString('value="Active"', $picker);
+        $this->assertStringContainsString('value="On Hold"', $picker);
 
         // Stand the first down, and the way is open.
         [$first] = $this->pairLinks(8920);
-        $this->post('pairs/' . $pairId . '/donors/' . $first . '/status', ['status' => 'on_hold']);
-        $this->post('pairs/' . $pairId . '/donors/' . $second . '/status', ['status' => 'active']);
+        $this->setPairDonorStatus($pairId, $first, 'The Donor', 'On Hold');
+        $this->setPairDonorStatus($pairId, $second, 'The Reserve', 'Active');
 
         $this->seeInDatabase('donors', ['mrn' => 8921, 'status' => 'on_hold']);
         $this->seeInDatabase('donors', ['mrn' => 8922, 'status' => 'active']);
@@ -2952,7 +2960,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         $this->assertStringContainsString('<span class="tab-status">Active</span>', $this->get('pairs/' . $pairId)->getBody());
 
-        $this->post('pairs/' . $pairId . '/donors/' . $id . '/status', ['status' => 'on_hold']);
+        $this->setPairDonorStatus($pairId, $id, 'D', 'On Hold');
 
         $this->seeInDatabase('donors', ['mrn' => 8811, 'status' => 'on_hold']);
         $this->assertStringContainsString('<span class="tab-status">On Hold</span>', $this->get('pairs/' . $pairId)->getBody());

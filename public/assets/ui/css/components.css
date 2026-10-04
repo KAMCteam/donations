@@ -1703,21 +1703,6 @@
 
 .pair-archive-why { font-style: italic; }
 
-/* Active or On Hold, from the open tab. The select and its fallback button
-   sit on one line with the other controls in that row. */
-.tab-status-form {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-}
-
-.tab-status-form .input {
-  width: auto;
-  padding-top: 0.4rem;
-  padding-bottom: 0.4rem;
-  font-size: var(--text-sm);
-}
-
 .tab-panel-empty,
 .tab-note {
   font-size: var(--text-sm);

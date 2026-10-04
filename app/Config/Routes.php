@@ -73,7 +73,6 @@ $routes->match(['get', 'post'], 'pairs/new', 'Ui::addPair');
 // comes straight back to it, at the tab it was pressed on. There is no page
 // of their own: the tabs are on the pair.
 $routes->post('pairs/(:segment)/donors', 'Ui::addPairDonor/$1');
-$routes->post('pairs/(:segment)/donors/(:num)/status', 'Ui::pairDonorStatus/$1/$2');
 $routes->match(['get', 'post'], 'pairs/(:segment)/donors/(:num)/delink', 'Ui::delinkPairDonor/$1/$2');
 $routes->post('pairs/(:segment)/donors/(:num)/swap', 'Ui::swapPairDonor/$1/$2');
 // A donor's workup is edited where it is read, so adding and removing a test

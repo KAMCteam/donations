@@ -223,13 +223,20 @@ posted anyway.
 
 **One donor to a pair may be Active.** A pair that said it was going ahead with
 two people would be saying nothing, so everything that could make a second one
-asks first: the tab's status control, the donor's card behind it, and both
-doors of Add donor.
+asks first: the donor's **Donor Status** field on their card, and both doors of
+Add donor.
+
+The word a donor is on is set in one place — that field, on their Personal
+Information card, where it sits with the rest of their details. The tab's head
+carried a second control for the same answer beside **Delink**; it is gone, and
+with it the `pairs/{id}/donors/{n}/status` post it made. **Swap** and
+**Delink** stay there, because neither is a field: they are things done to the
+link, not facts about the donor.
 
 There are two ways to change which donor that is, and they are not the same:
 
-- **Move the words about.** Stand the current one down to On Hold or Declined,
-  then set another to Active. Nobody is archived; both are still the pair's
+- **Move the words about,** each on its own card. Stand the current one down to
+  On Hold or Declined, then set another to Active. Nobody is archived; both are still the pair's
   donors and either can be taken back up.
 - **Swap**, which is only ever offered on the active donor — swapping a reserve
   would be swapping nothing. The one swapped out is **archived**: finished with,

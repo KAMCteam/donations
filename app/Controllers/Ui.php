@@ -768,30 +768,6 @@ class Ui extends BaseController
             ->with('ui_notice', 'Added to this pair.');
     }
 
-    /** Moves one of the pair's donors between Active, On Hold and Declined. */
-    public function pairDonorStatus(string $id, string $linkId): RedirectResponse
-    {
-        [$pair, $back, $tab] = $this->pairDonorTab($id, $linkId);
-
-        if ($pair === null) {
-            return redirect()->to(site_url('pairs'));
-        }
-
-        if ($tab === null) {
-            return redirect()->to($back);
-        }
-
-        $error = $this->store->setPairDonorStatus(
-            $pair['recipientId'],
-            $linkId,
-            UiStore::personStatusFromUi((string) $this->request->getPost('status'))
-        );
-
-        return $error === ''
-            ? redirect()->to($back)
-            : redirect()->to($back)->with('ui_error', $error);
-    }
-
     /**
      * Archives one of the pair's donors, and on the active one asks first what
      * is becoming of the pair.
@@ -2138,9 +2114,9 @@ class Ui extends BaseController
             return redirect()->back()->withInput()->with('ui_error', $error);
         }
 
-        // One active donor to a pair. The card collects the donor's status
-        // like any other field, so the rule is checked here as well as on the
-        // tab's own control — a card is just a slower way to press it.
+        // One active donor to a pair. The card is where a donor's status is
+        // set — it is one of their fields — so the rule is checked here, and
+        // again in the store, which is what moves the word.
         $status = UiStore::personStatusFromUi($post('dStatus'));
 
         if ($status === 'active' && $this->store->hasActiveDonor($pair['recipientId'], $linkId)) {

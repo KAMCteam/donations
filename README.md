@@ -426,6 +426,20 @@ rather than against the form.
 Red marks the answer somebody has to act on — Positive, Abnormal, Not cleared
 — not merely an unwelcome one.
 
+The colours are on the answers themselves, every one of them and not only the
+one recorded, and **the answer recorded colours the whole card**: a workup is
+seventy cards read by running down it, and a colour you have to look twice for
+is not read at all. The wash on the card is a shade lighter than the answer's
+own chip, because the card is a surface and a surface in the chip's strength
+would shout over what is sitting on it. The neutral answers — Not done, Not
+applicable, Not required — colour nothing: every card would be wearing grey,
+which is another way of saying nothing.
+
+Pressing **Not done** on a test that has an answer takes the answer back. An
+unanswered test still writes no row — there is nothing to write — but once
+there is one, a record that cannot be corrected is worse than one with an empty
+row in it.
+
 The sheet names no organ, so both programmes carry both lists.
 
 ### A test added under "Other" says what it answers

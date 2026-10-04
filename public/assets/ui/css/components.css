@@ -404,8 +404,38 @@
   transition-timing-function: var(--ease);
   transition-duration: var(--dur);
 }
-.lab-card.status-completed { border-color: #6ee7b7; }
-.lab-card.status-flagged   { border-color: #fca5a5; }
+/* The answer a test was given colours the whole card, not only its pill: a
+   workup is seventy cards read by running down it, and a colour you have to
+   look twice for is not read at all. The wash is a shade lighter than the
+   pill's — the card is a surface, and a surface in the pill's own strength
+   would shout over the answer sitting on it.
+*/
+.lab-card--red       { border-color: var(--red-200);     background-color: var(--red-50); }
+.lab-card--orange    { border-color: var(--orange-200);  background-color: var(--amber-50); }
+.lab-card--amber,
+.lab-card--amber-soft { border-color: var(--amber-200);  background-color: var(--amber-50); }
+.lab-card--emerald   { border-color: var(--emerald-200); background-color: var(--emerald-50); }
+.lab-card--teal,
+.lab-card--teal-soft { border-color: var(--teal-200);    background-color: var(--teal-50); }
+.lab-card--blue,
+.lab-card--blue-soft { border-color: var(--blue-200);    background-color: var(--blue-50); }
+
+.lab-card--red       > .lab-card-head { background-color: var(--red-100); }
+.lab-card--orange    > .lab-card-head { background-color: var(--orange-100); }
+.lab-card--amber     > .lab-card-head { background-color: var(--amber-100); }
+.lab-card--amber-soft > .lab-card-head { background-color: var(--amber-100); }
+.lab-card--emerald   > .lab-card-head { background-color: var(--emerald-100); }
+.lab-card--teal      > .lab-card-head { background-color: var(--teal-100); }
+.lab-card--teal-soft > .lab-card-head { background-color: var(--teal-100); }
+.lab-card--blue      > .lab-card-head { background-color: var(--blue-100); }
+.lab-card--blue-soft > .lab-card-head { background-color: var(--blue-100); }
+
+/* The rows under the head are white on an uncoloured card; on a coloured one
+   they let the card's own wash through, or the colour would stop at the
+   heading and the box would not be one colour at all. */
+.lab-card--toned > .lab-actions,
+.lab-card--toned > .lab-comment,
+.lab-card--toned > .lab-remove { background-color: transparent; }
 
 .lab-card-head {
   /* name and result on the left, then the pill and the pencil. */
@@ -504,7 +534,12 @@
 /* Chosen: the tone brings the fill, the text colour and the border, so the
    only thing left to add is the weight. No shadow — it made the chip float
    above a row that is meant to read as one control. */
-.lab-status-btn.is-active { font-weight: 600; }
+/* The one recorded, among a row that all wear a colour now: heavier, and
+   ringed in its own colour so it is the answer rather than one of them. */
+.lab-status-btn.is-active {
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
 
 /* The check list's comment line: on every card, not behind the pencil. */
 .lab-comment {

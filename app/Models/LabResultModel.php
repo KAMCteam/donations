@@ -76,6 +76,16 @@ class LabResultModel extends Model
         return ['done' => $done, 'total' => $total, 'pct' => (int) round($done / max($total, 1) * 100)];
     }
 
+    /** Whether this person has an answer on this test already. */
+    public function has(int|string $mrn, string $personType, int $labId): bool
+    {
+        return $this->where([
+            'person_mrn'  => $mrn,
+            'person_type' => $personType,
+            'lab_id'      => $labId,
+        ])->countAllResults() > 0;
+    }
+
     /** Records or replaces one result, keeping one row per person per test. */
     public function record(int|string $mrn, string $personType, int $labId, array $attributes): void
     {

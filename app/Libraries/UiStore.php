@@ -1935,8 +1935,13 @@ final class UiStore
             $status  = (string) ($test['status'] ?? 'not_done');
             $status  = in_array($status, $offered, true) ? $status : 'not_done';
 
-            // Nothing recorded and nothing said: no row to write.
-            if ($status === 'not_done' && $notes === '') {
+            // Nothing recorded and nothing said: no row to write — for a test
+            // nobody has answered yet. A test that *has* an answer is a
+            // different case: pressing Not done on it is taking the answer
+            // back, which is a correction, and a record that cannot be
+            // corrected is worse than one with an empty row in it.
+            if ($status === 'not_done' && $notes === ''
+                && ! $this->labResults->has($mrn, $personType, $labId)) {
                 continue;
             }
 
@@ -2171,17 +2176,21 @@ final class UiStore
         if (! is_array($chosen)) {
             // Nothing chosen: the type's own list, which is every test the
             // check list seeded — and a new custom test until it is saved.
-            $keys = $resultType === 'custom'
+            $own  = $resultType === 'custom';
+            $keys = $own
                 ? self::CUSTOM_ANSWER_DEFAULT
                 : (self::RESULT_OPTIONS[$resultType] ?? self::RESULT_OPTIONS['text']);
 
             return array_map(static fn (string $key): array => [
                 'key'   => $key,
                 'label' => self::RESULT_LABEL[$key] ?? $key,
-                // No colour until somebody picks one. An answer is a word
-                // first; a colour on it is something the record decided to
-                // say, and one nobody chose would be saying it by accident.
-                'tone'  => '',
+                // The check list's own tests keep the colours the sheet gives
+                // them — Positive is red wherever it is read, and that is not
+                // anybody's to decide. A test the record added starts with no
+                // colour at all: a colour on it is something the record
+                // decided to say, and one nobody chose would be saying it by
+                // accident.
+                'tone'  => $own ? '' : (self::RESULT_TONE[$key] ?? ''),
                 'own'   => false,
             ], $keys);
         }

@@ -151,8 +151,21 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
             $tone  = static fn (string $key): string => isset($byKey[$key])
                 ? (string) $byKey[$key]['tone']
                 : ui_tone('labStatus', $key);
+            // The answer a test was given colours the card it is on, not only
+            // the pill: a workup is read by running down it, and a colour you
+            // have to look twice for is not read at all.
+            //
+            // Only an answer that says something, though. Grey is what every
+            // card would be — "not done", "not applicable", "not required" are
+            // the resting state, and a workup washed grey top to bottom says
+            // nothing at all.
+            $cardTone = '';
+
+            if ($answered && ! in_array($tone($test['status']), ['', UiStore::LAB_TONE_DEFAULT], true)) {
+                $cardTone = ' lab-card--toned lab-card--' . substr($tone($test['status']), strlen('tone-'));
+            }
             ?>
-            <div class="lab-card<?= $animated ? ' lab-card--animated' : '' ?><?= $freeText ? ' lab-card--free' : '' ?> status-<?= esc($test['status']) ?>"<?= $custom ? ' id="' . esc($cardId) . '"' : '' ?> data-idx="<?= $i ?>">
+            <div class="lab-card<?= $animated ? ' lab-card--animated' : '' ?><?= $freeText ? ' lab-card--free' : '' ?><?= $cardTone ?> status-<?= esc($test['status']) ?>"<?= $custom ? ' id="' . esc($cardId) . '"' : '' ?> data-idx="<?= $i ?>">
                 <input type="hidden" name="<?= $base ?>[id]" value="<?= esc($test['id']) ?>">
                 <?php if (! $custom): ?>
                     <input type="hidden" name="<?= $base ?>[name]" value="<?= esc($test['name']) ?>">
@@ -193,12 +206,14 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
                           // and label ride on the button so ui.js can restyle
                           // the card without a copy of every vocabulary. ?>
                     <?php foreach ($answers as $answer): ?>
-                        <?php // A colour somebody chose shows on every answer
-                              // that has one, not only on the one recorded:
-                              // choosing them was the point. An answer nobody
-                              // coloured is plain, recorded or not. ?>
+                        <?php // Every answer that has a colour wears it, not
+                              // only the one recorded: the colours are how a
+                              // workup is read at a glance. The check list
+                              // gives its own tests theirs; a test the record
+                              // added wears the ones it was given, and an
+                              // answer nobody coloured is plain. ?>
                         <?php $answerTone = (string) $answer['tone']; ?>
-                        <button type="button" class="lab-status-btn<?= $custom && $answerTone !== '' ? ' lab-status-btn--tinted ' . esc($answerTone) : '' ?><?= $test['status'] === $answer['key'] ? ' is-active' . ($answerTone === '' ? '' : ' ' . esc($answerTone)) : '' ?>" data-lab-status="<?= esc($answer['key']) ?>" data-lab-tone="<?= esc($answerTone) ?>" data-lab-label="<?= esc($answer['label']) ?>"<?= in_array($answer['key'], UiStore::RESULT_UNANSWERED, true) ? ' data-lab-unanswered' : '' ?>><?= esc($answer['label']) ?></button>
+                        <button type="button" class="lab-status-btn<?= $answerTone === '' ? '' : ' lab-status-btn--tinted ' . esc($answerTone) ?><?= $test['status'] === $answer['key'] ? ' is-active' : '' ?>" data-lab-status="<?= esc($answer['key']) ?>" data-lab-tone="<?= esc($answerTone) ?>" data-lab-label="<?= esc($answer['label']) ?>"<?= in_array($answer['key'], UiStore::RESULT_UNANSWERED, true) ? ' data-lab-unanswered' : '' ?>><?= esc($answer['label']) ?></button>
                     <?php endforeach; ?>
                 </div>
                 <?php endif; ?>

@@ -3415,6 +3415,50 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('lab-status-btn--tinted tone-amber', $html);
     }
 
+    /**
+     * The answer a test was given colours the card it is on.
+     *
+     * A workup is seventy cards read by running down it, so the colour is on
+     * the card and not only on its pill — except the neutral one, which every
+     * card would be wearing and which would therefore say nothing.
+     */
+    public function testTheAnswerColoursTheWholeCard(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4240', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
+
+        $lab = $this->db->table('labs')
+            ->where('name', 'Cross match')->where('person_type', 'recipient')
+            ->get()->getRowArray();
+
+        // The blood group card already wears the record's own group, so this
+        // counts the change rather than assuming the sheet starts colourless.
+        $before = substr_count($this->get('recipients/4240')->getBody(), 'lab-card--toned');
+
+        // Positive is the one somebody has to act on, and the card says so.
+        $this->post('recipients/4240', [
+            'section' => 'labs',
+            'labs'    => [['id' => $lab['id'], 'name' => 'Cross match', 'status' => 'positive']],
+        ]);
+        $html = $this->get('recipients/4240')->getBody();
+        $this->assertSame($before + 1, substr_count($html, 'lab-card--toned'));
+        $this->assertStringContainsString('lab-card--toned lab-card--red', $html);
+
+        // And the check list's own answers wear the sheet's colours again,
+        // every one of them rather than only the one recorded.
+        $this->assertStringContainsString('data-lab-status="negative" data-lab-tone="tone-emerald"', $html);
+        $this->assertStringContainsString('lab-status-btn--tinted tone-emerald', $html);
+
+        // Not done is the resting state, so it colours nothing: the card gives
+        // its colour back.
+        $this->post('recipients/4240', [
+            'section' => 'labs',
+            'labs'    => [['id' => $lab['id'], 'name' => 'Cross match', 'status' => 'not_done']],
+        ]);
+        $after = $this->get('recipients/4240')->getBody();
+        $this->assertSame($before, substr_count($after, 'lab-card--toned'));
+        $this->assertStringNotContainsString('lab-card--red', $after);
+    }
+
     /** A date-shaped thing that is not a date is refused, not a stack trace. */
     public function testADateTheCalendarHasNoDayForIsNotADate(): void
     {

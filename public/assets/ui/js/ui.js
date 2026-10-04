@@ -182,8 +182,17 @@
     var input = card.querySelector("[data-lab-status-value]");
     if (input) input.value = status;
 
+    // The card wears the answer's own colour, as the server rendered it —
+    // except the neutral one, which every card would be wearing.
+    var tone = chosen.getAttribute("data-lab-tone");
+    var toned = tone && tone !== "tone-slate"
+      ? " lab-card--toned lab-card--" + tone.slice("tone-".length)
+      : "";
+
     card.className = "lab-card" +
       (card.classList.contains("lab-card--animated") ? " lab-card--animated" : "") +
+      (card.classList.contains("lab-card--free") ? " lab-card--free" : "") +
+      toned +
       " status-" + status;
 
     var pill = card.querySelector("[data-lab-pill]");
@@ -196,16 +205,13 @@
     }
 
     card.querySelectorAll("[data-lab-status]").forEach(function (btn) {
-      var active = btn === chosen;
-      var tone = btn.getAttribute("data-lab-tone");
-      // Whether this answer keeps its colour when it is not the one recorded.
-      // The server decided that — a colour somebody chose for a test of their
-      // own — and this only has to not lose it.
-      var tinted = btn.classList.contains("lab-status-btn--tinted");
+      var own = btn.getAttribute("data-lab-tone");
 
+      // Every answer that has a colour wears it, whether or not it is the one
+      // recorded; the one recorded is told apart by its weight.
       btn.className = "lab-status-btn" +
-        (tinted ? " lab-status-btn--tinted " + tone : "") +
-        (active ? " is-active" + (tone ? " " + tone : "") : "");
+        (own ? " lab-status-btn--tinted " + own : "") +
+        (btn === chosen ? " is-active" : "");
     });
   }
 

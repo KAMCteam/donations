@@ -153,7 +153,7 @@ final class SchemaTest extends CIUnitTestCase
         $this->assertTrue($donors->isMatched(2001));
     }
 
-    public function testClosingAPairReleasesBothSides(): void
+    public function testEndingAPairReleasesBothSides(): void
     {
         $this->addRecipient(1001);
         $this->addDonor(2001);
@@ -174,20 +174,32 @@ final class SchemaTest extends CIUnitTestCase
         $this->assertSame('Crossmatch positive', $closed['closed_reason']);
     }
 
-    public function testEveryStatusButClosedHoldsBothSides(): void
+    /**
+     * The word on a pair holds nobody back, and releases nobody.
+     *
+     * Every status a pair can wear — `closed` among them — leaves both of its
+     * people in it. Only `ended_at` lets them go, which is why describing a
+     * pair as Closed is a description and not an ending.
+     */
+    public function testNoStatusAtAllReleasesEitherSide(): void
     {
         $this->addRecipient(1001);
         $this->addDonor(2001);
         $pairs  = model(PairModel::class);
         $pairId = $pairs->link(1001, 2001);
 
-        foreach (['active', 'confirmed', 'on_hold', 'completed', 'pending', 'paired_exchange', 'declined'] as $status) {
+        $statuses = ['active', 'confirmed', 'on_hold', 'completed', 'pending', 'paired_exchange', 'declined', 'closed'];
+
+        foreach ($statuses as $status) {
             $pairs->update($pairId, ['status' => $status]);
             $this->assertCount(0, model(RecipientModel::class)->waitingList(), "{$status} should still hold the pair");
+            $this->assertCount(0, model(DonorModel::class)->register(null, true), "{$status} should still hold the donor");
         }
 
-        $pairs->update($pairId, ['status' => 'closed']);
+        // The ending does it, whatever word the row is left on.
+        $pairs->update($pairId, ['ended_at' => date('Y-m-d H:i:s')]);
         $this->assertCount(1, model(RecipientModel::class)->waitingList());
+        $this->assertCount(1, model(DonorModel::class)->register(null, true));
     }
 
     /**

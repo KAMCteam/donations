@@ -86,24 +86,6 @@ final class UiStore
     ];
 
     /**
-     * What the Pairs List's Status chips offer.
-     *
-     * The pair's six, less `closed` — because a closed pair is not on the list
-     * at all. Closing one is how a pair ends: the recipient goes back to the
-     * waiting list, the donors back to the register, and what happened is kept
-     * on the recipient's own record, with every donor it ever had. Leaving the
-     * row on the register as a greyed "Closed" line was the list saying there
-     * is a pair here when there is not one.
-     */
-    public const PAIRS_LIST_STATUS_OPTIONS = [
-        'on_hold'         => 'On Hold',
-        'active'          => 'Active',
-        'declined'        => 'Declined',
-        'transplanted'    => 'Transplanted',
-        'paired_exchange' => 'Paired Exchange',
-    ];
-
-    /**
      * What the Pairs List opens on when no filter is asked for.
      *
      * The register accumulates: every pair that was ever transplanted,
@@ -559,12 +541,17 @@ final class UiStore
     /**
      * The pairs on this programme, for the register that lists them.
      *
-     * Open ones only. A closed pair is a pair that is over — both sides are
-     * back on their own lists, and the Pairs List is the list of pairs there
-     * are, not of pairs there have been. What happened is not lost by leaving
-     * it out: it is on the recipient's record, which keeps every donor they
-     * were ever linked with. {@see findPair()} still opens a closed one by
-     * its own address, because history is readable, just not listed.
+     * Open ones only. A pair that has been **ended** — delinked, or taken
+     * apart — is a pair that is over: both sides are back on their own lists,
+     * and the Pairs List is the list of pairs there are, not of pairs there
+     * have been. What happened is not lost by leaving it out: it is on the
+     * recipient's record, which keeps every donor they were ever linked with.
+     * {@see findPair()} still opens an ended one by its own address, because
+     * history is readable, just not listed.
+     *
+     * A pair somebody has called **Closed** is not that. The word describes
+     * the pair; it does not end it. Those stay on the list, under their own
+     * chip, with both of their people still spoken for.
      *
      * @return list<array<string, mixed>>
      */
@@ -572,7 +559,7 @@ final class UiStore
     {
         $rows = array_filter(
             $this->pairs->overview($organ ?? $this->organ()),
-            static fn (array $row): bool => $row['status'] !== PairModel::CLOSED
+            static fn (array $row): bool => $row['ended_at'] === null
         );
 
         return array_map(fn (array $row): array => $this->pairToUi($row), array_values($rows));
@@ -807,7 +794,7 @@ final class UiStore
         $primary = null;
 
         foreach ($links as $link) {
-            if ($link['status'] === PairModel::CLOSED) {
+            if ($link['ended_at'] !== null) {
                 continue;
             }
 
@@ -968,8 +955,8 @@ final class UiStore
             $this->pairs->overview($organ),
             static function (array $row) use ($query): bool {
                 // Open ones only, as on the Pairs List: the search takes
-                // somebody to a pair, and a closed one is not there to go to.
-                if ($row['status'] === PairModel::CLOSED) {
+                // somebody to a pair, and an ended one is not there to go to.
+                if ($row['ended_at'] !== null) {
                     return false;
                 }
 
@@ -1183,9 +1170,9 @@ final class UiStore
             $row['relationship'] = $changes['relationship'];
         }
 
-        // Why it was closed, kept only while it is. Moving a pair off Closed
-        // clears the reason rather than leaving a sentence about an ending
-        // that has been undone.
+        // Why it was called Closed, kept only while it is. Moving a pair off
+        // the word clears the reason rather than leaving a sentence about a
+        // decision that has been changed.
         if (array_key_exists('closedReason', $changes)) {
             $reason              = trim((string) $changes['closedReason']);
             $row['closed_reason'] = $status === 'closed' && $reason !== '' ? $reason : null;
@@ -1208,10 +1195,10 @@ final class UiStore
      * wrong rather than being careful.
      *
      * The other two do nothing here, and that is the point: a recipient whose
-     * pair has been closed is not himself "closed", he is whatever he was —
-     * and the waiting list, defined against the pair rather than against this
-     * column, already shows him again. Nor is a person "in a paired exchange":
-     * their case is.
+     * pair has been called Closed is not himself "closed", he is whatever he
+     * was — and he is still in that pair, because the word describes the pair
+     * rather than ending it. Nor is a person "in a paired exchange": their
+     * case is.
      *
      * One rule survives the carrying: only one of a case's donors may be
      * Active, so a pair set Active while another of its donors holds that word
@@ -1387,7 +1374,7 @@ final class UiStore
         $tabs = [];
 
         foreach ($this->pairs->pairsForRecipient($recipientMrn) as $i => $row) {
-            $archived = $row['status'] === PairModel::CLOSED;
+            $archived = $row['ended_at'] !== null;
             $status   = (string) ($row['donor_status'] ?? 'on_hold');
 
             $tabs[] = [
@@ -1404,7 +1391,7 @@ final class UiStore
                 // which is the rule everything else here is built around.
                 'isActive'  => ! $archived && $status === 'active',
                 'linkedOn'  => substr((string) $row['created_at'], 0, 10),
-                'endedOn'   => $archived ? substr((string) $row['updated_at'], 0, 10) : '',
+                'endedOn'   => $archived ? substr((string) $row['ended_at'], 0, 10) : '',
                 'reason'    => (string) ($row['closed_reason'] ?? ''),
             ];
         }
@@ -1428,7 +1415,7 @@ final class UiStore
         $past = [];
 
         foreach ($this->pairs->pairsForDonor($donorMrn) as $row) {
-            if ($row['status'] !== PairModel::CLOSED) {
+            if ($row['ended_at'] === null) {
                 continue;
             }
 
@@ -1437,7 +1424,7 @@ final class UiStore
                 'name'      => (string) ($row['recipient_name'] ?? ''),
                 'bloodType' => (string) ($row['recipient_blood_group'] ?? ''),
                 'linkedOn'  => substr((string) $row['created_at'], 0, 10),
-                'endedOn'   => substr((string) $row['updated_at'], 0, 10),
+                'endedOn'   => substr((string) $row['ended_at'], 0, 10),
                 'reason'    => (string) ($row['closed_reason'] ?? ''),
             ];
         }

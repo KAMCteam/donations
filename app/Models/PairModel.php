@@ -8,14 +8,19 @@ use CodeIgniter\Model;
  * The linking system: which recipient is matched to which donor, and when
  * either of them is free again.
  *
- * One rule runs through all of it — **a pair is open unless its status is
- * `closed`** — and everything else follows from it:
+ * One rule runs through all of it — **a pair is open until it is ended** —
+ * and everything else follows from it:
  *
  *   - a recipient is on the waiting list when no open pair holds them
  *   - a donor is on the register when no open pair holds them
- *   - closing a pair releases both, and they can be linked again
+ *   - ending a pair releases both, and they can be linked again
  *
- * `OPEN` below is that rule written once, so no query can drift from it.
+ * Ended is `ended_at`, and only `ended_at`: null while the link stands,
+ * stamped when it is over. It used to be `status = 'closed'`, which made the
+ * word on the Pair Details card do the releasing — choosing it took the pair
+ * apart. The word is a description now, like On Hold or Declined, and the
+ * ending is its own fact. {@see self::openSql()} is that rule written once,
+ * so no query can drift from it.
  */
 class PairModel extends Model
 {
@@ -25,11 +30,28 @@ class PairModel extends Model
     protected $useTimestamps = true;
     protected $allowedFields = [
         'recipient_mrn', 'donor_mrn', 'status', 'for_exchange', 'relationship',
-        'crossmatch_date', 'surgery_date', 'closed_reason', 'notes',
+        'crossmatch_date', 'surgery_date', 'closed_reason', 'ended_at', 'notes',
     ];
 
-    /** Every status but this one means both sides are spoken for. */
+    /**
+     * The word, and only the word.
+     *
+     * A pair somebody has called Closed is still a pair: both of its people
+     * are still spoken for, and it is still on the Pairs List. What releases
+     * them is {@see self::close()}, which stamps `ended_at`.
+     */
     public const CLOSED = 'closed';
+
+    /**
+     * "This link is still open", for the queries that cannot call a method.
+     *
+     * Three models ask it as raw SQL inside a NOT EXISTS, so the condition is
+     * written here once and read from there.
+     */
+    public static function openSql(string $alias = 'p'): string
+    {
+        return ($alias === '' ? '' : $alias . '.') . 'ended_at IS NULL';
+    }
 
     /**
      * The status that says this pair is in a paired exchange.
@@ -55,7 +77,7 @@ class PairModel extends Model
             ->select('p.*')
             ->join('donors d', 'd.mrn = p.donor_mrn', 'left')
             ->where('p.recipient_mrn', $mrn)
-            ->where('p.status !=', self::CLOSED)
+            ->where('p.ended_at', null)
             ->orderBy("d.status = 'active'", 'DESC', false)
             ->orderBy('p.id')
             ->get()
@@ -157,17 +179,20 @@ class PairModel extends Model
     }
 
     /**
-     * Closes a pair, releasing both sides back onto their lists.
+     * Ends a pair, releasing both sides back onto their lists.
      *
-     * The row stays: a closed pair is history, not a mistake, and the reason
-     * is worth keeping.
+     * The row stays: an ended pair is history, not a mistake, and the reason
+     * is worth keeping. `ended_at` is what frees them — the word is set too,
+     * because Closed is what an ended pair is, but nothing reads the word to
+     * decide whether anybody is free.
      */
     public function close(int|string $pairId, ?string $reason = null): bool
     {
         return (bool) $this->update($pairId, [
             'status'        => self::CLOSED,
             'closed_reason' => $reason,
-            // A closed pair holds nobody, so it has nobody left to offer.
+            'ended_at'      => date('Y-m-d H:i:s'),
+            // An ended pair holds nobody, so it has nobody left to offer.
             'for_exchange'  => 0,
         ]);
     }
@@ -217,6 +242,6 @@ class PairModel extends Model
     /** Builder pre-filtered to open pairs. */
     private function openPairs(): \CodeIgniter\Database\BaseBuilder
     {
-        return $this->db->table('pairs')->where('status !=', self::CLOSED);
+        return $this->db->table('pairs')->where('ended_at', null);
     }
 }

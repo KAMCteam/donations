@@ -49,8 +49,10 @@ final class ExchangeDraft
     /**
      * Statuses a pair can be exchanged out of.
      *
-     * Everything open except a transplant that has already happened —
-     * `completed` is history, and a closed pair holds nobody.
+     * Everything except history: `completed` is a transplant that has already
+     * happened, and Closed is somebody saying this case is not being worked.
+     * Whether the pair still *exists* is a separate question, asked of
+     * `ended_at` in {@see self::isExchangeable()}.
      */
     private const NOT_EXCHANGEABLE = [PairModel::CLOSED, 'completed'];
 
@@ -109,7 +111,9 @@ final class ExchangeDraft
      */
     public static function isExchangeable(array $pair): bool
     {
-        return (int) ($pair['for_exchange'] ?? 0) === 1
+        // An ended pair holds nobody, whatever word it was left on.
+        return ($pair['ended_at'] ?? null) === null
+            && (int) ($pair['for_exchange'] ?? 0) === 1
             && self::isExchangeableStatus((string) $pair['status']);
     }
 

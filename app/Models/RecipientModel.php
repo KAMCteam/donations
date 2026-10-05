@@ -41,8 +41,9 @@ class RecipientModel extends Model
     /**
      * Recipients not held by an open pair, urgent first, then by score.
      *
-     * "Open" is every pair status except `closed`, so closing a pair puts both
-     * sides back on their lists.
+     * "Open" is a pair that has not been ended, whatever word it is on — so
+     * ending one puts both sides back on their lists, and calling a pair
+     * Closed does not.
      *
      * @return list<array<string, mixed>>
      */
@@ -54,7 +55,7 @@ class RecipientModel extends Model
             ->join('organ_programs op', 'op.code = r.organ_code', 'left')
             ->join('mrp m', 'm.id = r.mrp_id', 'left')
             ->join('coordinators c', 'c.id = r.coordinator_id', 'left')
-            ->where('NOT EXISTS (SELECT 1 FROM pairs p WHERE p.recipient_mrn = r.mrn AND p.status <> \'closed\')', null, false);
+            ->where('NOT EXISTS (SELECT 1 FROM pairs p WHERE p.recipient_mrn = r.mrn AND ' . PairModel::openSql() . ')', null, false);
 
         if ($organCode !== null && $organCode !== '') {
             $builder->where('r.organ_code', $organCode);
@@ -98,7 +99,7 @@ class RecipientModel extends Model
     {
         return $this->db->table('pairs')
             ->where('recipient_mrn', $mrn)
-            ->where('status !=', 'closed')
+            ->where('ended_at', null)
             ->countAllResults() > 0;
     }
 }

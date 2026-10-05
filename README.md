@@ -264,10 +264,11 @@ button away from a press that did not.
 
 #### Archived is a mode, not a status
 
-An archived tab is a link that is closed. The donor keeps whatever word they
-were given — archiving is the pair's doing and says nothing about them — and
-because the link is closed they are free again: their own record is editable,
-they are back on the Donors List, and they can be linked to somebody else.
+An archived tab is a link that has been **ended**. The donor keeps whatever
+word they were given — archiving is the pair's doing and says nothing about
+them — and because the link is ended they are free again: their own record is
+editable, they are back on the Donors List, and they can be linked to somebody
+else.
 
 One thing archives a donor: **Delink**, available on every live tab. On a
 reserve it archives that donor and nothing else. On the active one it asks the
@@ -292,14 +293,18 @@ Active, on their cards, which archives nobody.
 Taking the pair apart closes every link at once: the recipient goes back to the
 waiting list and every donor back to the register. Nothing is deleted.
 
-A closed pair also comes **off the Pairs List**, altogether — not as a greyed
-"Closed" row, which was the register saying there is a pair here when there is
-not one. The list is of the pairs there are. `Closed` is not one of the Status
-chips either, and `?status=closed` falls back to what the screen opens on. It
-is off the printed sheet and off the search for the same reason, and the
-dashboard's **Linked Pairs** counts the same set. None of it is deletion: the
-pair's own address still opens it, and the recipient's record keeps every donor
-it ever had.
+An ended pair also comes **off the Pairs List**, altogether — not as a greyed
+row, which was the register saying there is a pair here when there is not one.
+The list is of the pairs there are: it is off the printed sheet and off the
+search for the same reason, and the dashboard's **Linked Pairs** counts the
+same set. None of it is deletion — the pair's own address still opens it, and
+the recipient's record keeps every donor it ever had.
+
+What is *not* that is a pair somebody has called **Closed**. That is a word
+like On Hold or Declined: it describes the case, it does not end it. Such a
+pair stays on the list under its own Status chip, with both of its people still
+in it and off their own registers, and the word can be taken back off again.
+Ending a pair is **Delink**'s job, and nothing else's.
 
 An archived tab carries its own dates and the reason it ended, so the tabs are
 the history: *Linked 30/09/2026, archived 04/10/2026. Delinked from the pair.* There is no separate archive, because `pairs` **is** the log —
@@ -332,9 +337,10 @@ linked again: an ended link is history a new pair does not cancel.
 #### Where it is stored
 
 `pairs` holds it all: one row per donor ever linked to a recipient, with the
-link's own status. Archived is `status = 'closed'`, which is the same row state
-that frees both sides — so being archived and being released are one fact, not
-two that could disagree. The donor's Active / On Hold / Declined is
+link's own status. Archived is `ended_at` being set, which is the same row
+state that frees both sides — so being archived and being released are one
+fact, not two that could disagree. The word on the row (`status`) is a separate
+fact and frees nobody. The donor's Active / On Hold / Declined is
 `donors.status`, their own, read wherever they are.
 
 `potential_donors` is gone, and so is the middle state it held: its rows became
@@ -797,17 +803,19 @@ so under the field before it is saved — a save that writes two other records
 should not do it quietly, and the notice afterwards names who it was set on.
 
 Paired Exchange and Closed carry nothing: a person is not "in a paired
-exchange" and is not "closed", their case is. Closing a pair still puts both
-sides back on their lists, which is the link's doing and not a change to
-either person's own status.
+exchange" and is not "closed", their case is. Nor does calling a pair Closed
+move anybody: both of them stay in it, on whatever word their own record
+holds.
 
 One rule survives the carrying. Only one of a case's donors may be Active, so
 a pair set Active while another of its donors holds that word sets the
 recipient and leaves the donor alone. `UiStore::applyPairStatus()` is the whole
 of it, and it is the only thing that writes a person's status from a pair.
 
-One of those means more than its label: **Closed** is what "open pair" is
-defined against, so closing a pair puts both sides back on their lists.
+All six are words and nothing more — **Closed** included. It used to be what
+"open pair" was defined against, so choosing it took the pair apart; a pair is
+open until it is *ended* now, and the word says only what somebody wanted it
+to say.
 
 Two of them bring a question with them, and the Pair Details card asks it where
 the answer belongs — beside the word, and only while the word is on the screen:
@@ -819,7 +827,7 @@ the answer belongs — beside the word, and only while the word is on the screen
 
 Both are kept only while their status holds. Moving a pair off Closed clears
 the reason and moving it off Transplanted clears the date, because a sentence
-about an ending that was undone, or a day for a transplant that was taken back,
+about a decision that was changed, or a day for a transplant that was taken back,
 is worse than nothing. One `<select>` reveals both: `data-reveal` and
 `data-reveal-when` carry a list each and are read in step, and with `ui.js`
 absent the blocks are simply always visible — the server drops what does not
@@ -1157,23 +1165,28 @@ inside each band.
 
 ### The linking system
 
-One rule runs through all of it, written once as `PairModel::CLOSED`:
+One rule runs through all of it, written once as `PairModel::openSql()`:
 
-> **A pair is open unless its status is `closed`.**
+> **A pair is open until it is ended** — `ended_at IS NULL`.
 
 Everything follows from that:
 
 - A recipient is on the waiting list when no open pair holds them.
 - A donor is on the register when no open pair holds them.
-- Closing a pair releases both sides, and either can be linked again — to each
+- Ending a pair releases both sides, and either can be linked again — to each
   other or to somebody else.
-- `closed` is a status, not a deleted row, so a failed match stays on the
-  record with its `closed_reason`.
+- An ended pair is a stamped row, not a deleted one, so a failed match stays on
+  the record with its `closed_reason`.
+
+It used to be `status <> 'closed'`, which made the word on the Pair Details
+card do the releasing: describing a pair as Closed took it apart. The two facts
+are separate columns now — what a pair *is called* and whether it is *over* —
+and only the second one frees anybody.
 
 `PairModel::link()` refuses to link somebody who is already in an open pair.
 That check is in the model rather than the database because the natural way to
-express it — a unique index over a generated column that goes NULL once closed
-— is something MySQL rejects when the column belongs to an `ON UPDATE CASCADE`
+express it — a unique index over a generated column that goes NULL once the
+link is ended — is something MySQL rejects when the column belongs to an `ON UPDATE CASCADE`
 foreign key, and both MRN columns do, so that a corrected MRN still follows
 through to the pair. The cascade is worth more than the index.
 

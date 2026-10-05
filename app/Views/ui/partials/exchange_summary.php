@@ -1,5 +1,7 @@
 <?php
 
+use App\Libraries\UiStore;
+
 /**
  * What saving the exchange would do, said before it happens.
  *
@@ -8,9 +10,19 @@
  * off. Neither one writes anything: the form inside posts back to the builder,
  * which is where confirming is handled.
  *
+ * The new pairs are not only listed: each one asks what it *is* — the Pair
+ * Details card's own three fields, because this is where the pair is made and
+ * the screen that usually asks them does not exist for it yet. Saving writes
+ * them with the link, so a pair the exchange made arrives as complete as one
+ * entered by hand.
+ *
  * @var array<string, mixed> $state
  */
 $summary = $state['summary'];
+
+// A pair being made cannot already be closed — closing is what frees both
+// sides, and a pair that frees them the moment it exists is no pair at all.
+$newPairStatuses = array_diff_key(UiStore::PAIR_STATUS_OPTIONS, ['closed' => '']);
 ?>
 <h2 class="summary-title">Review the exchange</h2>
 <p class="summary-sub">Nothing has changed yet. Saving does all of the following at once.</p>
@@ -20,14 +32,36 @@ $summary = $state['summary'];
     <?php if ($summary['links'] === []): ?>
         <p class="summary-empty">None yet.</p>
     <?php else: ?>
-        <ul class="summary-list">
+        <ul class="summary-list summary-list--pairs">
             <?php foreach ($summary['links'] as $link): ?>
-                <li>
-                    <span class="summary-name"><?= esc($link['recipient']['name']) ?></span>
-                    <span class="chip-blood"><?= esc($link['recipient']['blood_group']) ?></span>
-                    <span class="summary-arrow">&larr;</span>
-                    <span class="summary-name"><?= esc($link['donor']['name']) ?></span>
-                    <span class="chip-blood"><?= esc($link['donor']['blood_group']) ?></span>
+                <?php $mrn = (string) $link['recipient']['mrn']; ?>
+                <li class="summary-pair">
+                    <div class="summary-pair-line">
+                        <span class="summary-name"><?= esc($link['recipient']['name']) ?></span>
+                        <span class="chip-blood"><?= esc($link['recipient']['blood_group']) ?></span>
+                        <span class="summary-arrow">&larr;</span>
+                        <span class="summary-name"><?= esc($link['donor']['name']) ?></span>
+                        <span class="chip-blood"><?= esc($link['donor']['blood_group']) ?></span>
+                    </div>
+                    <?= view('ui/partials/pair_details_fields', [
+                        'idStem' => 'xd-' . $mrn,
+                        'names'  => [
+                            'relationship'   => 'pairDetails[' . $mrn . '][relationship]',
+                            'crossmatchDate' => 'pairDetails[' . $mrn . '][crossmatchDate]',
+                            'status'         => 'pairDetails[' . $mrn . '][status]',
+                        ],
+                        // Empty, every one of them. The donor's stored
+                        // relationship is to the recipient they came in with:
+                        // "Sister" on a donor being crossed to somebody else's
+                        // recipient is not their sister, and a prefilled wrong
+                        // answer is worse than a blank one.
+                        'values' => [
+                            'relationship'   => '',
+                            'crossmatchDate' => '',
+                            'status'         => 'paired_exchange',
+                        ],
+                        'statuses' => $newPairStatuses,
+                    ], ['saveData' => false]) ?>
                 </li>
             <?php endforeach; ?>
         </ul>

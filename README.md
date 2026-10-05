@@ -389,6 +389,30 @@ save of the card. Taking the pair off means saying something else on the card,
 which is where the status is. A pair put forward by the button under any other
 status still withdraws by it, since the status is not what put it there.
 
+#### The review asks what each new pair is
+
+An exchange makes several pairs in one press, and the screen that usually asks
+what a pair *is* — the Pair Details card — does not exist for them until they
+do. So the review asks, with the card's own three fields under each new pair:
+**Relationship**, **Date of Crossmatch**, **Status**. Saving writes them with
+the link, so a pair the exchange made arrives as complete as one entered by
+hand, instead of as a bare row somebody has to go and finish.
+
+Two of the three answer themselves. Status starts on **Paired Exchange**,
+because that is what these pairs are, and **Closed** is not on its list at all:
+closing is what frees both sides again, and a pair that frees them the moment
+it exists is no pair. Relationship starts **empty**, deliberately — the donor's
+stored relationship is to the recipient they came in with, and "Sister" on a
+donor being crossed to somebody else's recipient is a wrong answer filled in
+for them.
+
+`ui/partials/pair_details_fields` is the three fields, with the caller naming
+them: the exchange asks once per pair and has to keep the answers apart, so
+they post as `pairDetails[<recipient MRN>][…]`. The review is one form around
+the whole summary now — which is why its Back and its close are buttons
+`ui.js` shuts the dialog with rather than little forms of their own: a form
+cannot sit inside another.
+
 Paired Exchange has a blood-type row too, labelled **Recipient blood type**,
 and it asks a different question from the others': the Pairs List's matches a
 pair when *either* side has the group, and this one is the recipient's alone.

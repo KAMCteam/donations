@@ -1772,6 +1772,59 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('recipients', ['mrn' => 8101, 'status' => 'paired_exchange']);
     }
 
+    /**
+     * The review asks what each new pair is, and saving writes it.
+     *
+     * An exchange makes several pairs at once, and the screen that usually
+     * asks for a pair's details does not exist for them yet — so the review
+     * asks there, with the Pair Details card's own three fields.
+     */
+    public function testTheReviewAsksForEachNewPairsDetails(): void
+    {
+        [$pairA] = $this->twoPairsToExchange();
+
+        $this->post('exchange/start/' . $pairA);
+        $this->post('exchange/build', ['action' => 'chooseDonor', 'recipientMrn' => '8101', 'donorMrn' => '8202']);
+        $this->post('exchange/build', ['action' => 'chooseRecipient', 'donorMrn' => '8102', 'recipientMrn' => '8201']);
+
+        // The fields are on the review, named for the recipient they belong to.
+        $review = $this->get('exchange/review')->getBody();
+        $this->assertStringContainsString('name="pairDetails[8101][relationship]"', $review);
+        $this->assertStringContainsString('name="pairDetails[8101][crossmatchDate]"', $review);
+        $this->assertStringContainsString('name="pairDetails[8101][status]"', $review);
+        // Paired Exchange is what these pairs are, so it is already chosen —
+        // and Closed is not a word a pair can be made on.
+        $this->assertStringContainsString('<option value="paired_exchange" selected>', $review);
+        $this->assertStringNotContainsString('<option value="closed"', $review);
+
+        $this->post('exchange/build', [
+            'action'      => 'confirm',
+            'pairDetails' => [
+                '8101' => ['relationship' => 'Sibling', 'crossmatchDate' => '01/10/2026', 'status' => 'active'],
+                '8201' => ['relationship' => 'Spouse', 'crossmatchDate' => '', 'status' => ''],
+            ],
+        ])->assertRedirectTo(site_url('pairs'));
+
+        $this->seeInDatabase('pairs', [
+            'recipient_mrn'   => 8101,
+            'donor_mrn'       => 8202,
+            'status'          => 'active',
+            'relationship'    => 'Sibling',
+            'crossmatch_date' => '2026-10-01',
+        ]);
+        // The donors list shows the relationship, so it lands there too.
+        $this->seeInDatabase('donors', ['mrn' => 8202, 'relationship' => 'Sibling']);
+        // Nothing said falls back to what the pair is: a paired exchange.
+        $this->seeInDatabase('pairs', [
+            'recipient_mrn' => 8201,
+            'donor_mrn'     => 8102,
+            'status'        => 'paired_exchange',
+            'relationship'  => 'Spouse',
+        ]);
+        // And the recipient takes the word the pair was given.
+        $this->seeInDatabase('recipients', ['mrn' => 8101, 'status' => 'active']);
+    }
+
     /** Only a blood-group match is ever offered, from either side. */
     public function testTheListsOfferCompatibleMatchesOnly(): void
     {

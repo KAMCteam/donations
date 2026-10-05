@@ -26,16 +26,19 @@
     </div>
 
     <div class="card card--pad">
-        <?= view('ui/partials/exchange_summary', ['state' => $state], ['saveData' => false]) ?>
+        <?php // One form around the whole summary, because the summary asks
+              // for each new pair's own details now and they travel with the
+              // answer. ?>
+        <form method="post" action="<?= site_url('exchange/build') ?>">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="confirm">
+            <?= view('ui/partials/exchange_summary', ['state' => $state], ['saveData' => false]) ?>
 
-        <div class="confirm-actions">
-            <a class="btn-outline" href="<?= site_url('exchange/build') ?>">Back</a>
-            <form method="post" action="<?= site_url('exchange/build') ?>" class="inline-form">
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="confirm">
+            <div class="confirm-actions">
+                <a class="btn-outline" href="<?= site_url('exchange/build') ?>">Back</a>
                 <button type="submit" class="btn-save"<?= $state['complete'] ? '' : ' disabled title="The chain is not finished yet"' ?>>Save the exchange</button>
-            </form>
-        </div>
+            </div>
+        </form>
     </div>
 </div>
 <?= $this->endSection() ?>

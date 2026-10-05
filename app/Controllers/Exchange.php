@@ -154,7 +154,11 @@ class Exchange extends BaseController
         }
 
         if ($action === 'confirm') {
-            $error = $this->draft->confirm($organ);
+            // Each new pair's own details, as the review asked for them:
+            // keyed by the recipient's MRN, which is what the draft keys the
+            // assignments by.
+            $details = $this->request->getPost('pairDetails');
+            $error   = $this->draft->confirm($organ, is_array($details) ? $details : []);
 
             if ($error === '') {
                 $this->session->setFlashdata('ui_notice', 'The exchange is saved. Its new pairs are below.');

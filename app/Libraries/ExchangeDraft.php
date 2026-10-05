@@ -457,7 +457,7 @@ final class ExchangeDraft
      *
      * @return string An empty string when it is done, else why it was not
      */
-    public function confirm(string $organ): string
+    public function confirm(string $organ, array $details = []): string
     {
         $state = $this->state($organ);
 
@@ -490,9 +490,26 @@ final class ExchangeDraft
         }
 
         foreach ($draft['assign'] as $recipientMrn => $donorMrn) {
-            $this->pairs->link((int) $recipientMrn, (int) $donorMrn, ['status' => 'paired_exchange']);
+            $said   = is_array($details[$recipientMrn] ?? null) ? $details[$recipientMrn] : [];
+            $status = self::newPairStatus((string) ($said['status'] ?? ''));
+
+            $relationship = trim((string) ($said['relationship'] ?? ''));
+            $crossmatch   = UiStore::dmyToIso((string) ($said['crossmatchDate'] ?? ''));
+
+            $this->pairs->link((int) $recipientMrn, (int) $donorMrn, [
+                'status'          => $status,
+                'relationship'    => $relationship === '' ? null : $relationship,
+                'crossmatch_date' => $crossmatch === '' ? null : $crossmatch,
+            ]);
+
             // The two are one status from the moment the pair exists.
-            $this->recipients->update((int) $recipientMrn, ['status' => 'paired_exchange']);
+            $this->recipients->update((int) $recipientMrn, ['status' => $status]);
+
+            // The donors list shows the relationship, so the donor carries it
+            // too — as the pair's own card keeps the two in step.
+            if ($relationship !== '') {
+                $this->donors->update((int) $donorMrn, ['relationship' => $relationship]);
+            }
         }
 
         // A donor sent back to the register needs nothing doing: closing their
@@ -514,6 +531,21 @@ final class ExchangeDraft
         $this->discard();
 
         return '';
+    }
+
+    /**
+     * The word a pair the exchange is making starts on.
+     *
+     * Paired Exchange unless the review said otherwise, because that is what
+     * these pairs are. Closed is not a word a pair can be made on — closing is
+     * what frees both sides again — and neither is anything outside the list
+     * the card offers.
+     */
+    private static function newPairStatus(string $said): string
+    {
+        return $said !== 'closed' && isset(UiStore::PAIR_STATUS_OPTIONS[$said])
+            ? $said
+            : 'paired_exchange';
     }
 
     // ---- Reading the registers --------------------------------------------

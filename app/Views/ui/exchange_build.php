@@ -224,20 +224,24 @@ $chooser = static function (string $action, string $ownField, string $ownMrn, st
 </div>
 
 <dialog class="dialog dialog--wide" id="review-exchange">
-    <div class="dialog-body">
-        <form method="dialog" class="dialog-close-form">
-            <button class="dialog-close" aria-label="Close">&times;</button>
-        </form>
+    <?php // One form around the whole summary: it asks for each new pair's
+          // details now, and they have to travel with the answer. Which is
+          // also why the close and Back buttons are not forms of their own any
+          // more — a form cannot sit inside another — but buttons `ui.js`
+          // closes the dialog with. Without it the dialog never opens: the
+          // button behind it is a link to the page that asks the same. ?>
+    <form method="post" action="<?= site_url('exchange/build') ?>" class="dialog-body">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="confirm">
+        <div class="dialog-close-form">
+            <button type="button" class="dialog-close" aria-label="Close" data-dialog-close>&times;</button>
+        </div>
         <?= view('ui/partials/exchange_summary', ['state' => $state], ['saveData' => false]) ?>
         <div class="confirm-actions">
-            <form method="dialog"><button type="submit" class="btn-outline">Back</button></form>
-            <form method="post" action="<?= site_url('exchange/build') ?>" class="inline-form">
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="confirm">
-                <button type="submit" class="btn-save">Save the exchange</button>
-            </form>
+            <button type="button" class="btn-outline" data-dialog-close>Back</button>
+            <button type="submit" class="btn-save">Save the exchange</button>
         </div>
-    </div>
+    </form>
 </dialog>
 
 <dialog class="dialog" id="cancel-exchange">

@@ -102,11 +102,14 @@ final class UiStore
     /**
      * What a person's own record offers — a recipient's and a donor's alike.
      *
-     * Three of the pair's six, and deliberately not the other three: a person
-     * is not transplanted, closed or in a paired exchange; their *case* is,
-     * and that is the pair's to say. Where the two do overlap they are still
-     * kept in step — setting one sets the other — which is why these three are
-     * exactly a subset rather than a separate vocabulary.
+     * Four of the pair's six, and deliberately not the other two: a person is
+     * not "closed" and is not "in a paired exchange"; their *case* is, and
+     * that is the pair's to say. Transplanted is theirs, though — a transplant
+     * is a thing that happens to a person — so the word belongs on both sides.
+     *
+     * Being exactly a subset is what lets the pair's status carry into them:
+     * set the pair to one of these four and the recipient and the donor on it
+     * are given the same word, because it is the same fact said once.
      */
     /**
      * What kind of dialysis a recipient is on.
@@ -126,9 +129,10 @@ final class UiStore
     public const DIALYSIS_PREEMPTIVE = 'preemptive';
 
     public const PERSON_STATUS_OPTIONS = [
-        'on_hold'  => 'On Hold',
-        'active'   => 'Active',
-        'declined' => 'Declined',
+        'on_hold'      => 'On Hold',
+        'active'       => 'Active',
+        'declined'     => 'Declined',
+        'transplanted' => 'Transplanted',
     ];
 
     public const STATUS_TONE = [
@@ -360,17 +364,18 @@ final class UiStore
     public const DONATION_TYPES_ON_PAIR = ['living_related', 'living_unrelated', 'deceased'];
 
     /**
-     * The same three, in the spelling the donor screens post.
+     * The same four, in the spelling the donor screens post.
      *
      * The donor form has always sent the label and converted on the way in
      * ("On Hold" -> `on_hold`), where the recipient form sends the key. Left
      * as it is: changing it would rewrite the mapping for no gain, and the
-     * three values are the recipient's three.
+     * four values are the recipient's four.
      */
     public const DONOR_STATUS_OPTIONS = [
-        'On Hold'  => 'On Hold',
-        'Active'   => 'Active',
-        'Declined' => 'Declined',
+        'On Hold'      => 'On Hold',
+        'Active'       => 'Active',
+        'Declined'     => 'Declined',
+        'Transplanted' => 'Transplanted',
     ];
 
     /**
@@ -1155,14 +1160,61 @@ final class UiStore
     }
 
     /**
-     * Gives a recipient their pair's status, where it is one they can hold.
+     * Gives a pair's two people the word the pair has just been given.
      *
-     * Silently does nothing for the three that only describe a pair. That is
-     * the point: a recipient whose pair has just been closed is not himself
-     * "closed", he is whatever he was — and the waiting list, which is defined
-     * against the pair rather than against this column, already shows him
-     * again.
+     * Four of the six are a person's as much as a pair's — On Hold, Active,
+     * Declined, Transplanted — and where the fact is the same fact, saying it
+     * on the pair says it. A pair that is Transplanted is a recipient who has
+     * had their transplant and a donor who gave it; leaving the two of them
+     * reading "Active" on the registers afterwards was the register being
+     * wrong rather than being careful.
+     *
+     * The other two do nothing here, and that is the point: a recipient whose
+     * pair has been closed is not himself "closed", he is whatever he was —
+     * and the waiting list, defined against the pair rather than against this
+     * column, already shows him again. Nor is a person "in a paired exchange":
+     * their case is.
+     *
+     * One rule survives the carrying: only one of a case's donors may be
+     * Active, so a pair set Active while another of its donors holds that word
+     * sets the recipient and leaves the donor alone.
+     *
+     * @return list<string> Who it was set on, for the screen to say.
      */
+    public function applyPairStatus(string $pairId, string $status): array
+    {
+        $status = $this->statusKey($status);
+
+        if (! isset(self::PERSON_STATUS_OPTIONS[$status])) {
+            return [];
+        }
+
+        $link = $this->pairs->find((int) $pairId);
+
+        if ($link === null) {
+            return [];
+        }
+
+        $given     = [];
+        $recipient = $this->recipients->find((int) $link['recipient_mrn']);
+
+        if ($recipient !== null) {
+            $this->recipients->update((int) $link['recipient_mrn'], ['status' => $status]);
+            $given[] = (string) $recipient['name'];
+        }
+
+        $donor      = $this->donors->find((int) $link['donor_mrn']);
+        $takenByAnother = $status === 'active'
+            && $this->hasActiveDonor((string) $link['recipient_mrn'], (string) $link['id']);
+
+        if ($donor !== null && ! $takenByAnother) {
+            $this->donors->update((int) $link['donor_mrn'], ['status' => $status]);
+            $given[] = (string) $donor['name'];
+        }
+
+        return $given;
+    }
+
     // ---- Medical record numbers --------------------------------------------
 
     /**

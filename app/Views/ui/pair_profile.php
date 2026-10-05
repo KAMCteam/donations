@@ -106,6 +106,17 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
                             <option value="<?= esc($value) ?>"<?= $v['pairStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <?php // Said before the save, not after it: four of these
+                          // six words are the recipient's and the donor's own
+                          // as well, and saving the card writes them there
+                          // too. Somebody setting a pair Transplanted should
+                          // know the two registers change with it. ?>
+                    <p class="field-hint">
+                        <?= esc(implode(', ', array_slice(UiStore::PERSON_STATUS_OPTIONS, 0, -1))) ?>
+                        and <?= esc(array_values(UiStore::PERSON_STATUS_OPTIONS)[count(UiStore::PERSON_STATUS_OPTIONS) - 1]) ?>
+                        are the recipient's and the donor's status too: saving this card sets theirs to the same word.
+                        Paired Exchange and Closed are the pair's alone and leave both as they are.
+                    </p>
                 </div>
             </div>
 

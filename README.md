@@ -632,7 +632,7 @@ the script, every bar is still right: the server renders them.
 
 A recipient's status, a donor's, and the Match Status of a pair were once one
 value shared between screens — setting it on either set the other. They are
-three separate facts now, and nothing carries one to another:
+three separate facts:
 
 | Where | What it says |
 | --- | --- |
@@ -642,19 +642,41 @@ three separate facts now, and nothing carries one to another:
 
 What broke the old arrangement was a recipient being allowed more than one
 donor: with three links open, there is no saying which of them a Declined on
-the person was about. So closing a pair no longer closes the recipient,
-declining a recipient no longer declines their donors, and each of the three
-selects is saved by the card it sits on and no other.
+the person was about. So declining a recipient does not decline their donors,
+and a person's own card writes the person and nothing else.
 
 `UiStore::STATUS_OPTIONS` still holds every word any of them can take, so a
 value stored before this reads correctly wherever it appears. What each screen
 *offers* is narrower: `PERSON_STATUS_OPTIONS` and `DONOR_STATUS_OPTIONS` are On
-Hold / Active / Declined, and `PAIR_STATUS_OPTIONS` adds the three that are a
-pair's alone.
+Hold / Active / Declined / **Transplanted**, and `PAIR_STATUS_OPTIONS` adds the
+two that are a pair's alone — Paired Exchange and Closed.
+
+Transplanted was the pair's alone until the register read wrongly for it: a
+recipient whose transplant has happened is not "active" on a waiting list, and
+the donor who gave is not "active" either. A transplant is a thing that happens
+to people, so people can hold the word. `recipients.status` and `donors.status`
+are ENUMs, so it took a migration to let them.
+
+#### One direction carries: the pair's status hands the word on
+
+The four a person can hold are exactly the first four a pair can, and where the
+fact is the same fact, saying it on the pair says it. Saving Pair Details sets
+the recipient's and the donor's own status to the same word, and the card says
+so under the field before it is saved — a save that writes two other records
+should not do it quietly, and the notice afterwards names who it was set on.
+
+Paired Exchange and Closed carry nothing: a person is not "in a paired
+exchange" and is not "closed", their case is. Closing a pair still puts both
+sides back on their lists, which is the link's doing and not a change to
+either person's own status.
+
+One rule survives the carrying. Only one of a case's donors may be Active, so
+a pair set Active while another of its donors holds that word sets the
+recipient and leaves the donor alone. `UiStore::applyPairStatus()` is the whole
+of it, and it is the only thing that writes a person's status from a pair.
 
 One of those means more than its label: **Closed** is what "open pair" is
-defined against, so closing a pair puts both sides back on their lists. That is
-the link's doing, not a change to either person's own status.
+defined against, so closing a pair puts both sides back on their lists.
 
 Two of them bring a question with them, and the Pair Details card asks it where
 the answer belongs — beside the word, and only while the word is on the screen:

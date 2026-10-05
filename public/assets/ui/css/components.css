@@ -180,6 +180,16 @@
   margin-bottom: 0.375rem;
 }
 
+/* What saving this field will do beyond itself, said under it. Lighter than
+   the label and lighter than the box, because it is a warning and not an
+   answer — the field is still the field. */
+.field-hint {
+  margin-top: 0.375rem;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--slate-500);
+}
+
 /* Something the field already knows, said beside its name — the age a date of
    birth comes to. Not a second label: it is lighter than one, and it is empty
    until there is a date to read it off. */

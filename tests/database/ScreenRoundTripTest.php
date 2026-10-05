@@ -884,15 +884,18 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             $this->assertStringContainsString('>' . $label . '</option>', $html);
         }
 
-        // The three a pair alone can be are not on a person's own record:
-        // somebody is not "transplanted", their case is.
-        foreach (['transplanted', 'paired_exchange', 'closed'] as $pairOnly) {
+        // Transplanted is a person's word too — a transplant is a thing that
+        // happens to somebody — but the two that only describe a case are not
+        // on a person's record.
+        $this->assertStringContainsString('value="transplanted"', $html);
+
+        foreach (['paired_exchange', 'closed'] as $pairOnly) {
             $this->assertStringNotContainsString('value="' . $pairOnly . '"', $html);
         }
     }
 
     /** The pair's Match Status is the same list, not a second one. */
-    /** The pair offers six; a person's three are exactly the first three. */
+    /** The pair offers six; a person's four are exactly the first four. */
     public function testThePairOffersItsOwnLongerList(): void
     {
         $this->post('pairs/new', [
@@ -916,7 +919,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         $this->assertSame(
             array_keys(UiStore::PERSON_STATUS_OPTIONS),
-            array_slice(array_keys(UiStore::PAIR_STATUS_OPTIONS), 0, 3)
+            array_slice(array_keys(UiStore::PAIR_STATUS_OPTIONS), 0, 4)
         );
     }
 
@@ -2364,10 +2367,46 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         // there is no saying which of them this would have meant.
         $this->assertSame('active', $this->db->table('pairs')->where('id', $pairId)->get()->getRowArray()['status']);
 
-        // The pair's card sets the pair, and only the pair.
+        // The pair's card sets the pair — and hands the word on, because
+        // Transplanted is the recipient's own as much as the pair's.
         $this->post('pairs/' . $pairId, ['section' => 'pair', 'pairStatus' => 'transplanted']);
         $this->assertSame('transplanted', $this->db->table('pairs')->where('id', $pairId)->get()->getRowArray()['status']);
-        $this->assertSame('declined', $this->db->table('recipients')->where('mrn', 9507)->get()->getRowArray()['status']);
+        $this->assertSame('transplanted', $this->db->table('recipients')->where('mrn', 9507)->get()->getRowArray()['status']);
+    }
+
+    /** The Status field says what it will do beyond itself, before it does it. */
+    public function testThePairsStatusSaysItSetsThePeoplesToo(): void
+    {
+        [$pairId] = $this->pairWith('2010', '2011', 'The Donor');
+
+        $html = $this->get('pairs/' . $pairId . '?edit=pair')->getBody();
+
+        $this->assertStringContainsString('class="field-hint"', $html);
+        $this->assertStringContainsString('On Hold, Active, Declined', $html);
+        $this->assertStringContainsString('and Transplanted', $html);
+        $this->assertStringContainsString('saving this card sets theirs to the same word', $html);
+        $this->assertStringContainsString('Paired Exchange and Closed', $html);
+    }
+
+    /** A transplant happens to a person, so a person's record says so. */
+    public function testARecordCanBeTransplantedOnItsOwn(): void
+    {
+        $this->post('recipients/new', ['mrn' => '2012', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
+        $this->post('donors/new', ['mrn' => '2013', 'name' => 'D', 'age' => '30', 'bloodType' => 'A']);
+
+        $this->assertStringContainsString('value="transplanted"', $this->get('recipients/2012?edit=personal')->getBody());
+        $this->assertStringContainsString('value="Transplanted"', $this->get('donors/2013?edit=personal')->getBody());
+
+        $this->post('recipients/2012', [
+            'section' => 'personal', 'name' => 'R', 'bloodType' => 'A', 'status' => 'transplanted',
+        ]);
+        $this->post('donors/2013', [
+            'section' => 'personal', 'name' => 'D', 'bloodType' => 'A',
+            'donationType' => 'living', 'donorStatus' => 'Transplanted',
+        ]);
+
+        $this->seeInDatabase('recipients', ['mrn' => 2012, 'status' => 'transplanted']);
+        $this->seeInDatabase('donors', ['mrn' => 2013, 'status' => 'transplanted']);
     }
 
     /** The Donors List narrows by blood type, the same way the waitlist does. */
@@ -2410,7 +2449,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             // Every status a record can hold is offered, and nothing else.
             $this->assertStringContainsString('Status:', $all);
             $this->assertStringContainsString('status=on_hold', $all);
-            $this->assertStringNotContainsString('status=transplanted', $all);
+            $this->assertStringContainsString('status=transplanted', $all);
+            $this->assertStringNotContainsString('status=closed', $all);
 
             $onHold = $this->get($screen . '?status=on_hold')->getBody();
             $this->assertStringContainsString($held, $onHold);
@@ -2736,12 +2776,15 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
-     * A recipient's status and their links' are separate facts now.
+     * A recipient's status and their links' are separate facts.
      *
      * They were one while a recipient had one donor. With several there is no
      * saying which of them a recipient set to Declined would mean, so the
      * person's status is the person's — are they on the programme — and each
      * link carries its own.
+     *
+     * One direction still carries, because it says one fact rather than two:
+     * the pair's status is the people's where the word is one they can hold.
      */
     public function testTheRecipientsStatusAndTheirLinksAreSeparate(): void
     {
@@ -2764,10 +2807,21 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('recipients', ['mrn' => 2005, 'status' => 'declined']);
         $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'active']);
 
-        // The pair's card moves the pair, and only the pair.
+        // The pair's card moves the pair, and hands the word to both of them:
+        // four of the six are the people's as much as the pair's.
         $this->post('pairs/' . $pairId, ['section' => 'pair', 'pairStatus' => 'on_hold']);
         $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'on_hold']);
-        $this->seeInDatabase('recipients', ['mrn' => 2005, 'status' => 'declined']);
+        $this->seeInDatabase('recipients', ['mrn' => 2005, 'status' => 'on_hold']);
+        $this->seeInDatabase('donors', ['mrn' => 2006, 'status' => 'on_hold']);
+        $this->assertStringContainsString('Status set to On Hold on', (string) session('ui_notice'));
+
+        // The other two are the pair's alone and leave both where they are.
+        $this->post('pairs/' . $pairId, [
+            'section' => 'pair', 'pairStatus' => 'closed', 'closedReason' => 'Not going ahead.',
+        ]);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'closed']);
+        $this->seeInDatabase('recipients', ['mrn' => 2005, 'status' => 'on_hold']);
+        $this->seeInDatabase('donors', ['mrn' => 2006, 'status' => 'on_hold']);
     }
 
     /**

@@ -1769,7 +1769,91 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('pairs', ['id' => $pairB, 'status' => 'closed']);
         $this->seeInDatabase('pairs', ['recipient_mrn' => 8101, 'donor_mrn' => 8202, 'status' => 'paired_exchange']);
         $this->seeInDatabase('pairs', ['recipient_mrn' => 8201, 'donor_mrn' => 8102, 'status' => 'paired_exchange']);
-        $this->seeInDatabase('recipients', ['mrn' => 8101, 'status' => 'paired_exchange']);
+        // The people keep their own word: a person is not "in a paired
+        // exchange", their case is — and a recipient left holding it would be
+        // missing from the next exchange's lists, which ask for Active.
+        $this->seeInDatabase('recipients', ['mrn' => 8101, 'status' => 'active']);
+    }
+
+    /**
+     * A recipient is never offered the donor they came in with.
+     *
+     * An exchange exists because that donor cannot give to them — offering
+     * them back is offering the thing being worked around. The mirror holds
+     * for a donor and their own recipient.
+     */
+    public function testTheChainNeverOffersSomebodyTheirOwnSide(): void
+    {
+        [$pairA] = $this->twoPairsToExchange();
+        // Their own donor is blood-group compatible with them, so nothing but
+        // this rule keeps him off the list.
+        $this->post('pairs/new', [
+            'rMrn' => '8301', 'dMrn' => '8302',
+            'rName' => 'Same Group R', 'rAge' => '40', 'rBloodType' => 'A', 'rStatus' => 'active',
+            'dName' => 'Their Own Donor', 'dAge' => '30', 'dBloodType' => 'A', 'dStatus' => 'Active',
+        ]);
+        $ownPair = (int) $this->db->table('pairs')->where('recipient_mrn', 8301)->get()->getRowArray()['id'];
+        $this->post('pairs/' . $ownPair, ['section' => 'exchange', 'forExchange' => '1']);
+
+        $this->post('exchange/start/' . $ownPair);
+
+        $html = $this->get('exchange/build')->getBody();
+
+        // Somebody else's A donor is offered; their own is not. The page
+        // names their own donor elsewhere — starting the exchange is what
+        // leaves them without a recipient — so this asks the lists, not the
+        // page.
+        $offered = $this->exchangeChoices($html);
+
+        $this->assertStringContainsString('Donor B', $offered);
+        $this->assertStringNotContainsString('Their Own Donor', $offered);
+    }
+
+    /** And nobody who is not Active, wherever they were found. */
+    public function testTheChainOffersOnlyActivePeople(): void
+    {
+        [$pairA] = $this->twoPairsToExchange();
+
+        // A free donor of the right group, on hold: not somebody a chain can
+        // be built on.
+        $this->post('donors/new', [
+            'mrn' => '8303', 'name' => 'Held Donor', 'age' => '30',
+            'bloodType' => 'A', 'donorStatus' => 'On Hold',
+        ]);
+        $this->post('donors/new', [
+            'mrn' => '8304', 'name' => 'Free Donor', 'age' => '30',
+            'bloodType' => 'A', 'donorStatus' => 'Active',
+        ]);
+
+        $this->post('exchange/start/' . $pairA);
+
+        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
+
+        $this->assertStringContainsString('Free Donor', $offered);
+        $this->assertStringNotContainsString('Held Donor', $offered);
+
+        // The same of a recipient, on the list a spare donor chooses from.
+        $this->post('recipients/new', [
+            'mrn' => '8305', 'name' => 'Held Recipient', 'age' => '40',
+            'bloodType' => 'B', 'status' => 'on_hold',
+        ]);
+        $this->post('recipients/new', [
+            'mrn' => '8306', 'name' => 'Free Recipient', 'age' => '40',
+            'bloodType' => 'B', 'status' => 'active',
+        ]);
+
+        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
+
+        $this->assertStringContainsString('Free Recipient', $offered);
+        $this->assertStringNotContainsString('Held Recipient', $offered);
+    }
+
+    /** Every name the builder's choice lists offer, as one string. */
+    private function exchangeChoices(string $html): string
+    {
+        preg_match_all('/<option\b[^>]*>(.*?)<\/option>/s', $html, $found);
+
+        return implode(' | ', array_map('trim', $found[1]));
     }
 
     /**
@@ -1830,9 +1914,9 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     {
         [$pairA] = $this->twoPairsToExchange();
         // An AB donor, who can only give to AB — so not to either recipient.
-        $this->post('donors/new', ['mrn' => '8601', 'name' => 'AB Donor', 'age' => '40', 'bloodType' => 'AB']);
+        $this->post('donors/new', ['mrn' => '8601', 'name' => 'AB Donor', 'age' => '40', 'bloodType' => 'AB', 'donorStatus' => 'Active']);
         // An O donor, who can give to anyone.
-        $this->post('donors/new', ['mrn' => '8602', 'name' => 'Universal Donor', 'age' => '41', 'bloodType' => 'O']);
+        $this->post('donors/new', ['mrn' => '8602', 'name' => 'Universal Donor', 'age' => '41', 'bloodType' => 'O', 'donorStatus' => 'Active']);
 
         $this->post('exchange/start/' . $pairA);
         $html = $this->get('exchange/build')->getBody();
@@ -1849,7 +1933,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testADonorCannotBeMatchedTwice(): void
     {
         [$pairA] = $this->twoPairsToExchange();
-        $this->post('recipients/new', ['mrn' => '8701', 'name' => 'Second Recipient', 'age' => '39', 'bloodType' => 'AB']);
+        $this->post('recipients/new', ['mrn' => '8701', 'name' => 'Second Recipient', 'age' => '39', 'bloodType' => 'AB', 'status' => 'active']);
 
         $this->post('exchange/start/' . $pairA);
         // The A recipient takes the A donor from pair B.
@@ -1867,7 +1951,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testARecipientWithoutADonorStopsTheSave(): void
     {
         [$pairA] = $this->twoPairsToExchange();
-        $this->post('donors/new', ['mrn' => '8801', 'name' => 'Spare Donor', 'age' => '44', 'bloodType' => 'O']);
+        $this->post('donors/new', ['mrn' => '8801', 'name' => 'Spare Donor', 'age' => '44', 'bloodType' => 'O', 'donorStatus' => 'Active']);
 
         $this->post('exchange/start/' . $pairA);
         // Pair A's recipient takes the free O donor. Pair A's own donor is now
@@ -1901,7 +1985,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testTheSpareDonorsFatesWaitUntilNobodyElseIs(): void
     {
         [$pairA] = $this->twoPairsToExchange();
-        $this->post('donors/new', ['mrn' => '8803', 'name' => 'Spare Donor', 'age' => '44', 'bloodType' => 'O']);
+        $this->post('donors/new', ['mrn' => '8803', 'name' => 'Spare Donor', 'age' => '44', 'bloodType' => 'O', 'donorStatus' => 'Active']);
 
         // Straight after starting, both sides of pair A are open: a recipient
         // without a donor, and a donor without a recipient.
@@ -1936,7 +2020,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     public function testASpareDonorCanBeDeletedInstead(): void
     {
         [$pairA] = $this->twoPairsToExchange();
-        $this->post('donors/new', ['mrn' => '8802', 'name' => 'Spare Donor', 'age' => '44', 'bloodType' => 'O']);
+        $this->post('donors/new', ['mrn' => '8802', 'name' => 'Spare Donor', 'age' => '44', 'bloodType' => 'O', 'donorStatus' => 'Active']);
 
         $this->post('exchange/start/' . $pairA);
         $this->post('exchange/build', ['action' => 'chooseDonor', 'recipientMrn' => '8101', 'donorMrn' => '8802']);
@@ -2071,16 +2155,19 @@ final class ScreenRoundTripTest extends CIUnitTestCase
      */
     private function twoPairsToExchange(): array
     {
-        // A recipient with a B donor, and a B recipient with an A donor.
+        // A recipient with a B donor, and a B recipient with an A donor. Both
+        // sides Active, as a pair being worked up is: the exchange offers
+        // nobody else, because a chain is an agreement between people who are
+        // on the programme now.
         $this->post('pairs/new', [
             'rMrn' => '8101', 'dMrn' => '8102',
-            'rName' => 'Recipient A', 'rAge' => '44', 'rBloodType' => 'A',
-            'dName' => 'Donor A', 'dAge' => '33', 'dBloodType' => 'B',
+            'rName' => 'Recipient A', 'rAge' => '44', 'rBloodType' => 'A', 'rStatus' => 'active',
+            'dName' => 'Donor A', 'dAge' => '33', 'dBloodType' => 'B', 'dStatus' => 'Active',
         ]);
         $this->post('pairs/new', [
             'rMrn' => '8201', 'dMrn' => '8202',
-            'rName' => 'Recipient B', 'rAge' => '51', 'rBloodType' => 'B',
-            'dName' => 'Donor B', 'dAge' => '36', 'dBloodType' => 'A',
+            'rName' => 'Recipient B', 'rAge' => '51', 'rBloodType' => 'B', 'rStatus' => 'active',
+            'dName' => 'Donor B', 'dAge' => '36', 'dBloodType' => 'A', 'dStatus' => 'Active',
         ]);
 
         $ids = array_column($this->db->table('pairs')->orderBy('id')->get()->getResultArray(), 'id');

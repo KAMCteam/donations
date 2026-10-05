@@ -422,6 +422,37 @@ the whole summary now — which is why its Back and its close are buttons
 `ui.js` shuts the dialog with rather than little forms of their own: a form
 cannot sit inside another.
 
+#### Who the chain may offer
+
+Two rules besides the blood groups, on both of the builder's lists:
+
+- **Never their own side.** A recipient is not offered the donor they came in
+  with, and a donor is not offered their own recipient. An exchange exists
+  *because* that donor cannot give to that recipient; offering them back is
+  offering the thing being worked around, and the blood groups do not always
+  catch it — two people can be compatible on paper and still be a pair somebody
+  is trying to break. A recipient holding more than one link has all of their
+  donors left off, not just the first.
+- **Active only.** On Hold, Declined and Transplanted are three ways of not
+  being on the programme now, and a chain built on one of them is a chain
+  somebody has to come back and unpick. The rule reads the *person's* own
+  status, so it holds wherever they were found — in a pair, on the waiting
+  list, or on the donors list. Worth knowing when a new donor seems to be
+  missing: Add Donor starts on **On Hold**, and the exchange will not see them
+  until somebody says Active.
+
+What the lists refuse to show, the post refuses to take. A page left open while
+somebody was stood down would otherwise put them in a chain, and `assign()`
+says why in both cases — *is not Active*, or *is already their own donor,
+which is what this exchange is for changing*.
+
+The second rule has a consequence worth stating: saving an exchange no longer writes
+**Paired Exchange** onto the recipient. It used to, and that was already at
+odds with the rest of the platform — a person is not in a paired exchange,
+their case is — but it also left them holding a word that is not Active, so the
+registry's own saved exchanges would have been the one thing the next exchange
+could not offer. The pair carries the word; the people carry theirs.
+
 Paired Exchange has a blood-type row too, labelled **Recipient blood type**,
 and it asks a different question from the others': the Pairs List's matches a
 pair when *either* side has the group, and this one is the recipient's alone.

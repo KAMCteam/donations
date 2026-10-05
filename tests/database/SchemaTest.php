@@ -408,21 +408,25 @@ final class SchemaTest extends CIUnitTestCase
         $this->assertNotContains('not_applicable', UiStore::RESULT_OPTIONS['acceptable_abnormal']);
         $this->assertContains('not_applicable', UiStore::RESULT_OPTIONS['acceptable_abnormal_na']);
 
-        // The imaging and the two urine tests are asked of everyone as well,
-        // on both sheets.
+        // The imaging is asked of everyone, on both sheets.
         $donorTypes = array_column(
             model(LabModel::class)->workupFor('kidney', 'donor'),
             'result_type',
             'name'
         );
 
-        foreach (['CXR', 'ECG', 'Echo', 'Cr clearance', '24h-urine for protein'] as $test) {
-            $this->assertSame('acceptable_abnormal', $types[$test], $test . ' cannot not apply');
+        foreach ([$types, $donorTypes] as $sheet) {
+            foreach (['CXR', 'ECG', 'Echo'] as $test) {
+                $this->assertSame('acceptable_abnormal', $sheet[$test], $test . ' cannot not apply');
+            }
         }
 
-        foreach (['CXR', 'ECG', 'Echo', 'Creatinine Clearance', '24h-urine for protein'] as $test) {
-            $this->assertSame('acceptable_abnormal', $donorTypes[$test], $test . ' cannot not apply');
-        }
+        // The two urine collections can: an anuric patient has no urine to
+        // collect, which is not the same as nobody having collected it.
+        $this->assertSame('acceptable_abnormal_na', $types['Cr clearance']);
+        $this->assertSame('acceptable_abnormal_na', $types['24h-urine for protein']);
+        $this->assertSame('acceptable_abnormal_na', $donorTypes['Creatinine Clearance']);
+        $this->assertSame('acceptable_abnormal_na', $donorTypes['24h-urine for protein']);
 
         // US KUB is off both sheets.
         $this->assertArrayNotHasKey('US KUB', $types);

@@ -455,15 +455,27 @@ Pending / Done / Flagged:
 | `result_type` | The card offers |
 | --- | --- |
 | `blood_group` | Not done · A · B · AB · O |
-| `done` | Not done · Pending · Done · N/A |
-| `positive_negative` | Not done · Pending · Positive · Negative · N/A |
-| `acceptable_abnormal` | Not done · Pending · Acceptable · Abnormal · N/A |
-| `cleared_not_cleared` | Not done · Pending · Cleared · Not cleared · N/A |
-| `given_not_given` | Not done · Given · Not required · Not given · N/A |
+| `done` | Not done · Pending · Done |
+| `positive_negative` | Not done · Pending · Positive · Negative |
+| `acceptable_abnormal` | Not done · Pending · Acceptable · Abnormal |
+| `acceptable_abnormal_na` | the same, and **Not applicable** |
+| `cleared_not_cleared` | Not done · Pending · Cleared · Not cleared · Not applicable |
+| `given_not_given` | Given · Not required · Not given · Not applicable |
+| `seen_not_seen` | Not done · Seen · Not seen |
+| `free_text` | nothing — the card is its comment box |
 
-`not_done` starts them all — nobody has looked yet — and N/A ends most, since
-a test that cannot apply to this patient is a real answer; the sheet adds it
-to several vocabularies by hand. The answer is stored in `lab_results.status`,
+`not_done` starts most of them — nobody has looked yet — and **Not
+applicable** is on the ones where a test can fail to arise at all: a clearance
+nobody needs, a vaccine that does not apply, and the two urine collections, the
+24-hour protein and the creatinine clearance, which an anuric patient has no
+urine to make. That last pair answered Acceptable / Abnormal only until the
+word was added to them, and "Not done" was being pressed for a collection that
+could never have been done — which says something else entirely.
+
+`given_not_given` has no Not done of its own: a vaccination that was not given
+says so, and the two would be one answer under two names. Until one is pressed
+the card shows nothing, while the record still holds `not_done`, which is how
+the workup knows it is outstanding. The answer is stored in `lab_results.status`,
 and the bar counts the tests that have one, whichever it is. An answer a test
 does not offer is refused rather than stored, checked against the catalogue
 rather than against the form.

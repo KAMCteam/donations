@@ -2409,6 +2409,49 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('donors', ['mrn' => 2013, 'status' => 'transplanted']);
     }
 
+    /**
+     * A collection nobody could make is not "not done", it does not apply.
+     *
+     * 24h-urine for protein and Cr clearance are collections rather than bench
+     * tests, so an anuric patient has no answer to give — and both sheets now
+     * offer the word for that, as the cancer screening tests already did.
+     */
+    public function testTheUrineCollectionsOfferNotApplicable(): void
+    {
+        $this->post('recipients/new', ['mrn' => '2014', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
+        $this->post('donors/new', ['mrn' => '2015', 'name' => 'D', 'age' => '30', 'bloodType' => 'A']);
+
+        foreach (['24h-urine for protein', 'Cr clearance', 'Creatinine Clearance'] as $name) {
+            $this->seeInDatabase('labs', [
+                'name'        => $name,
+                'person_mrn'  => null,
+                'result_type' => 'acceptable_abnormal_na',
+            ]);
+        }
+
+        // And the card offers it, beside the three it always had.
+        $lab = $this->db->table('labs')
+            ->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'Cr clearance'])
+            ->get()->getRowArray();
+
+        $html = $this->get('recipients/2014?edit=labs')->getBody();
+        $card = substr($html, (int) strpos($html, 'value="' . $lab['id'] . '"'));
+        $card = substr($card, 0, (int) strpos($card, '</div></div>') ?: 4000);
+
+        $this->assertStringContainsString('data-lab-status="not_applicable"', $card);
+
+        // It stores like any other answer.
+        $this->post('recipients/2014', [
+            'section' => 'labs',
+            'labs'    => [['id' => $lab['id'], 'name' => 'Cr clearance', 'status' => 'not_applicable']],
+        ]);
+        $this->seeInDatabase('lab_results', [
+            'person_mrn' => 2014,
+            'lab_id'     => $lab['id'],
+            'status'     => 'not_applicable',
+        ]);
+    }
+
     /** The Donors List narrows by blood type, the same way the waitlist does. */
     public function testTheDonorsListFiltersByBloodType(): void
     {

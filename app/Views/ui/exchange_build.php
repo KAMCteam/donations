@@ -145,7 +145,7 @@ $chooser = static function (string $action, string $ownField, string $ownMrn, st
                                 <span class="node-open-label">No donor yet</span>
                                 <?= $chooser('chooseDonor', 'recipientMrn', (string) $node['recipient']['mrn'],
                                     'donorMrn', $node['choosableDonors'],
-                                    $node['noDonorsBecause']) ?>
+                                    'No compatible donors at the moment.') ?>
                             </div>
                         <?php endif; ?>
                     </li>
@@ -168,10 +168,7 @@ $chooser = static function (string $action, string $ownField, string $ownMrn, st
                                 <?= $chooser('chooseRecipient', 'donorMrn', (string) $donor['mrn'],
                                     'recipientMrn', $donor['choosableRecipients'], '') ?>
                             <?php else: ?>
-                                <?php // Not merely "nobody": which rule left the
-                                      // list empty, so somebody can go and
-                                      // change the thing it names. ?>
-                                <p class="node-empty"><?= esc($donor['noRecipientsBecause']) ?></p>
+                                <p class="node-empty">No compatible recipients are free.</p>
                             <?php endif; ?>
 
                             <?php if ($onlyDonorsLeft): ?>

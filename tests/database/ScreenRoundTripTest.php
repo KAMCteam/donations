@@ -1771,138 +1771,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('pairs', ['recipient_mrn' => 8201, 'donor_mrn' => 8102, 'status' => 'paired_exchange']);
         // The people keep their own word: a person is not "in a paired
         // exchange", their case is — and a recipient left holding it would be
-        // missing from the next exchange's lists, which ask for Active.
+        // missing from the next chain's lists, which ask for Active.
         $this->seeInDatabase('recipients', ['mrn' => 8101, 'status' => 'active']);
-    }
-
-    /**
-     * A recipient is never offered the donor they came in with.
-     *
-     * An exchange exists because that donor cannot give to them — offering
-     * them back is offering the thing being worked around. The mirror holds
-     * for a donor and their own recipient.
-     */
-    public function testTheChainNeverOffersSomebodyTheirOwnSide(): void
-    {
-        [$pairA] = $this->twoPairsToExchange();
-        // Their own donor is blood-group compatible with them, so nothing but
-        // this rule keeps him off the list.
-        $this->post('pairs/new', [
-            'rMrn' => '8301', 'dMrn' => '8302',
-            'rName' => 'Same Group R', 'rAge' => '40', 'rBloodType' => 'A', 'rStatus' => 'active',
-            'dName' => 'Their Own Donor', 'dAge' => '30', 'dBloodType' => 'A', 'dStatus' => 'Active',
-        ]);
-        $ownPair = (int) $this->db->table('pairs')->where('recipient_mrn', 8301)->get()->getRowArray()['id'];
-        $this->post('pairs/' . $ownPair, ['section' => 'exchange', 'forExchange' => '1']);
-
-        $this->post('exchange/start/' . $ownPair);
-
-        $html = $this->get('exchange/build')->getBody();
-
-        // Somebody else's A donor is offered; their own is not. The page
-        // names their own donor elsewhere — starting the exchange is what
-        // leaves them without a recipient — so this asks the lists, not the
-        // page.
-        $offered = $this->exchangeChoices($html);
-
-        $this->assertStringContainsString('Donor B', $offered);
-        $this->assertStringNotContainsString('Their Own Donor', $offered);
-    }
-
-    /**
-     * The donor left without a recipient is offered the other pairs' people.
-     *
-     * Starting an exchange breaks the pair it starts from, so its donor is
-     * standing there needing somebody — and the somebody is a recipient held
-     * by another pair that was put forward. A recipient in a pair is the
-     * commonest answer there is, and the list has to carry them.
-     */
-    public function testTheSpareDonorIsOfferedARecipientFromAnotherPair(): void
-    {
-        [$pairA] = $this->twoPairsToExchange();
-
-        $this->post('exchange/start/' . $pairA);
-
-        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
-
-        // Donor A (B group) can give to Recipient B (B group), who is in the
-        // other pair — so she is on his list, named with the pair she is in.
-        $this->assertStringContainsString('Recipient B', $offered);
-        $this->assertStringContainsString('From pair #', $offered);
-    }
-
-    /** And nobody who is not Active, wherever they were found. */
-    public function testTheChainOffersOnlyActivePeople(): void
-    {
-        [$pairA] = $this->twoPairsToExchange();
-
-        // A free donor of the right group, on hold: not somebody a chain can
-        // be built on.
-        $this->post('donors/new', [
-            'mrn' => '8303', 'name' => 'Held Donor', 'age' => '30',
-            'bloodType' => 'A', 'donorStatus' => 'On Hold',
-        ]);
-        $this->post('donors/new', [
-            'mrn' => '8304', 'name' => 'Free Donor', 'age' => '30',
-            'bloodType' => 'A', 'donorStatus' => 'Active',
-        ]);
-
-        $this->post('exchange/start/' . $pairA);
-
-        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
-
-        $this->assertStringContainsString('Free Donor', $offered);
-        $this->assertStringNotContainsString('Held Donor', $offered);
-
-        // The same of a recipient, on the list a spare donor chooses from.
-        $this->post('recipients/new', [
-            'mrn' => '8305', 'name' => 'Held Recipient', 'age' => '40',
-            'bloodType' => 'B', 'status' => 'on_hold',
-        ]);
-        $this->post('recipients/new', [
-            'mrn' => '8306', 'name' => 'Free Recipient', 'age' => '40',
-            'bloodType' => 'B', 'status' => 'active',
-        ]);
-
-        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
-
-        $this->assertStringContainsString('Free Recipient', $offered);
-        $this->assertStringNotContainsString('Held Recipient', $offered);
-    }
-
-    /** Every name the builder's choice lists offer, as one string. */
-    private function exchangeChoices(string $html): string
-    {
-        preg_match_all('/<option\b[^>]*>(.*?)<\/option>/s', $html, $found);
-
-        return implode(' | ', array_map('trim', $found[1]));
-    }
-
-    /**
-     * An empty list says which rule emptied it.
-     *
-     * "No compatible recipients are free" is a screen arguing with somebody
-     * who can see the person on another page. Blood groups are the question
-     * itself and not worth naming; the two rules that are about a *record* —
-     * not Active, and in a pair nobody put forward — are, because both are
-     * somebody's to change.
-     */
-    public function testTheChainSaysWhyAListIsEmpty(): void
-    {
-        [$pairA] = $this->twoPairsToExchange();
-
-        // Donor A is group B, so Recipient B is the only person he could give
-        // to. Stand her down and his list has nobody left.
-        $this->post('recipients/8201', [
-            'section' => 'personal', 'name' => 'Recipient B', 'bloodType' => 'B', 'status' => 'on_hold',
-        ]);
-
-        $this->post('exchange/start/' . $pairA);
-
-        $html = $this->get('exchange/build')->getBody();
-
-        $this->assertStringContainsString('1 compatible recipient is not Active', $html);
-        $this->assertStringNotContainsString('No compatible recipients are free', $html);
     }
 
     /**
@@ -1976,6 +1846,59 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         // Posting the incompatible one anyway is refused, not merely hidden.
         $this->post('exchange/build', ['action' => 'chooseDonor', 'recipientMrn' => '8101', 'donorMrn' => '8601']);
         $this->assertStringContainsString('cannot give to', (string) session()->getFlashdata('ui_error'));
+    }
+
+    /**
+     * The chain offers only people who are Active, wherever they were found.
+     *
+     * On Hold, Declined and Transplanted are three ways of not being on the
+     * programme now, and a chain built on one of them is a chain somebody has
+     * to come back and unpick.
+     */
+    public function testTheChainOffersOnlyActivePeople(): void
+    {
+        [$pairA] = $this->twoPairsToExchange();
+
+        // Two free donors of the right group; one of them is on hold.
+        $this->post('donors/new', [
+            'mrn' => '8303', 'name' => 'Held Donor', 'age' => '30',
+            'bloodType' => 'A', 'donorStatus' => 'On Hold',
+        ]);
+        $this->post('donors/new', [
+            'mrn' => '8304', 'name' => 'Free Donor', 'age' => '30',
+            'bloodType' => 'A', 'donorStatus' => 'Active',
+        ]);
+        // And two recipients on the waiting list, the same way.
+        $this->post('recipients/new', [
+            'mrn' => '8305', 'name' => 'Held Recipient', 'age' => '40',
+            'bloodType' => 'B', 'status' => 'on_hold',
+        ]);
+        $this->post('recipients/new', [
+            'mrn' => '8306', 'name' => 'Free Recipient', 'age' => '40',
+            'bloodType' => 'B', 'status' => 'active',
+        ]);
+
+        $this->post('exchange/start/' . $pairA);
+
+        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
+
+        // From the donors list, and from the waiting list.
+        $this->assertStringContainsString('Free Donor', $offered);
+        $this->assertStringNotContainsString('Held Donor', $offered);
+        $this->assertStringContainsString('Free Recipient', $offered);
+        $this->assertStringNotContainsString('Held Recipient', $offered);
+
+        // And from a pair: both sides of pair B are Active and on offer.
+        $this->assertStringContainsString('Donor B', $offered);
+        $this->assertStringContainsString('Recipient B', $offered);
+    }
+
+    /** Every name the builder's choice lists offer, as one string. */
+    private function exchangeChoices(string $html): string
+    {
+        preg_match_all('/<option\b[^>]*>(.*?)<\/option>/s', $html, $found);
+
+        return implode(' | ', array_map('trim', $found[1]));
     }
 
     /** A donor already spoken for is gone from the other lists. */
@@ -2148,53 +2071,20 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringNotContainsString('Recipient C', $this->get('exchange')->getBody());
     }
 
-    /**
-     * A chain already running draws on any pair that is not finished.
-     *
-     * Consent — Pair Exchange pressed on the pair's own screen — is what it
-     * takes to *start* an exchange from a pair, because the pair is the
-     * subject of it. Being drawn into one that is already under way is a
-     * different question: a chain closes by finding somebody for whoever is
-     * left over, and the somebody is usually in a pair nobody thought to put
-     * forward. Asking for consent there left chains that could not close.
-     */
-    public function testARunningChainDrawsOnPairsNobodyPutForward(): void
+    /** Somebody in a pair nobody offered is not on the table to displace. */
+    public function testAPairNotOfferedCannotBeBrokenByAnExchange(): void
     {
         [$pairA, $pairB] = $this->twoPairsToExchange();
         $this->post('pairs/' . $pairB, ['section' => 'exchange', 'forExchange' => '0']);
 
         $this->post('exchange/start/' . $pairA);
 
-        // Withdrawn, so not a pair anybody can start from...
-        $this->assertStringNotContainsString('Recipient B', $this->get('exchange')->getBody());
-        $this->post('exchange/start/' . $pairB)->assertRedirectTo(site_url('exchange'));
-
-        // ...and still somebody this chain can reach.
-        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
-        $this->assertStringContainsString('Donor B', $offered);
+        $html = $this->get('exchange/build')->getBody();
+        $this->assertStringNotContainsString('Donor B', $html, 'pair B was withdrawn, so its donor is not on offer');
 
         $this->post('exchange/build', ['action' => 'chooseDonor', 'recipientMrn' => '8101', 'donorMrn' => '8202']);
-
-        // Taken: the chain now holds pair B's recipient, needing a donor.
-        $chain = $this->get('exchange/build')->getBody();
-        $this->assertStringContainsString('Recipient B', $chain);
-        $this->assertStringContainsString('Donor B', $chain);
-    }
-
-    /** What it cannot draw on is a pair that is over. */
-    public function testAFinishedPairCannotBeBrokenByAnExchange(): void
-    {
-        [$pairA, $pairB] = $this->twoPairsToExchange();
-        model(\App\Models\PairModel::class)->update($pairB, ['status' => 'transplanted']);
-
-        $this->post('exchange/start/' . $pairA);
-
-        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
-        $this->assertStringNotContainsString('Donor B', $offered, 'the transplant has happened');
-
-        $this->post('exchange/build', ['action' => 'chooseDonor', 'recipientMrn' => '8101', 'donorMrn' => '8202']);
-        $this->assertStringContainsString('is finished', (string) session()->getFlashdata('ui_error'));
-        $this->seeInDatabase('pairs', ['id' => $pairB, 'status' => 'transplanted']);
+        $this->assertStringContainsString('not been put forward', (string) session()->getFlashdata('ui_error'));
+        $this->seeInDatabase('pairs', ['id' => $pairB, 'status' => 'active']);
     }
 
     /** The list offers only pairs an exchange can move, and can be searched. */
@@ -2238,9 +2128,9 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     private function twoPairsToExchange(): array
     {
         // A recipient with a B donor, and a B recipient with an A donor. Both
-        // sides Active, as a pair being worked up is: the exchange offers
-        // nobody else, because a chain is an agreement between people who are
-        // on the programme now.
+        // sides Active, as a pair being worked up is: the chain offers nobody
+        // else, because a chain is an agreement between people who are on the
+        // programme now.
         $this->post('pairs/new', [
             'rMrn' => '8101', 'dMrn' => '8102',
             'rName' => 'Recipient A', 'rAge' => '44', 'rBloodType' => 'A', 'rStatus' => 'active',

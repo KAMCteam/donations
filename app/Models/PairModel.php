@@ -195,32 +195,6 @@ class PairModel extends Model
     }
 
     /** Builder pre-filtered to open pairs. */
-    /**
-     * Every donor an open pair of this recipient's holds, as MRNs.
-     *
-     * A recipient may hold more than one link, so this is a list rather than a
-     * row: the exchange has to know *all* of their own donors, because the one
-     * thing it must never offer them is somebody they already have.
-     *
-     * @return list<int>
-     */
-    public function openDonorMrnsFor(int|string $recipientMrn): array
-    {
-        return array_map(
-            static fn (array $row): int => (int) $row['donor_mrn'],
-            $this->openPairs()->select('donor_mrn')->where('recipient_mrn', $recipientMrn)->get()->getResultArray()
-        );
-    }
-
-    /** The mirror: every recipient an open pair of this donor's holds. */
-    public function openRecipientMrnsFor(int|string $donorMrn): array
-    {
-        return array_map(
-            static fn (array $row): int => (int) $row['recipient_mrn'],
-            $this->openPairs()->select('recipient_mrn')->where('donor_mrn', $donorMrn)->get()->getResultArray()
-        );
-    }
-
     private function openPairs(): \CodeIgniter\Database\BaseBuilder
     {
         return $this->db->table('pairs')->where('status !=', self::CLOSED);

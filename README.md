@@ -424,54 +424,21 @@ cannot sit inside another.
 
 #### Who the chain may offer
 
-Three rules besides the blood groups, on both of the builder's lists:
+One rule besides the blood groups and the consent above: **Active only.** On
+Hold, Declined and Transplanted are three ways of not being on the programme
+now, and a chain built on one of them is a chain somebody has to come back and
+unpick. The rule reads the *person's* own status, so it holds wherever they
+were found — in a pair, on the waiting list, or on the donors list. Worth
+knowing when a new donor seems to be missing: Add Donor starts on **On Hold**,
+and the exchange will not see them until somebody says Active.
 
-- **Never their own side.** A recipient is not offered the donor they came in
-  with, and a donor is not offered their own recipient. An exchange exists
-  *because* that donor cannot give to that recipient; offering them back is
-  offering the thing being worked around, and the blood groups do not always
-  catch it — two people can be compatible on paper and still be a pair somebody
-  is trying to break. A recipient holding more than one link has all of their
-  donors left off, not just the first.
-- **Active only.** On Hold, Declined and Transplanted are three ways of not
-  being on the programme now, and a chain built on one of them is a chain
-  somebody has to come back and unpick. The rule reads the *person's* own
-  status, so it holds wherever they were found — in a pair, on the waiting
-  list, or on the donors list. Worth knowing when a new donor seems to be
-  missing: Add Donor starts on **On Hold**, and the exchange will not see them
-  until somebody says Active.
-- **Nothing from a pair that is over.** A transplant that has happened cannot
-  be unmade and a closed pair holds nobody, so neither is on the table.
-
-What is *not* a rule any more: being put forward. **Pair Exchange** on a pair's
-own screen is the consent to *start* an exchange from that pair — it is the
-subject of one, and `exchangeablePairs()` still lists only pairs that pressed
-it. Being drawn into a chain already running is a different question, and
-asking for consent there made the screen unusable: a chain closes by finding
-somebody for whoever is left over, and the somebody is usually in a pair nobody
-thought to put forward. The chain could not reach them, so it could not close.
-`mayBeDrawnOn()` is the looser rule the candidate lists use, and saving closes
-what the chain broke on the same terms.
-
-**An empty list says which rule emptied it.** "No compatible recipients are
-free" is a screen arguing with somebody who can see the person on another page,
-so the message names the count and the reason instead — *Nobody to offer: 3
-compatible recipients are not Active*, or *… are in a pair that has not been
-put forward for exchange*. Blood groups are not named: they are the question
-itself, and nobody can change one. The other two are records somebody can go
-and change, which is the only reason a screen should mention a rule at all.
-
-What the lists refuse to show, the post refuses to take. A page left open while
-somebody was stood down would otherwise put them in a chain, and `assign()`
-says why in both cases — *is not Active*, or *is already their own donor,
-which is what this exchange is for changing*.
-
-The second rule has a consequence worth stating: saving an exchange no longer writes
-**Paired Exchange** onto the recipient. It used to, and that was already at
-odds with the rest of the platform — a person is not in a paired exchange,
-their case is — but it also left them holding a word that is not Active, so the
-registry's own saved exchanges would have been the one thing the next exchange
-could not offer. The pair carries the word; the people carry theirs.
+It is why saving an exchange no longer writes **Paired Exchange** onto the
+recipient. That was already at odds with the rest of the platform — a person is
+not in a paired exchange, their case is — and it would now leave them holding a
+word that is not Active, making the registry's own saved exchanges the one
+thing the next exchange could not offer. The rows written before it stopped are
+set back to Active by a migration, since no screen offers that word and nobody
+could take it off by hand.
 
 Paired Exchange has a blood-type row too, labelled **Recipient blood type**,
 and it asks a different question from the others': the Pairs List's matches a

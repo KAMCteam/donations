@@ -55,33 +55,15 @@ final class ExchangeDraft
     private const NOT_EXCHANGEABLE = [PairModel::CLOSED, 'completed'];
 
     /**
-     * Pair statuses an exchange can do nothing with, whoever asks.
+     * The one word a person has to be on to be offered to a chain.
      *
-     * The two above, and the transplant that has already happened: a chain
-     * takes a donor from one pair and gives them to another, and neither is
-     * possible once the operation is done.
-     */
-    private const FINISHED = [PairModel::CLOSED, 'completed', 'transplanted'];
-
-    /** Why the last choice list came back as short as it did. */
-    private string $lastReason = '';
-
-    /**
-     * The one word a person has to be on to be swapped.
-     *
-     * A chain is an agreement between people who are on the programme now. On
-     * Hold, Declined and Transplanted are three ways of not being, and a chain
-     * built on any of them is one somebody has to come back and unpick.
+     * On Hold, Declined and Transplanted are three ways of not being on the
+     * programme now, and a chain built on one of them is a chain somebody has
+     * to come back and unpick. It is the *person's* own status, so the rule
+     * holds wherever they were found — in a pair, on the waiting list, or on
+     * the donors list.
      */
     private const AVAILABLE = 'active';
-
-    /** Why this person cannot be put in a chain, or '' when they can. */
-    private static function notAvailable(array $person): string
-    {
-        return ($person['status'] ?? '') === self::AVAILABLE
-            ? ''
-            : $person['name'] . ' is not Active, so they cannot be put in a chain.';
-    }
 
     /** Who a donor of each blood group can give to. */
     private const CAN_GIVE_TO = [
@@ -131,28 +113,6 @@ final class ExchangeDraft
     public static function isExchangeableStatus(string $status): bool
     {
         return ! in_array($status, self::NOT_EXCHANGEABLE, true);
-    }
-
-    /**
-     * Whether a chain already under way may draw on this pair.
-     *
-     * Looser than `isExchangeable()`, and deliberately: **starting** an
-     * exchange from a pair needs that pair's own consent — Pair Exchange
-     * pressed on its screen — because the pair is the subject of it. Being
-     * *drawn into* one that is already running is a different question, and
-     * asking for consent there made the screen unusable: a chain closes by
-     * finding somebody for whoever is left over, and the somebody is usually
-     * in a pair nobody thought to put forward. The chain could not reach them,
-     * so it could not close.
-     *
-     * What it still refuses is a pair that is over. A transplant that has
-     * happened cannot be unmade, and a closed pair holds nobody.
-     *
-     * @param array<string, mixed> $pair
-     */
-    public static function mayBeDrawnOn(array $pair): bool
-    {
-        return ! in_array((string) $pair['status'], self::FINISHED, true);
     }
 
     /** Blood-group compatibility, donor to recipient. */
@@ -235,20 +195,6 @@ final class ExchangeDraft
                 . $recipient['name'] . ' (' . $recipient['blood_group'] . ').';
         }
 
-        // What the lists refuse to show, the post refuses to take: a page left
-        // open while somebody was stood down would otherwise put them in a
-        // chain, and their own donor is the one person an exchange is for
-        // getting away from.
-        $unavailable = self::notAvailable($recipient) ?: self::notAvailable($donor);
-
-        if ($unavailable !== '') {
-            return $unavailable;
-        }
-
-        if (in_array((int) $donor['mrn'], $this->pairs->openDonorMrnsFor((int) $recipient['mrn']), true)) {
-            return $donor['name'] . ' is already ' . $recipient['name'] . "'s own donor, which is what this exchange is for changing.";
-        }
-
         $donorMrnInt = (int) $donor['mrn'];
 
         foreach ($draft['assign'] as $withMrn => $theirDonor) {
@@ -259,8 +205,8 @@ final class ExchangeDraft
 
         $holding = $this->pairs->openPairForDonor($donorMrnInt);
 
-        if ($holding !== null && ! self::mayBeDrawnOn($holding)) {
-            return 'Pair #' . $holding['id'] . ' is finished, so nobody can be taken out of it.';
+        if ($holding !== null && ! self::isExchangeable($holding)) {
+            return 'Pair #' . $holding['id'] . ' has not been put forward for exchange.';
         }
 
         $this->remember($draft);
@@ -305,8 +251,8 @@ final class ExchangeDraft
         // Pulling a recipient out of their pair breaks it, the same way.
         $holding = $this->pairs->openPairForRecipient((int) $recipient['mrn']);
 
-        if ($holding !== null && ! self::mayBeDrawnOn($holding)) {
-            return 'Pair #' . $holding['id'] . ' is finished, so nobody can be taken out of it.';
+        if ($holding !== null && ! self::isExchangeable($holding)) {
+            return 'Pair #' . $holding['id'] . ' has not been put forward for exchange.';
         }
 
         if ($holding !== null && ! in_array((int) $holding['id'], $draft['broken'], true)) {
@@ -409,11 +355,9 @@ final class ExchangeDraft
                 continue;
             }
 
-            $donor['fate']                = $draft['fate'][(int) $donor['mrn']] ?? '';
+            $donor['fate']              = $draft['fate'][(int) $donor['mrn']] ?? '';
             $donor['choosableRecipients'] = $this->compatibleRecipients($organ, $draft, $donor);
-            // Why the list is as short as it is, for when it is empty.
-            $donor['noRecipientsBecause'] = $this->lastReason;
-            $spareDonors[]                = $donor;
+            $spareDonors[]              = $donor;
         }
 
         $undecided = array_values(array_filter($spareDonors, static fn (array $d): bool => $d['fate'] === ''));
@@ -432,16 +376,8 @@ final class ExchangeDraft
 
     /**
      * Compatible donors for one recipient, each labelled with where they came
-     * from, and never one this exchange has already spoken for.
-     *
-     * Two the list never holds, whatever their blood group says:
-     *
-     *   - **This recipient's own donor.** An exchange exists because the donor
-     *     they came in with cannot give to them — offering that donor back is
-     *     offering the thing being worked around.
-     *   - **Anybody not Active.** On Hold, Declined and Transplanted are three
-     *     ways of being unavailable, and a chain built on one of them is a
-     *     chain that has to be unpicked.
+     * from, and never one this exchange has already spoken for — nor anybody
+     * whose own status is not Active.
      *
      * @param array<string, mixed> $recipient
      *
@@ -449,14 +385,15 @@ final class ExchangeDraft
      */
     public function compatibleDonors(string $organ, array $draft, array $recipient): array
     {
-        $taken     = array_map('intval', array_values($draft['assign']));
-        $own       = $this->pairs->openDonorMrnsFor((int) $recipient['mrn']);
-        $out       = [];
-        $notActive = 0;
-        $heldBack  = 0;
+        $taken = array_map('intval', array_values($draft['assign']));
+        $out   = [];
 
         foreach ($this->donors->where('organ_code', $organ)->orderBy('name')->findAll() as $donor) {
-            if (in_array((int) $donor['mrn'], $taken, true) || in_array((int) $donor['mrn'], $own, true)) {
+            if (in_array((int) $donor['mrn'], $taken, true)) {
+                continue;
+            }
+
+            if (($donor['status'] ?? '') !== self::AVAILABLE) {
                 continue;
             }
 
@@ -464,23 +401,10 @@ final class ExchangeDraft
                 continue;
             }
 
-            // Counted, not only skipped: an empty list that does not say why
-            // is a screen arguing with somebody who can see the donor on
-            // another page.
-            if (($donor['status'] ?? '') !== self::AVAILABLE) {
-                $notActive++;
-
-                continue;
-            }
-
             $holding = $this->pairs->openPairForDonor((int) $donor['mrn']);
 
-            // In a pair that is over? Then there is nothing to take them out
-            // of. Consent belongs to starting an exchange, not to being drawn
-            // into one already running — see `mayBeDrawnOn()`.
-            if ($holding !== null && ! self::mayBeDrawnOn($holding)) {
-                $heldBack++;
-
+            // In a pair nobody offered? Then they are not this chain's to take.
+            if ($holding !== null && ! self::isExchangeable($holding)) {
                 continue;
             }
 
@@ -490,14 +414,12 @@ final class ExchangeDraft
             $out[] = $donor;
         }
 
-        $this->lastReason = self::reason('donor', $notActive, $heldBack);
-
         return $out;
     }
 
     /**
-     * Compatible recipients for one donor, the mirror of the above — their own
-     * recipient left off, and nobody who is not Active.
+     * Compatible recipients for one donor, the mirror of the above — Active
+     * only, as there.
      *
      * @param array<string, mixed> $donor
      *
@@ -505,13 +427,14 @@ final class ExchangeDraft
      */
     public function compatibleRecipients(string $organ, array $draft, array $donor): array
     {
-        $own       = $this->pairs->openRecipientMrnsFor((int) $donor['mrn']);
-        $out       = [];
-        $notActive = 0;
-        $heldBack  = 0;
+        $out = [];
 
         foreach ($this->recipients->where('organ_code', $organ)->orderBy('name')->findAll() as $recipient) {
-            if (isset($draft['assign'][(int) $recipient['mrn']]) || in_array((int) $recipient['mrn'], $own, true)) {
+            if (isset($draft['assign'][(int) $recipient['mrn']])) {
+                continue;
+            }
+
+            if (($recipient['status'] ?? '') !== self::AVAILABLE) {
                 continue;
             }
 
@@ -519,17 +442,9 @@ final class ExchangeDraft
                 continue;
             }
 
-            if (($recipient['status'] ?? '') !== self::AVAILABLE) {
-                $notActive++;
-
-                continue;
-            }
-
             $holding = $this->pairs->openPairForRecipient((int) $recipient['mrn']);
 
-            if ($holding !== null && ! self::mayBeDrawnOn($holding)) {
-                $heldBack++;
-
+            if ($holding !== null && ! self::isExchangeable($holding)) {
                 continue;
             }
 
@@ -539,37 +454,7 @@ final class ExchangeDraft
             $out[] = $recipient;
         }
 
-        $this->lastReason = self::reason('recipient', $notActive, $heldBack);
-
         return $out;
-    }
-
-    /**
-     * Why the last list came back as short as it did, in words somebody can
-     * act on.
-     *
-     * An empty dropdown saying only "nobody is free" is a screen arguing with
-     * somebody who can see the person on another page. Blood groups are not
-     * worth naming — they are the question itself — but the two rules that are
-     * about a *record* rather than about medicine are, because both are
-     * somebody's to change.
-     */
-    private static function reason(string $side, int $notActive, int $heldBack): string
-    {
-        $many = static fn (int $n): string => $n . ' compatible ' . $side . ($n === 1 ? ' is' : 's are');
-        $said = [];
-
-        if ($notActive > 0) {
-            $said[] = $many($notActive) . ' not Active';
-        }
-
-        if ($heldBack > 0) {
-            $said[] = $many($heldBack) . ' in a pair that is finished';
-        }
-
-        return $said === []
-            ? 'No compatible ' . $side . 's are free.'
-            : 'Nobody to offer: ' . implode(', and ', $said) . '.';
     }
 
     /** The draft as the session holds it, for the two lookups above. */
@@ -620,7 +505,7 @@ final class ExchangeDraft
         foreach ($draft['broken'] as $pairId) {
             $pair = $this->pairs->find($pairId);
 
-            if ($pair !== null && self::mayBeDrawnOn($pair)) {
+            if ($pair !== null && self::isExchangeable($pair)) {
                 $this->pairs->close($pairId, 'Paired exchange');
             }
         }
@@ -638,15 +523,13 @@ final class ExchangeDraft
                 'crossmatch_date' => $crossmatch === '' ? null : $crossmatch,
             ]);
 
-            // The pair hands its word to its two people, where it is one they
-            // can hold — the rule the pair's own card follows. Paired Exchange
-            // is not one of them: a person is not in a paired exchange, their
-            // case is. It also used to be written on the recipient, and a
-            // recipient left holding it would then be missing from the next
-            // exchange's lists, which ask for people who are Active.
+            // The two are one status from the moment the pair exists — where
+            // it is a word a person can hold. Paired Exchange is not one: a
+            // person is not in a paired exchange, their case is. It used to be
+            // written here, and a recipient left holding it is a recipient the
+            // lists above cannot offer, since they ask for Active.
             if (isset(UiStore::PERSON_STATUS_OPTIONS[$status])) {
                 $this->recipients->update((int) $recipientMrn, ['status' => $status]);
-                $this->donors->update((int) $donorMrn, ['status' => $status]);
             }
 
             // The donors list shows the relationship, so the donor carries it
@@ -855,17 +738,15 @@ final class ExchangeDraft
         $donorMrn = $draft['assign'][(int) $recipient['mrn']] ?? null;
         $donor    = $donorMrn === null ? null : $this->donors->find((int) $donorMrn);
         $fromPair = $inPlay['origin']['r' . (int) $recipient['mrn']] ?? null;
-        // Asked for only while the slot is open, so the reason beside it is
-        // this recipient's and not the last one the screen drew.
-        $choices  = $donor === null ? $this->compatibleDonors($draft['organ'], $draft, $recipient) : [];
 
         return [
             'recipient'        => $recipient,
             'donor'            => $donor,
             'fromPair'         => $fromPair,
             'wasTheirDonor'    => $fromPair === null ? null : $this->originalDonor($fromPair),
-            'choosableDonors'  => $choices,
-            'noDonorsBecause'  => $donor === null ? $this->lastReason : '',
+            'choosableDonors'  => $donor === null
+                ? $this->compatibleDonors($draft['organ'], $draft, $recipient)
+                : [],
         ];
     }
 

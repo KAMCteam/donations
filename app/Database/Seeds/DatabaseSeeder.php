@@ -115,8 +115,8 @@ class DatabaseSeeder extends Seeder
             ['Urinalysis', 'acceptable_abnormal'],
             ['Urine Culture', 'acceptable_abnormal'],
             ['Protein/Creatinine ratio', 'acceptable_abnormal'],
-            ['24h-urine for protein', 'acceptable_abnormal'],
-            ['Cr clearance', 'acceptable_abnormal'],
+            ['24h-urine for protein', 'acceptable_abnormal_na'],
+            ['Cr clearance', 'acceptable_abnormal_na'],
             ['Stool exam', 'acceptable_abnormal'],
             ['Stool cultures', 'positive_negative'],
         ],
@@ -219,10 +219,10 @@ class DatabaseSeeder extends Seeder
         'Urine/Stool' => [
             ['Urinalysis', 'acceptable_abnormal'],
             ['Urine Culture', 'acceptable_abnormal'],
-            ['24h-urine for protein', 'acceptable_abnormal'],
+            ['24h-urine for protein', 'acceptable_abnormal_na'],
             ['Microalbuminuria', 'acceptable_abnormal'],
             ['Protein/Creatinine ratio', 'acceptable_abnormal'],
-            ['Creatinine Clearance', 'acceptable_abnormal'],
+            ['Creatinine Clearance', 'acceptable_abnormal_na'],
             ['Stool Exam', 'acceptable_abnormal'],
         ],
         'Imaging' => [

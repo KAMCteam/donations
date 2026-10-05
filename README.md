@@ -441,6 +441,14 @@ Two rules besides the blood groups, on both of the builder's lists:
   missing: Add Donor starts on **On Hold**, and the exchange will not see them
   until somebody says Active.
 
+**An empty list says which rule emptied it.** "No compatible recipients are
+free" is a screen arguing with somebody who can see the person on another page,
+so the message names the count and the reason instead — *Nobody to offer: 3
+compatible recipients are not Active*, or *… are in a pair that has not been
+put forward for exchange*. Blood groups are not named: they are the question
+itself, and nobody can change one. The other two are records somebody can go
+and change, which is the only reason a screen should mention a rule at all.
+
 What the lists refuse to show, the post refuses to take. A page left open while
 somebody was stood down would otherwise put them in a chain, and `assign()`
 says why in both cases — *is not Active*, or *is already their own donor,

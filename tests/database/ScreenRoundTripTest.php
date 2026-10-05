@@ -1879,6 +1879,33 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
+     * An empty list says which rule emptied it.
+     *
+     * "No compatible recipients are free" is a screen arguing with somebody
+     * who can see the person on another page. Blood groups are the question
+     * itself and not worth naming; the two rules that are about a *record* —
+     * not Active, and in a pair nobody put forward — are, because both are
+     * somebody's to change.
+     */
+    public function testTheChainSaysWhyAListIsEmpty(): void
+    {
+        [$pairA] = $this->twoPairsToExchange();
+
+        // Donor A is group B, so Recipient B is the only person he could give
+        // to. Stand her down and his list has nobody left.
+        $this->post('recipients/8201', [
+            'section' => 'personal', 'name' => 'Recipient B', 'bloodType' => 'B', 'status' => 'on_hold',
+        ]);
+
+        $this->post('exchange/start/' . $pairA);
+
+        $html = $this->get('exchange/build')->getBody();
+
+        $this->assertStringContainsString('1 compatible recipient is not Active', $html);
+        $this->assertStringNotContainsString('No compatible recipients are free', $html);
+    }
+
+    /**
      * The review asks what each new pair is, and saving writes it.
      *
      * An exchange makes several pairs at once, and the screen that usually

@@ -54,6 +54,9 @@ final class ExchangeDraft
      */
     private const NOT_EXCHANGEABLE = [PairModel::CLOSED, 'completed'];
 
+    /** Why the last choice list came back as short as it did. */
+    private string $lastReason = '';
+
     /**
      * The one word a person has to be on to be swapped.
      *
@@ -375,9 +378,11 @@ final class ExchangeDraft
                 continue;
             }
 
-            $donor['fate']              = $draft['fate'][(int) $donor['mrn']] ?? '';
+            $donor['fate']                = $draft['fate'][(int) $donor['mrn']] ?? '';
             $donor['choosableRecipients'] = $this->compatibleRecipients($organ, $draft, $donor);
-            $spareDonors[]              = $donor;
+            // Why the list is as short as it is, for when it is empty.
+            $donor['noRecipientsBecause'] = $this->lastReason;
+            $spareDonors[]                = $donor;
         }
 
         $undecided = array_values(array_filter($spareDonors, static fn (array $d): bool => $d['fate'] === ''));
@@ -413,16 +418,14 @@ final class ExchangeDraft
      */
     public function compatibleDonors(string $organ, array $draft, array $recipient): array
     {
-        $taken = array_map('intval', array_values($draft['assign']));
-        $own   = $this->pairs->openDonorMrnsFor((int) $recipient['mrn']);
-        $out   = [];
+        $taken     = array_map('intval', array_values($draft['assign']));
+        $own       = $this->pairs->openDonorMrnsFor((int) $recipient['mrn']);
+        $out       = [];
+        $notActive = 0;
+        $heldBack  = 0;
 
         foreach ($this->donors->where('organ_code', $organ)->orderBy('name')->findAll() as $donor) {
             if (in_array((int) $donor['mrn'], $taken, true) || in_array((int) $donor['mrn'], $own, true)) {
-                continue;
-            }
-
-            if (($donor['status'] ?? '') !== self::AVAILABLE) {
                 continue;
             }
 
@@ -430,10 +433,21 @@ final class ExchangeDraft
                 continue;
             }
 
+            // Counted, not only skipped: an empty list that does not say why
+            // is a screen arguing with somebody who can see the donor on
+            // another page.
+            if (($donor['status'] ?? '') !== self::AVAILABLE) {
+                $notActive++;
+
+                continue;
+            }
+
             $holding = $this->pairs->openPairForDonor((int) $donor['mrn']);
 
             // In a pair nobody offered? Then they are not this chain's to take.
             if ($holding !== null && ! self::isExchangeable($holding)) {
+                $heldBack++;
+
                 continue;
             }
 
@@ -442,6 +456,8 @@ final class ExchangeDraft
                 : 'From pair #' . $holding['id'];
             $out[] = $donor;
         }
+
+        $this->lastReason = self::reason('donor', $notActive, $heldBack);
 
         return $out;
     }
@@ -456,15 +472,13 @@ final class ExchangeDraft
      */
     public function compatibleRecipients(string $organ, array $draft, array $donor): array
     {
-        $own = $this->pairs->openRecipientMrnsFor((int) $donor['mrn']);
-        $out = [];
+        $own       = $this->pairs->openRecipientMrnsFor((int) $donor['mrn']);
+        $out       = [];
+        $notActive = 0;
+        $heldBack  = 0;
 
         foreach ($this->recipients->where('organ_code', $organ)->orderBy('name')->findAll() as $recipient) {
             if (isset($draft['assign'][(int) $recipient['mrn']]) || in_array((int) $recipient['mrn'], $own, true)) {
-                continue;
-            }
-
-            if (($recipient['status'] ?? '') !== self::AVAILABLE) {
                 continue;
             }
 
@@ -472,9 +486,17 @@ final class ExchangeDraft
                 continue;
             }
 
+            if (($recipient['status'] ?? '') !== self::AVAILABLE) {
+                $notActive++;
+
+                continue;
+            }
+
             $holding = $this->pairs->openPairForRecipient((int) $recipient['mrn']);
 
             if ($holding !== null && ! self::isExchangeable($holding)) {
+                $heldBack++;
+
                 continue;
             }
 
@@ -484,7 +506,37 @@ final class ExchangeDraft
             $out[] = $recipient;
         }
 
+        $this->lastReason = self::reason('recipient', $notActive, $heldBack);
+
         return $out;
+    }
+
+    /**
+     * Why the last list came back as short as it did, in words somebody can
+     * act on.
+     *
+     * An empty dropdown saying only "nobody is free" is a screen arguing with
+     * somebody who can see the person on another page. Blood groups are not
+     * worth naming — they are the question itself — but the two rules that are
+     * about a *record* rather than about medicine are, because both are
+     * somebody's to change.
+     */
+    private static function reason(string $side, int $notActive, int $heldBack): string
+    {
+        $many = static fn (int $n): string => $n . ' compatible ' . $side . ($n === 1 ? ' is' : 's are');
+        $said = [];
+
+        if ($notActive > 0) {
+            $said[] = $many($notActive) . ' not Active';
+        }
+
+        if ($heldBack > 0) {
+            $said[] = $many($heldBack) . ' in a pair that has not been put forward for exchange';
+        }
+
+        return $said === []
+            ? 'No compatible ' . $side . 's are free.'
+            : 'Nobody to offer: ' . implode(', and ', $said) . '.';
     }
 
     /** The draft as the session holds it, for the two lookups above. */
@@ -770,15 +822,17 @@ final class ExchangeDraft
         $donorMrn = $draft['assign'][(int) $recipient['mrn']] ?? null;
         $donor    = $donorMrn === null ? null : $this->donors->find((int) $donorMrn);
         $fromPair = $inPlay['origin']['r' . (int) $recipient['mrn']] ?? null;
+        // Asked for only while the slot is open, so the reason beside it is
+        // this recipient's and not the last one the screen drew.
+        $choices  = $donor === null ? $this->compatibleDonors($draft['organ'], $draft, $recipient) : [];
 
         return [
             'recipient'        => $recipient,
             'donor'            => $donor,
             'fromPair'         => $fromPair,
             'wasTheirDonor'    => $fromPair === null ? null : $this->originalDonor($fromPair),
-            'choosableDonors'  => $donor === null
-                ? $this->compatibleDonors($draft['organ'], $draft, $recipient)
-                : [],
+            'choosableDonors'  => $choices,
+            'noDonorsBecause'  => $donor === null ? $this->lastReason : '',
         ];
     }
 

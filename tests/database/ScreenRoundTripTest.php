@@ -3314,6 +3314,87 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->dontSeeInDatabase('donors', ['mrn' => 8892, 'notes' => 'Should not land.']);
     }
 
+    /**
+     * A pair that comes apart leaves its donors on the recipient's record.
+     *
+     * The recipient goes back to the waiting list, and everything the pair
+     * worked out about each donor goes with them: the same Donors section,
+     * the same tabs, the same cards — archived, and read only.
+     */
+    public function testADissolvedPairsDonorsStayOnTheRecipientsRecord(): void
+    {
+        [$pairId] = $this->pairWith('8710', '8711', 'The Donor');
+        $this->addPairDonor($pairId, '8712', 'The Reserve');
+        [$first]  = $this->pairLinks(8710);
+
+        $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'dissolve']);
+
+        // Back on the waiting list, with nothing holding either of them.
+        $this->dontSeeInDatabase('pairs', ['recipient_mrn' => 8710, 'status !=' => 'closed']);
+
+        $html = str_replace('—', '&mdash;', $this->get('recipients/8710')->getBody());
+
+        $this->assertStringContainsString('>Donors</h2>', $html);
+        $this->assertStringContainsString('2 donors previously linked', $html);
+        $this->assertStringContainsString('The Donor', $html);
+        $this->assertStringContainsString('Donor &mdash; Required Lab Tests', $html);
+        // Every tab archived, and nothing on any of them to press.
+        $this->assertSame(2, substr_count($html, 'tab--delinked'));
+        $this->assertStringNotContainsString('/delink"', $html);
+        $this->assertStringNotContainsString('edit=pd' . $first . '-', $html);
+        $this->assertStringNotContainsString('id="add-donor"', $html);
+    }
+
+    /** And each of those tabs opens, from the record's own address. */
+    public function testTheRecipientsArchiveOpensEachDonorsTab(): void
+    {
+        [$pairId] = $this->pairWith('8720', '8721', 'The First');
+        $this->addPairDonor($pairId, '8722', 'The Second');
+        [$first]  = $this->pairLinks(8720);
+
+        $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'dissolve']);
+
+        $opened = $this->get('recipients/8720?donor=1')->getBody();
+        $this->assertStringContainsString('>The First</h3>', $opened);
+        $this->assertStringContainsString('recipients/8720?donor=2', $opened);
+
+        $second = $this->get('recipients/8720?donor=2')->getBody();
+        $this->assertStringContainsString('>The Second</h3>', $second);
+    }
+
+    /** While a pair holds them, though, the tabs stay on the pair. */
+    public function testAPairedRecipientsRecordLeavesTheTabsOnThePair(): void
+    {
+        [$pairId] = $this->pairWith('8730', '8731', 'The Donor');
+
+        $this->assertStringContainsString('donor-tabs', $this->get('pairs/' . $pairId)->getBody());
+        $this->assertStringNotContainsString('donor-tabs', $this->get('recipients/8730')->getBody());
+    }
+
+    /**
+     * The donor's half of it: where their pair went.
+     *
+     * Their own record does not carry the pair — the recipient's does — so it
+     * carries the sentence that says so, and the way across.
+     */
+    public function testADonorsRecordSaysWhoTheyWereLinkedWith(): void
+    {
+        [$pairId] = $this->pairWith('8740', '8741', 'The Donor');
+        [$first]  = $this->pairLinks(8740);
+
+        // Nothing to say while the pair is theirs.
+        $this->assertStringNotContainsString('previously linked with', $this->get('donors/8741')->getBody());
+
+        $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'dissolve']);
+
+        $html = $this->get('donors/8741')->getBody();
+        $this->assertStringContainsString('previously linked with', $html);
+        $this->assertStringContainsString(site_url('recipients/8740'), $html);
+        $this->assertStringContainsString('R 8740', $html);
+        // The section itself belongs to the recipient, not to them.
+        $this->assertStringNotContainsString('donor-tabs', $html);
+    }
+
     /** The status beside a tab's name is a word, and only a word. */
     public function testATabsStatusIsPlainText(): void
     {

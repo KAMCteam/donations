@@ -30,6 +30,8 @@ use App\Libraries\UiStore;
  * @var string                     $linkNewUrl
  * @var string                     $linkExistingUrl
  * @var list<array<string, mixed>> $linkCandidates
+ * @var array<string, mixed>       $archive     This recipient's donors, after the pair
+ * @var list<array<string, mixed>> $pastRecipients  Who this donor was linked with
  */
 // A save that bounced re-renders with what was typed rather than with what the
 // record held, so a rejected MRN does not cost the rest of the form. The keys
@@ -94,6 +96,22 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
     <?php if ($error !== ''): ?>
         <div class="form-error" role="alert"><?= esc($error) ?></div>
+    <?php endif; ?>
+
+    <?php // Where this donor has been. They are back on the register, so
+          // their own screen says nothing about the pair they were worked up
+          // for — and the workup, the crossmatch and the rest of it are kept
+          // on that recipient's record. This is the way across to it. ?>
+    <?php if ($mode === 'view' && ! $isRecipient && $pastRecipients !== []): ?>
+        <?php foreach ($pastRecipients as $past): ?>
+            <p class="tab-note">
+                This donor was previously linked with
+                <a href="<?= site_url('recipients/' . rawurlencode($past['id'])) ?>"><?= esc($past['name'] !== '' ? $past['name'] : $past['id']) ?></a><?= $past['name'] !== '' ? ' (' . esc($past['id']) . ')' : '' ?>,
+                whose record keeps the pair in full &mdash; this donor's tab on it, their workup and the dates.
+                Linked <?= esc(UiStore::isoToDMY($past['linkedOn'])) ?>, archived <?= esc(UiStore::isoToDMY($past['endedOn'])) ?>.
+                <?php if ($past['reason'] !== ''): ?><span class="tab-note-why"><?= esc($past['reason']) ?></span><?php endif; ?>
+            </p>
+        <?php endforeach; ?>
     <?php endif; ?>
 
     <form id="person-form" class="stack-5" method="post" action="<?= current_url() ?>">
@@ -434,6 +452,29 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             </div>
         <?php endif; ?>
     </form>
+
+    <?php // The pair's Donors section, kept on the recipient's own record
+          // once the pair is gone: same tabs, same cards, all archived. It
+          // sits after the form because each donor's cards are forms of
+          // their own, and forms do not nest. ?>
+    <?php if ($mode === 'view' && $isRecipient && $archive['tabs'] !== []): ?>
+        <?= view('ui/partials/donor_tabs', [
+            // No pair any more — the tabs hang off this record instead.
+            'pair'          => null,
+            'tabsArchiveOf' => (string) $person['id'],
+            'tabs'          => $archive['tabs'],
+            'openTab'       => $archive['open'],
+            'donor'         => $archive['donor'],
+            'v'             => $archive['v'],
+            'labTests'      => $archive['labTests'],
+            // Read-only throughout: an archived tab has no Edit on it, so
+            // there is no card for this screen to open.
+            'editing'       => '',
+            'offerable'     => [],
+            'mrps'          => $mrps,
+            'coordinators'  => $coordinators,
+        ], ['saveData' => false]) ?>
+    <?php endif; ?>
 
     <?php if ($mode === 'view' && $linked === null): ?>
         <dialog id="link-choice" class="dialog">

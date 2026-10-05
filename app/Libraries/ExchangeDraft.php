@@ -54,6 +54,15 @@ final class ExchangeDraft
      */
     private const NOT_EXCHANGEABLE = [PairModel::CLOSED, 'completed'];
 
+    /**
+     * Pair statuses an exchange can do nothing with, whoever asks.
+     *
+     * The two above, and the transplant that has already happened: a chain
+     * takes a donor from one pair and gives them to another, and neither is
+     * possible once the operation is done.
+     */
+    private const FINISHED = [PairModel::CLOSED, 'completed', 'transplanted'];
+
     /** Why the last choice list came back as short as it did. */
     private string $lastReason = '';
 
@@ -122,6 +131,28 @@ final class ExchangeDraft
     public static function isExchangeableStatus(string $status): bool
     {
         return ! in_array($status, self::NOT_EXCHANGEABLE, true);
+    }
+
+    /**
+     * Whether a chain already under way may draw on this pair.
+     *
+     * Looser than `isExchangeable()`, and deliberately: **starting** an
+     * exchange from a pair needs that pair's own consent — Pair Exchange
+     * pressed on its screen — because the pair is the subject of it. Being
+     * *drawn into* one that is already running is a different question, and
+     * asking for consent there made the screen unusable: a chain closes by
+     * finding somebody for whoever is left over, and the somebody is usually
+     * in a pair nobody thought to put forward. The chain could not reach them,
+     * so it could not close.
+     *
+     * What it still refuses is a pair that is over. A transplant that has
+     * happened cannot be unmade, and a closed pair holds nobody.
+     *
+     * @param array<string, mixed> $pair
+     */
+    public static function mayBeDrawnOn(array $pair): bool
+    {
+        return ! in_array((string) $pair['status'], self::FINISHED, true);
     }
 
     /** Blood-group compatibility, donor to recipient. */
@@ -228,8 +259,8 @@ final class ExchangeDraft
 
         $holding = $this->pairs->openPairForDonor($donorMrnInt);
 
-        if ($holding !== null && ! self::isExchangeable($holding)) {
-            return 'Pair #' . $holding['id'] . ' has not been put forward for exchange.';
+        if ($holding !== null && ! self::mayBeDrawnOn($holding)) {
+            return 'Pair #' . $holding['id'] . ' is finished, so nobody can be taken out of it.';
         }
 
         $this->remember($draft);
@@ -274,8 +305,8 @@ final class ExchangeDraft
         // Pulling a recipient out of their pair breaks it, the same way.
         $holding = $this->pairs->openPairForRecipient((int) $recipient['mrn']);
 
-        if ($holding !== null && ! self::isExchangeable($holding)) {
-            return 'Pair #' . $holding['id'] . ' has not been put forward for exchange.';
+        if ($holding !== null && ! self::mayBeDrawnOn($holding)) {
+            return 'Pair #' . $holding['id'] . ' is finished, so nobody can be taken out of it.';
         }
 
         if ($holding !== null && ! in_array((int) $holding['id'], $draft['broken'], true)) {
@@ -444,8 +475,10 @@ final class ExchangeDraft
 
             $holding = $this->pairs->openPairForDonor((int) $donor['mrn']);
 
-            // In a pair nobody offered? Then they are not this chain's to take.
-            if ($holding !== null && ! self::isExchangeable($holding)) {
+            // In a pair that is over? Then there is nothing to take them out
+            // of. Consent belongs to starting an exchange, not to being drawn
+            // into one already running — see `mayBeDrawnOn()`.
+            if ($holding !== null && ! self::mayBeDrawnOn($holding)) {
                 $heldBack++;
 
                 continue;
@@ -494,7 +527,7 @@ final class ExchangeDraft
 
             $holding = $this->pairs->openPairForRecipient((int) $recipient['mrn']);
 
-            if ($holding !== null && ! self::isExchangeable($holding)) {
+            if ($holding !== null && ! self::mayBeDrawnOn($holding)) {
                 $heldBack++;
 
                 continue;
@@ -531,7 +564,7 @@ final class ExchangeDraft
         }
 
         if ($heldBack > 0) {
-            $said[] = $many($heldBack) . ' in a pair that has not been put forward for exchange';
+            $said[] = $many($heldBack) . ' in a pair that is finished';
         }
 
         return $said === []
@@ -587,7 +620,7 @@ final class ExchangeDraft
         foreach ($draft['broken'] as $pairId) {
             $pair = $this->pairs->find($pairId);
 
-            if ($pair !== null && self::isExchangeable($pair)) {
+            if ($pair !== null && self::mayBeDrawnOn($pair)) {
                 $this->pairs->close($pairId, 'Paired exchange');
             }
         }

@@ -424,7 +424,7 @@ cannot sit inside another.
 
 #### Who the chain may offer
 
-Two rules besides the blood groups, on both of the builder's lists:
+Three rules besides the blood groups, on both of the builder's lists:
 
 - **Never their own side.** A recipient is not offered the donor they came in
   with, and a donor is not offered their own recipient. An exchange exists
@@ -440,6 +440,18 @@ Two rules besides the blood groups, on both of the builder's lists:
   list, or on the donors list. Worth knowing when a new donor seems to be
   missing: Add Donor starts on **On Hold**, and the exchange will not see them
   until somebody says Active.
+- **Nothing from a pair that is over.** A transplant that has happened cannot
+  be unmade and a closed pair holds nobody, so neither is on the table.
+
+What is *not* a rule any more: being put forward. **Pair Exchange** on a pair's
+own screen is the consent to *start* an exchange from that pair — it is the
+subject of one, and `exchangeablePairs()` still lists only pairs that pressed
+it. Being drawn into a chain already running is a different question, and
+asking for consent there made the screen unusable: a chain closes by finding
+somebody for whoever is left over, and the somebody is usually in a pair nobody
+thought to put forward. The chain could not reach them, so it could not close.
+`mayBeDrawnOn()` is the looser rule the candidate lists use, and saving closes
+what the chain broke on the same terms.
 
 **An empty list says which rule emptied it.** "No compatible recipients are
 free" is a screen arguing with somebody who can see the person on another page,

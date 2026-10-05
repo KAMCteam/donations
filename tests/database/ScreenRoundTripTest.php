@@ -2148,20 +2148,53 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringNotContainsString('Recipient C', $this->get('exchange')->getBody());
     }
 
-    /** Somebody in a pair nobody offered is not on the table to displace. */
-    public function testAPairNotOfferedCannotBeBrokenByAnExchange(): void
+    /**
+     * A chain already running draws on any pair that is not finished.
+     *
+     * Consent — Pair Exchange pressed on the pair's own screen — is what it
+     * takes to *start* an exchange from a pair, because the pair is the
+     * subject of it. Being drawn into one that is already under way is a
+     * different question: a chain closes by finding somebody for whoever is
+     * left over, and the somebody is usually in a pair nobody thought to put
+     * forward. Asking for consent there left chains that could not close.
+     */
+    public function testARunningChainDrawsOnPairsNobodyPutForward(): void
     {
         [$pairA, $pairB] = $this->twoPairsToExchange();
         $this->post('pairs/' . $pairB, ['section' => 'exchange', 'forExchange' => '0']);
 
         $this->post('exchange/start/' . $pairA);
 
-        $html = $this->get('exchange/build')->getBody();
-        $this->assertStringNotContainsString('Donor B', $html, 'pair B was withdrawn, so its donor is not on offer');
+        // Withdrawn, so not a pair anybody can start from...
+        $this->assertStringNotContainsString('Recipient B', $this->get('exchange')->getBody());
+        $this->post('exchange/start/' . $pairB)->assertRedirectTo(site_url('exchange'));
+
+        // ...and still somebody this chain can reach.
+        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
+        $this->assertStringContainsString('Donor B', $offered);
 
         $this->post('exchange/build', ['action' => 'chooseDonor', 'recipientMrn' => '8101', 'donorMrn' => '8202']);
-        $this->assertStringContainsString('not been put forward', (string) session()->getFlashdata('ui_error'));
-        $this->seeInDatabase('pairs', ['id' => $pairB, 'status' => 'active']);
+
+        // Taken: the chain now holds pair B's recipient, needing a donor.
+        $chain = $this->get('exchange/build')->getBody();
+        $this->assertStringContainsString('Recipient B', $chain);
+        $this->assertStringContainsString('Donor B', $chain);
+    }
+
+    /** What it cannot draw on is a pair that is over. */
+    public function testAFinishedPairCannotBeBrokenByAnExchange(): void
+    {
+        [$pairA, $pairB] = $this->twoPairsToExchange();
+        model(\App\Models\PairModel::class)->update($pairB, ['status' => 'transplanted']);
+
+        $this->post('exchange/start/' . $pairA);
+
+        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
+        $this->assertStringNotContainsString('Donor B', $offered, 'the transplant has happened');
+
+        $this->post('exchange/build', ['action' => 'chooseDonor', 'recipientMrn' => '8101', 'donorMrn' => '8202']);
+        $this->assertStringContainsString('is finished', (string) session()->getFlashdata('ui_error'));
+        $this->seeInDatabase('pairs', ['id' => $pairB, 'status' => 'transplanted']);
     }
 
     /** The list offers only pairs an exchange can move, and can be searched. */

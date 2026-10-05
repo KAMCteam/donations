@@ -1809,6 +1809,28 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringNotContainsString('Their Own Donor', $offered);
     }
 
+    /**
+     * The donor left without a recipient is offered the other pairs' people.
+     *
+     * Starting an exchange breaks the pair it starts from, so its donor is
+     * standing there needing somebody — and the somebody is a recipient held
+     * by another pair that was put forward. A recipient in a pair is the
+     * commonest answer there is, and the list has to carry them.
+     */
+    public function testTheSpareDonorIsOfferedARecipientFromAnotherPair(): void
+    {
+        [$pairA] = $this->twoPairsToExchange();
+
+        $this->post('exchange/start/' . $pairA);
+
+        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
+
+        // Donor A (B group) can give to Recipient B (B group), who is in the
+        // other pair — so she is on his list, named with the pair she is in.
+        $this->assertStringContainsString('Recipient B', $offered);
+        $this->assertStringContainsString('From pair #', $offered);
+    }
+
     /** And nobody who is not Active, wherever they were found. */
     public function testTheChainOffersOnlyActivePeople(): void
     {

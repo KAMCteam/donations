@@ -86,6 +86,24 @@ final class UiStore
     ];
 
     /**
+     * What the Pairs List's Status chips offer.
+     *
+     * The pair's six, less `closed` — because a closed pair is not on the list
+     * at all. Closing one is how a pair ends: the recipient goes back to the
+     * waiting list, the donors back to the register, and what happened is kept
+     * on the recipient's own record, with every donor it ever had. Leaving the
+     * row on the register as a greyed "Closed" line was the list saying there
+     * is a pair here when there is not one.
+     */
+    public const PAIRS_LIST_STATUS_OPTIONS = [
+        'on_hold'         => 'On Hold',
+        'active'          => 'Active',
+        'declined'        => 'Declined',
+        'transplanted'    => 'Transplanted',
+        'paired_exchange' => 'Paired Exchange',
+    ];
+
+    /**
      * What the Pairs List opens on when no filter is asked for.
      *
      * The register accumulates: every pair that was ever transplanted,
@@ -538,12 +556,26 @@ final class UiStore
         return array_map(fn (array $row): array => $this->donorToUi($row), $rows);
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * The pairs on this programme, for the register that lists them.
+     *
+     * Open ones only. A closed pair is a pair that is over — both sides are
+     * back on their own lists, and the Pairs List is the list of pairs there
+     * are, not of pairs there have been. What happened is not lost by leaving
+     * it out: it is on the recipient's record, which keeps every donor they
+     * were ever linked with. {@see findPair()} still opens a closed one by
+     * its own address, because history is readable, just not listed.
+     *
+     * @return list<array<string, mixed>>
+     */
     public function pairs(?string $organ = null): array
     {
-        $rows = $this->pairs->overview($organ ?? $this->organ());
+        $rows = array_filter(
+            $this->pairs->overview($organ ?? $this->organ()),
+            static fn (array $row): bool => $row['status'] !== PairModel::CLOSED
+        );
 
-        return array_map(fn (array $row): array => $this->pairToUi($row), $rows);
+        return array_map(fn (array $row): array => $this->pairToUi($row), array_values($rows));
     }
 
     /** @return list<array{id: string, name: string}> */
@@ -935,6 +967,12 @@ final class UiStore
         $pairs = array_values(array_filter(
             $this->pairs->overview($organ),
             static function (array $row) use ($query): bool {
+                // Open ones only, as on the Pairs List: the search takes
+                // somebody to a pair, and a closed one is not there to go to.
+                if ($row['status'] === PairModel::CLOSED) {
+                    return false;
+                }
+
                 foreach (['id', 'r_mrn', 'r_name', 'd_mrn', 'd_name'] as $field) {
                     if (stripos((string) $row[$field], $query) !== false) {
                         return true;

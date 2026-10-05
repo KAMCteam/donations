@@ -90,7 +90,7 @@ class ReportModel extends Model
         // per link. Aggregating also keeps one row per MRN whatever the joins
         // multiply.
         $builder
-            ->join('pairs p', $selfMrn . ' = t.mrn AND p.status <> ' . $this->db->escape('closed'), 'left')
+            ->join('pairs p', $selfMrn . ' = t.mrn AND ' . PairModel::openSql(), 'left')
             ->join($otherTable . ' o', 'o.mrn = ' . $otherMrn, 'left')
             ->select("GROUP_CONCAT(DISTINCT CONCAT(o.name, ' (', o.mrn, ')') ORDER BY o.name SEPARATOR ', ') AS related", false)
             ->select('MAX(p.crossmatch_date) AS crossmatch_date', false)

@@ -1286,10 +1286,7 @@ class Ui extends BaseController
         // everything; `all` is a filter the chips ask for by name.
         $statusFilter = (string) ($this->request->getGet('status') ?? UiStore::PAIRS_DEFAULT_STATUS);
 
-        // Closed is not among them: a closed pair is off the list altogether,
-        // so asking for one by address asks for nothing and the chips would
-        // all read as unpressed. `?status=closed` falls back to the default.
-        if ($statusFilter !== 'all' && ! isset(UiStore::PAIRS_LIST_STATUS_OPTIONS[$statusFilter])) {
+        if ($statusFilter !== 'all' && ! isset(UiStore::STATUS_OPTIONS[$statusFilter])) {
             $statusFilter = UiStore::PAIRS_DEFAULT_STATUS;
         }
 

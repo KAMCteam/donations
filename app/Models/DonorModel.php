@@ -37,7 +37,7 @@ class DonorModel extends Model
             ->select('d.*, op.label AS program_label, m.name AS mrp_name, c.name AS coordinator_name')
             ->select('(SELECT COUNT(*) FROM lab_results lr WHERE lr.person_mrn = d.mrn AND lr.person_type = \'donor\') AS labs_total', false)
             ->select('(SELECT COUNT(*) FROM lab_results lr WHERE lr.person_mrn = d.mrn AND lr.person_type = \'donor\' AND lr.status = \'completed\') AS labs_completed', false)
-            ->select('EXISTS (SELECT 1 FROM pairs p WHERE p.donor_mrn = d.mrn AND p.status <> \'closed\') AS is_matched', false)
+            ->select('EXISTS (SELECT 1 FROM pairs p WHERE p.donor_mrn = d.mrn AND ' . PairModel::openSql() . ') AS is_matched', false)
             ->join('organ_programs op', 'op.code = d.organ_code', 'left')
             ->join('mrp m', 'm.id = d.mrp_id', 'left')
             ->join('coordinators c', 'c.id = d.coordinator_id', 'left');
@@ -47,7 +47,7 @@ class DonorModel extends Model
         }
 
         if ($unmatchedOnly) {
-            $builder->where('NOT EXISTS (SELECT 1 FROM pairs p WHERE p.donor_mrn = d.mrn AND p.status <> \'closed\')', null, false);
+            $builder->where('NOT EXISTS (SELECT 1 FROM pairs p WHERE p.donor_mrn = d.mrn AND ' . PairModel::openSql() . ')', null, false);
         }
 
         if ($bloodGroup !== null && $bloodGroup !== '') {
@@ -74,7 +74,7 @@ class DonorModel extends Model
     {
         return $this->db->table('pairs')
             ->where('donor_mrn', $mrn)
-            ->where('status !=', 'closed')
+            ->where('ended_at', null)
             ->countAllResults() > 0;
     }
 }

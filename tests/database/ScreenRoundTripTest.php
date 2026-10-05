@@ -936,17 +936,15 @@ final class ScreenRoundTripTest extends CIUnitTestCase
      */
  
     /**
-     * `closed` is the one status with meaning beyond its label: it is what an
-     * open pair is defined against, so it still frees both sides.
-     */
-    /**
-     * Closing is the pair's to do, and the pair asks why.
+     * Calling a pair Closed describes it. It does not end it.
      *
-     * It is the one status that means something beyond its label — both sides
-     * go back on their lists — so it is the one the card asks a reason for,
-     * and the reason is kept only while the pair is closed.
+     * The word is the one the card asks a reason for, and the reason is kept
+     * only while the pair is on it. What it does **not** do is take the pair
+     * apart: both people are still in it, off their own lists, and the pair is
+     * still on the Pairs List under its own chip. Ending a pair is Delink's
+     * job, and nothing else's.
      */
-    public function testClosingAPairAsksWhyAndReleasesBothSides(): void
+    public function testCallingAPairClosedAsksWhyAndKeepsBothOnIt(): void
     {
         $this->post('pairs/new', [
             'rMrn' => '2009', 'dMrn' => '2010',
@@ -971,11 +969,19 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'closed_reason' => 'Crossmatch positive on repeat',
         ]);
 
+        // Nobody is released by it: the link stands, so neither of them is
+        // back on their own list.
         $store = new UiStore();
-        $this->assertCount(1, $store->waitingList());
-        $this->assertCount(1, $store->availableDonors());
+        $this->assertCount(0, $store->waitingList());
+        $this->assertCount(0, $store->availableDonors());
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'ended_at' => null]);
 
-        // Reopening it drops the reason: it is about an ending that is undone.
+        // And the pair is still on the register, under the chip for the word.
+        $this->assertStringContainsString('R', $this->get('pairs?status=closed')->getBody());
+        $this->assertStringContainsString('status=closed', $this->get('pairs')->getBody());
+
+        // Moving it off the word drops the reason: it is about a decision
+        // that has been changed.
         $this->post('pairs/' . $pairId, ['section' => 'pair', 'pairStatus' => 'active', 'closedReason' => '']);
         $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'active', 'closed_reason' => null]);
     }
@@ -3602,14 +3608,15 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
-     * A pair that is over comes off the register altogether.
+     * A pair that has been *ended* comes off the register altogether.
      *
      * Delinking the pair's donor, or taking the pair apart, puts the recipient
      * back on the waiting list and the donor back on theirs. The pair is not a
-     * pair any more, so the Pairs List does not hold a greyed "Closed" line
-     * saying there is one. What happened is on the recipient's own record.
+     * pair any more, so the Pairs List does not hold a greyed line saying
+     * there is one — not under All, and not under Closed either. What happened
+     * is on the recipient's own record.
      */
-    public function testAClosedPairComesOffThePairsList(): void
+    public function testAnEndedPairComesOffThePairsList(): void
     {
         [$pairId] = $this->pairWith('9310', '9311', 'The Donor');
         [$first]  = $this->pairLinks(9310);
@@ -3636,16 +3643,14 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         // And the one still going is untouched by any of it.
         $this->assertStringContainsString('Still Going', $this->get('pairs?status=all')->getBody());
 
-        // Closed is not one of the chips either.
-        $html = $this->get('pairs')->getBody();
-        $this->assertStringNotContainsString('status=closed', $html);
-        $this->assertStringNotContainsString('>Closed</a>', $html);
+        // The Closed chip is there — it is a word a pair can wear — and an
+        // ended pair is not under it either. Being ended is not a status.
+        $this->assertStringContainsString('status=closed', $this->get('pairs')->getBody());
 
-        // And asking for it by address falls back to what the screen opens
-        // on, which is the pairs there are rather than an empty table.
         $closed = $this->get('pairs?status=closed')->getBody();
-        $this->assertStringContainsString('Still Going', $closed);
+        $this->assertStringContainsString('No pairs found.', $closed);
         $this->assertStringNotContainsString('The Donor', $closed);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'closed']);
 
         // It is not deleted, though: its own address still opens it.
         $this->assertStringContainsString('Pair Profile', $this->get('pairs/' . $pairId)->getBody());

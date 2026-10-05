@@ -118,6 +118,9 @@ class MultiDonorDemoSeeder extends Seeder
                     'status'        => $status,
                     'relationship'  => $relationship,
                     'closed_reason' => $status === 'closed' ? 'Delinked from the pair.' : null,
+                    // The fixture's closed link is a delinked one, and what
+                    // makes a link ended is this column rather than the word.
+                    'ended_at'      => $status === 'closed' ? date('Y-m-d H:i:s') : null,
                     'created_at'    => date('Y-m-d H:i:s'),
                     'updated_at'    => date('Y-m-d H:i:s'),
                 ]);

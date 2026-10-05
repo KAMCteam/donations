@@ -1726,6 +1726,18 @@ class Ui extends BaseController
                 $this->store->updateDonor($donor['id'], ['relationship' => $post('relationship')]);
             }
 
+            // Four of the six words are the people's as much as the pair's, so
+            // the pair hands them on — and says it did, because a save that
+            // changes two other records should not do it quietly. The card
+            // itself warns before the save, under the field.
+            $given = $this->store->applyPairStatus($pair['id'], $post('pairStatus'));
+
+            if ($given !== []) {
+                $word = UiStore::STATUS_OPTIONS[$post('pairStatus')] ?? $post('pairStatus');
+
+                $back->with('ui_notice', 'Status set to ' . $word . ' on ' . implode(' and ', $given) . ' as well.');
+            }
+
             return $back;
         }
 

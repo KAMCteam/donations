@@ -2452,6 +2452,33 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         ]);
     }
 
+    /**
+     * A blank form's cards have their answers on them.
+     *
+     * The Add screens build their workup from the catalogue rather than from a
+     * record, and that path was handing the view a test with no answers: every
+     * card arrived with nothing to press and a comment box, which is what a
+     * free-text card looks like. The two paths build the same card, so they
+     * read the answers the same way.
+     */
+    public function testABlankFormsWorkupCardsCarryTheirAnswers(): void
+    {
+        foreach (['recipients/new', 'donors/new'] as $screen) {
+            $html = $this->get($screen)->getBody();
+
+            $this->assertStringContainsString('data-lab-status="not_done"', $html, $screen);
+            $this->assertStringContainsString('data-lab-status="pending"', $html, $screen);
+            // Blood group answers with the four groups, as it does on a record.
+            $this->assertStringContainsString('data-lab-status="blood_a"', $html, $screen);
+            $this->assertStringContainsString('data-lab-status="acceptable"', $html, $screen);
+        }
+
+        // Add Pair builds both sides from the same catalogue.
+        $pair = $this->get('pairs/new')->getBody();
+
+        $this->assertSame(2, substr_count($pair, 'data-lab-status="blood_a"'), 'the recipient and the donor');
+    }
+
     /** The Donors List narrows by blood type, the same way the waitlist does. */
     public function testTheDonorsListFiltersByBloodType(): void
     {

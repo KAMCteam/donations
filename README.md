@@ -549,6 +549,14 @@ those answer. Because an answer somebody invented cannot be a value in an
 ENUM, `lab_results.status` is a `VARCHAR(60)`; keys for invented answers are
 slugs prefixed `c_`, which is what keeps them from colliding with ours.
 
+The card renders the answers it is handed, so both paths that build one have
+to hand them over: `UiStore::labTests()` for a saved record, and
+`UiStore::defaultLabTests()` for the blank workup an Add screen starts from.
+The second was missed when the answers moved onto the test, and every card on
+Add Recipient, Add Donor and Add Pair came up with nothing to press and a
+comment box — which is what a free-text card looks like, so it read as a
+deliberate change rather than as the omission it was.
+
 ### Asking before taking something away
 
 Every delete asks first, and asks **over the screen it was pressed on**. It

@@ -1255,6 +1255,14 @@ final class UiStore
                 'group'      => (string) ($lab['parent_name'] ?? ''),
                 'resultType' => (string) ($lab['result_type'] ?? 'text'),
                 'custom'     => false,
+                // The same answers a saved record's cards carry, because they
+                // are the same cards: the card renders the answers it is
+                // given, and a blank form that handed it none showed every
+                // test with nothing to press.
+                'answers'    => self::answerSet(
+                    (string) ($lab['result_type'] ?? 'text'),
+                    $lab['answer_set'] ?? null
+                ),
                 'status'     => 'not_done',
                 'result'     => '',
                 'date'       => '',

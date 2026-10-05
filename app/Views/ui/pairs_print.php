@@ -24,10 +24,14 @@ use App\Libraries\UiStore;
  * @var string $printedOn   DD/MM/YYYY
  * @var list<array{id: string, name: string}> $mrps
  */
+// The Pairs List's own columns, in its own order and with its own words — the
+// sheet is that list on paper, so the two say the same things or the sheet is
+// a second list that drifts. Its last column is the delete button, which paper
+// has no use for; everything before it is here.
 $headers = [
     'Pair #', 'MRN', 'Name', 'Age', 'Type', 'Relationship',
     'Blood Group', 'MRP', 'Gender', 'Phone Number',
-    'Type Dialysis', 'Dialysis', 'Entry Date', 'Status', 'Date of Crossmatch', 'Note',
+    'Type Dialysis', 'First Dialysis', 'Entry Date', 'Status', 'Date of Crossmatch',
 ];
 
 $dash = '—';
@@ -96,7 +100,6 @@ $mrpName = static function (string $id) use ($mrps): string {
                 $recipient   = $row['recipient'];
                 $donor       = $row['donor'];
                 $statusLabel = UiStore::STATUS_OPTIONS[$pair['status']] ?? $pair['status'];
-                $note        = (string) ($pair['notes'] ?? '');
                 ?>
                 <tbody class="pair">
                     <tr>
@@ -114,8 +117,10 @@ $mrpName = static function (string $id) use ($mrps): string {
                         <td class="c-mono"><?= esc($orDash($recipient['firstDialysis'] ?? '')) ?></td>
                         <td class="c-mono"><?= esc($entry($recipient['dateRegistered'] ?? '')) ?></td>
                         <td rowspan="2" class="c-span"><?= esc($statusLabel) ?></td>
+                        <?php // No Note column, as the list has none: a pair's
+                              // note is on the pair's own screen and on its own
+                              // printed sheet, where there is room to read it. ?>
                         <td class="c-mono"><?= esc($orDash((string) ($pair['scheduledDate'] ?? ''))) ?></td>
-                        <td rowspan="2" class="c-span c-note"><?= esc($note !== '' ? $note : $dash) ?></td>
                     </tr>
                     <tr>
                         <td class="c-mono"><?= esc($donor['id'] ?? $dash) ?></td>

@@ -374,6 +374,15 @@ named on the letterhead so a printout says what it is a printout of. The two
 sheets are one view — `ui/register_print` — because they are the same document
 with different columns, and the caller hands the cells over already formatted.
 
+The Pairs List's own sheet, `ui/pairs_print`, is the same promise and has to be
+kept to it by hand: it is a second view of the same table, so a column renamed
+on the screen has to be renamed on the sheet, or the sheet quietly becomes a
+different list. Its columns are the list's, in the list's order and the list's
+words, less the one the list ends with — the delete button, which paper has no
+use for. It carried a **Note** column the list itself dropped; that is gone
+too. A pair's note is on the pair's own screen and on its own printed sheet,
+where there is room to read it rather than twelve characters of it.
+
 ### Paired Exchange: the status is the offer
 
 A pair reaches the Paired Exchange list two ways, and they are the same way.

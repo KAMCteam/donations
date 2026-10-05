@@ -45,7 +45,6 @@
 .c-role   { text-transform: capitalize; color: #475569; }
 .c-mono   { font-family: "Consolas", "DM Mono", ui-monospace, monospace; white-space: nowrap; }
 .c-span   { background-color: #f8fafc; }
-.c-note   { max-width: 12ch; }
 
 @media print {
   .sheet-table { max-width: none; }

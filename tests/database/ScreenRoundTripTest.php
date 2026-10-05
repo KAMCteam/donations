@@ -2326,6 +2326,18 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         // recipient and the donor they are matched to.
         $this->assertSame(2, substr_count($html, '<tbody class="pair">'));
 
+        // The sheet is the list on paper, so it carries the list's own
+        // columns, in its own words — and nothing the list does not have.
+        $screen = $this->get('pairs')->getBody();
+
+        foreach (['Type Dialysis', 'First Dialysis', 'Entry Date', 'Date of Crossmatch'] as $column) {
+            $this->assertStringContainsString('<th>' . $column . '</th>', $html, $column);
+            $this->assertStringContainsString('<th>' . $column . '</th>', $screen, $column);
+        }
+
+        $this->assertStringNotContainsString('<th>Note</th>', $html);
+        $this->assertStringNotContainsString('<th>Dialysis</th>', $html, 'the list says First Dialysis');
+
         // The filters narrow the sheet exactly as they narrow the table.
         $filtered = $this->get('pairs/print?bt=A')->getBody();
         $this->assertStringContainsString('Blood type A', $filtered);

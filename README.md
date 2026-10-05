@@ -23,6 +23,23 @@ php spark db:seed DatabaseSeeder           # programmes + lab catalogue
 php spark serve      # http://localhost:8080
 ```
 
+### After every pull
+
+```bash
+php spark migrate                          # whatever the new commits added
+```
+
+The screens are code; the check list, the programmes and the words a status
+can take are **data**. A commit that adds an answer to a test, or a word to a
+status, ships a migration that writes it — and until the migration is run, the
+copy on that machine still holds the old data and the screen still shows the
+old thing, with nothing to say it is behind. Migrations are safe to run again:
+each one runs once and the command does nothing when there is nothing new.
+
+`php spark db:seed DatabaseSeeder` is also safe to re-run, and is the other way
+to bring the lab catalogue up to date: it writes the check list as the code has
+it, over whatever the rows say.
+
 Set at least the following in `.env`:
 
 ```ini

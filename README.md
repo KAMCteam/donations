@@ -290,13 +290,35 @@ Raising one of the pair's own is standing this one down and setting that one
 Active, on their cards, which archives nobody.
 
 Taking the pair apart closes every link at once: the recipient goes back to the
-waiting list, every donor back to the register, and the pair's screen stays
-with every tab on it archived — which is where anybody asking what happened
-goes. Nothing is deleted.
+waiting list and every donor back to the register. Nothing is deleted.
 
 An archived tab carries its own dates and the reason it ended, so the tabs are
 the history: *Linked 30/09/2026, archived 04/10/2026. Delinked from the pair.* There is no separate archive, because `pairs` **is** the log —
 one row per link ever made, and closing one is how a link ends.
+
+#### The section outlives the pair
+
+A pair ending is not the record ending. The recipient is back on the waiting
+list, and the donors worked up for them are still theirs — so the **Donors**
+section goes with the recipient onto their own record: the same tabs, the same
+cards, the same workups, every tab archived and nothing on any of them to
+press. Opening that recipient from the waitlist later opens all of it, which is
+the point: their old labs and every donor ever considered for them are on the
+one screen they are reached by, not on a pair screen somebody has to know the
+number of.
+
+The section is on the record **only while no open pair holds them.** While one
+does, the pair's own screen is where the tabs are; two copies would be two
+places to read the same thing and one of them stale. Linking the recipient
+again moves the whole section back onto the new pair, the archived tabs
+included, because it is the same list either way — every donor they have ever
+had.
+
+The donor's half of it is a sentence rather than a section. Their record says
+*This donor was previously linked with …*, with the dates, the reason, and a
+link to that recipient — because the pair's record is kept on the recipient's
+screen, and the donor's job is to say where it went. It stays said if they are
+linked again: an ended link is history a new pair does not cancel.
 
 #### Where it is stored
 

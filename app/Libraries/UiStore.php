@@ -1374,6 +1374,39 @@ final class UiStore
         return $tabs;
     }
 
+    /**
+     * The recipients this donor has been linked with and is not any more.
+     *
+     * Read on the donor's own record, where it is the one thing their screen
+     * cannot otherwise say: their workup on that pair, and everything the pair
+     * recorded, is kept on the recipient's record, so the donor gets the
+     * sentence and the way across to it. Only closed links are here — an open
+     * one is already said, in "Linked: …" at the top of the screen.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function donorPastRecipients(int|string $donorMrn): array
+    {
+        $past = [];
+
+        foreach ($this->pairs->pairsForDonor($donorMrn) as $row) {
+            if ($row['status'] !== PairModel::CLOSED) {
+                continue;
+            }
+
+            $past[] = [
+                'id'        => (string) $row['recipient_mrn'],
+                'name'      => (string) ($row['recipient_name'] ?? ''),
+                'bloodType' => (string) ($row['recipient_blood_group'] ?? ''),
+                'linkedOn'  => substr((string) $row['created_at'], 0, 10),
+                'endedOn'   => substr((string) $row['updated_at'], 0, 10),
+                'reason'    => (string) ($row['closed_reason'] ?? ''),
+            ];
+        }
+
+        return $past;
+    }
+
     /** One of a pair's donors, by the id of the link. */
     public function pairDonor(int|string $recipientMrn, int|string $id): ?array
     {

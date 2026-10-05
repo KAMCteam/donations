@@ -378,6 +378,40 @@ class Ui extends BaseController
         $linked   = $isRecipient ? $this->store->findDonor($linkedId) : $this->store->findRecipient($linkedId);
         $links    = $person === null ? [] : $this->linkUrls($personType, $person['id']);
 
+        // A pair coming apart puts the recipient back on the waiting list and
+        // the donor back on the register. It does not undo what was done: the
+        // donors worked up for that recipient are still theirs, so the pair's
+        // Donors section follows them onto their own record — every tab
+        // archived, every workup still readable, nothing to press.
+        //
+        // Only while no open pair holds them. While one does, the pair's own
+        // screen is where the tabs are, and showing them twice would be two
+        // places to read the same thing and one of them stale.
+        $archive = ['tabs' => [], 'open' => 0, 'donor' => null, 'v' => [], 'labTests' => []];
+
+        if ($isRecipient && $person !== null && $linked === null && ($person['donors'] ?? []) !== []) {
+            $archive['tabs'] = $person['donors'];
+            $asked           = (int) ($this->request->getGet('donor') ?? 0);
+            $archive['open'] = $asked >= 1 && $asked <= count($archive['tabs']) ? $asked : 1;
+            $archive['donor'] = $this->store->findDonor($archive['tabs'][$archive['open'] - 1]['donorId']);
+
+            if ($archive['donor'] !== null) {
+                $archive['v']        = $this->donorValues($archive['donor']);
+                $archive['labTests'] = $archive['donor']['labTests'] ?? [];
+            }
+        }
+
+        // The donor's half of the same history. Theirs is a sentence and a
+        // link rather than a section: the pair's record — their workup on it,
+        // and everything else it held — is kept on the recipient's screen, so
+        // the donor's job is to say where it went.
+        //
+        // Said whether or not they are in a pair now. Only ended links are in
+        // it, and one of those is history a new pair does not cancel.
+        $pastRecipients = ! $isRecipient && $person !== null
+            ? $this->store->donorPastRecipients((string) $person['id'])
+            : [];
+
         $sections = array_keys(self::PERSON_SECTIONS);
 
         // Which pair this new donor is being entered for, if the screen was
@@ -418,6 +452,11 @@ class Ui extends BaseController
                 : '',
             'labTests'   => $labTests,
             'mrps'       => $mrps,
+            // The donors this recipient has had, for the section that stays
+            // on their record after the pair is gone.
+            'archive'    => $archive,
+            // The recipients this donor has had, for the note that says so.
+            'pastRecipients' => $pastRecipients,
             // The coordinator is chosen from the people registered as one,
             // not typed: Add MRP is where they are registered.
             'coordinators' => $this->store->coordinators(),

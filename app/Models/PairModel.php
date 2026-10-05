@@ -87,6 +87,26 @@ class PairModel extends Model
         return $this->openPairs()->where('donor_mrn', $mrn)->get()->getRowArray();
     }
 
+    /**
+     * Every recipient this donor has been linked with, in the order they were.
+     *
+     * The mirror of {@see self::pairsForRecipient()}, and closed ones included
+     * for the same reason: a donor who was worked up for somebody and is now
+     * back on the register came from somewhere, and their record says so.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function pairsForDonor(int|string $mrn): array
+    {
+        return $this->db->table('pairs p')
+            ->select('p.*, r.name AS recipient_name, r.blood_group AS recipient_blood_group')
+            ->join('recipients r', 'r.mrn = p.recipient_mrn', 'left')
+            ->where('p.donor_mrn', $mrn)
+            ->orderBy('p.id')
+            ->get()
+            ->getResultArray();
+    }
+
     /** The open pair joining these two specifically, or null. */
     public function openPairFor(int|string $recipientMrn, int|string $donorMrn): ?array
     {

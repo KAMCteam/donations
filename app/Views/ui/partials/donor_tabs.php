@@ -37,7 +37,17 @@ use App\Libraries\UiStore;
  * Tabs are links, not script: which one is open is in the address, so it can
  * be sent to somebody and comes back on a refresh.
  *
- * @var array<string, mixed>       $pair      The pair these donors belong to
+ * The section outlives the pair. When a pair comes apart the recipient goes
+ * back to the waiting list, and this same section goes with them onto their
+ * own record: every donor they were ever linked with, every tab archived,
+ * every workup still readable. A pair ending is not the record ending, so
+ * nothing here disappears — it only stops being editable. That is what
+ * `$tabsArchiveOf` says: whose record the section is being read on, when it
+ * is not being read on a pair.
+ *
+ * @var array<string, mixed>|null  $pair      The pair these donors belong to,
+ *                                            null on a recipient's own record
+ * @var string                     $tabsArchiveOf  That recipient's MRN, '' on a pair
  * @var list<array<string, mixed>> $tabs
  * @var int                        $openTab   1-based, or 0 for none
  * @var array<string, mixed>|null  $donor     The open tab's donor
@@ -48,8 +58,14 @@ use App\Libraries\UiStore;
  * @var list<array{id: string, name: string}> $mrps
  * @var list<array<string, mixed>> $coordinators Everyone registered as one
  */
-$pairUrl = site_url('pairs/' . rawurlencode($pair['id']));
-$tabUrl  = static fn (array $t): string => site_url('pairs/' . rawurlencode($pair['id'])) . '?donor=' . (int) $t['number'];
+// Read on a recipient's own record, the pair is gone: the tabs hang off the
+// record instead, and there is nothing to press on any of them.
+$isArchive = ($tabsArchiveOf ?? '') !== '';
+$home      = $isArchive
+    ? site_url('recipients/' . rawurlencode((string) $tabsArchiveOf))
+    : site_url('pairs/' . rawurlencode($pair['id']));
+$tabUrl    = static fn (array $t): string => $home . '?donor=' . (int) $t['number'];
+$offerable = $isArchive ? [] : ($offerable ?? []);
 
 // Plain words, in the same weight as everything else on the tab. A colour here
 // would be read as a warning, and "on hold" is not one.
@@ -64,16 +80,21 @@ foreach ($tabs as $t) {
 }
 
 ?>
-<div class="card card--pad donor-tabs">
+<div class="card card--pad donor-tabs<?= $isArchive ? ' donor-tabs--archive' : '' ?>">
     <div class="card-head">
         <div>
             <h2 class="card-title">Donors</h2>
-            <p class="lab-count"><?= esc(ui_plural(count($tabs), 'donor')) ?> on this pair</p>
+            <p class="lab-count"><?= esc(ui_plural(count($tabs), 'donor')) ?> <?= $isArchive ? 'previously linked' : 'on this pair' ?></p>
         </div>
-        <?php // With scripting off the link goes to Add Donor opened for this
-              // pair, which is the commoner of the two choices; ui.js opens
-              // the dialog below instead when it can. ?>
-        <a class="btn-primary" href="<?= site_url('donors/new') ?>?pair=<?= esc($pair['recipientId']) ?>" data-dialog="add-donor"><?= ui_icon('plus') ?>Add donor</a>
+        <?php // Nobody is added to a pair that is not there any more: on a
+              // recipient's own record this is the history, and the way to
+              // give them another donor is Link with Donor in the header. ?>
+        <?php if (! $isArchive): ?>
+            <?php // With scripting off the link goes to Add Donor opened for
+                  // this pair, which is the commoner of the two choices;
+                  // ui.js opens the dialog below instead when it can. ?>
+            <a class="btn-primary" href="<?= site_url('donors/new') ?>?pair=<?= esc($pair['recipientId']) ?>" data-dialog="add-donor"><?= ui_icon('plus') ?>Add donor</a>
+        <?php endif; ?>
     </div>
 
     <div class="tabs" role="tablist">
@@ -89,7 +110,11 @@ foreach ($tabs as $t) {
     </div>
 
     <?php if ($donor === null): ?>
-        <p class="tab-panel-empty">This pair has no donor yet. Use <strong>Add donor</strong> to put one on it.</p>
+        <?php if ($isArchive): ?>
+            <p class="tab-panel-empty">This donor's own record is no longer on the register, so there is nothing left to show on the tab.</p>
+        <?php else: ?>
+            <p class="tab-panel-empty">This pair has no donor yet. Use <strong>Add donor</strong> to put one on it.</p>
+        <?php endif; ?>
     <?php else: ?>
         <?php $tab = $tabs[$openTab - 1]; ?>
         <div class="tab-panel<?= $tab['archived'] ? ' tab-panel--delinked' : '' ?>" role="tabpanel">
@@ -97,7 +122,11 @@ foreach ($tabs as $t) {
                 <?php // Why nothing on it can be pressed, said once — with the
                       // dates, because an archived tab is the history. ?>
                 <p class="tab-note">
-                    This pair has finished with <?= esc($donor['name']) ?>, so the tab is shown as it was and cannot be changed.
+                    <?php if ($isArchive): ?>
+                        This recipient is back on the waiting list, so <?= esc($donor['name']) ?>'s tab is shown as it was and cannot be changed.
+                    <?php else: ?>
+                        This pair has finished with <?= esc($donor['name']) ?>, so the tab is shown as it was and cannot be changed.
+                    <?php endif; ?>
                     Linked <?= esc(UiStore::isoToDMY($tab['linkedOn'])) ?><?php if ($tab['endedOn'] !== ''): ?>, archived <?= esc(UiStore::isoToDMY($tab['endedOn'])) ?><?php endif; ?>.
                     <?php if ($tab['reason'] !== ''): ?><span class="tab-note-why"><?= esc($tab['reason']) ?></span><?php endif; ?>
                 </p>
@@ -178,7 +207,7 @@ foreach ($tabs as $t) {
                             : 'This pair has finished with ' . $donor['name'] . '. Their tab stays here, read-only, '
                                 . 'with the status they have now — and their own record is untouched, so they go '
                                 . 'back to the register and can be linked again from their own screen.',
-                        'action'  => $pairUrl . '/donors/' . rawurlencode((string) $tab['id']) . '/delink',
+                        'action'  => $home . '/donors/' . rawurlencode((string) $tab['id']) . '/delink',
                         'confirmVerb' => 'Delink donor',
                         'confirmIcon' => 'unlink',
                         'confirmChoices' => $delinkChoices,
@@ -197,7 +226,7 @@ foreach ($tabs as $t) {
                     'labTests' => $labTests,
                     'editing'  => $editing,
                     'viewUrl'  => $tabUrl($tab),
-                    'labUrl'   => $pairUrl . '/donors/' . rawurlencode($tab['id']) . '/labs',
+                    'labUrl'   => $home . '/donors/' . rawurlencode($tab['id']) . '/labs',
                     'mrps'     => $mrps,
                     'coordinators' => $coordinators,
                     'hasActive' => $hasActive,
@@ -207,6 +236,7 @@ foreach ($tabs as $t) {
     <?php endif; ?>
 </div>
 
+<?php if (! $isArchive): ?>
 <dialog id="add-donor" class="dialog">
     <div class="dialog-body">
         <form method="dialog" class="dialog-close-form">
@@ -215,9 +245,10 @@ foreach ($tabs as $t) {
         <?= view('ui/partials/pair_donor_choice', [
             'pair'      => $pair,
             'newUrl'    => site_url('donors/new') . '?pair=' . rawurlencode($pair['recipientId']),
-            'addUrl'    => $pairUrl . '/donors',
+            'addUrl'    => $home . '/donors',
             'offerable' => $offerable,
             'hasActive' => $hasActive,
         ], ['saveData' => false]) ?>
     </div>
 </dialog>
+<?php endif; ?>

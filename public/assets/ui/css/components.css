@@ -1864,6 +1864,17 @@
   background-color: var(--slate-50);
 }
 
+/* The reason a link was ended, in the words somebody typed. */
+.tab-note-why {
+  display: block;
+  margin-top: 0.15rem;
+  font-style: italic;
+}
+
+/* The same section on a recipient's own record, under the form it follows.
+   `.page` spaces nothing, so what comes after the form says so itself. */
+.donor-tabs--archive { margin-top: 1.25rem; }
+
 /* Grey, and nothing on it to press but the way out. */
 .tab-panel--delinked .tab-panel-name,
 .tab-panel--delinked .tab-value { color: var(--slate-500); }

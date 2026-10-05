@@ -3596,9 +3596,59 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         // An empty table says so in one sentence, whatever emptied it. The
         // chips sit above it and are the way back.
-        $none = $this->get('pairs?status=closed')->getBody();
+        $none = $this->get('pairs?status=declined')->getBody();
         $this->assertStringContainsString('No pairs found.', $none);
         $this->assertStringNotContainsString('Show all pairs', $none);
+    }
+
+    /**
+     * A pair that is over comes off the register altogether.
+     *
+     * Delinking the pair's donor, or taking the pair apart, puts the recipient
+     * back on the waiting list and the donor back on theirs. The pair is not a
+     * pair any more, so the Pairs List does not hold a greyed "Closed" line
+     * saying there is one. What happened is on the recipient's own record.
+     */
+    public function testAClosedPairComesOffThePairsList(): void
+    {
+        [$pairId] = $this->pairWith('9310', '9311', 'The Donor');
+        [$first]  = $this->pairLinks(9310);
+        // A second pair, left alone, so the list has something to show when
+        // the first one goes.
+        $this->pairWith('9320', '9321', 'Still Going');
+
+        $this->assertStringContainsString('The Donor', $this->get('pairs?status=all')->getBody());
+
+        $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'dissolve']);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'status' => 'closed']);
+
+        // Where it went: the recipient's own record keeps the donor.
+        $this->assertStringContainsString('The Donor', $this->get('recipients/9310')->getBody());
+
+        // Off every view of the list, All included, and off the sheet it
+        // prints — and off the search that leads to it. Read by the donor's
+        // name: the recipient's is in the notice the dissolve left, which is
+        // the message and not the table.
+        foreach (['pairs', 'pairs?status=all', 'pairs/print?status=all', 'pairs?status=all&q=9310'] as $screen) {
+            $this->assertStringNotContainsString('The Donor', $this->get($screen)->getBody(), $screen . ' is clear of it');
+        }
+
+        // And the one still going is untouched by any of it.
+        $this->assertStringContainsString('Still Going', $this->get('pairs?status=all')->getBody());
+
+        // Closed is not one of the chips either.
+        $html = $this->get('pairs')->getBody();
+        $this->assertStringNotContainsString('status=closed', $html);
+        $this->assertStringNotContainsString('>Closed</a>', $html);
+
+        // And asking for it by address falls back to what the screen opens
+        // on, which is the pairs there are rather than an empty table.
+        $closed = $this->get('pairs?status=closed')->getBody();
+        $this->assertStringContainsString('Still Going', $closed);
+        $this->assertStringNotContainsString('The Donor', $closed);
+
+        // It is not deleted, though: its own address still opens it.
+        $this->assertStringContainsString('Pair Profile', $this->get('pairs/' . $pairId)->getBody());
     }
 
     // ---- Lab workup ------------------------------------------------------

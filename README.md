@@ -292,6 +292,15 @@ Active, on their cards, which archives nobody.
 Taking the pair apart closes every link at once: the recipient goes back to the
 waiting list and every donor back to the register. Nothing is deleted.
 
+A closed pair also comes **off the Pairs List**, altogether — not as a greyed
+"Closed" row, which was the register saying there is a pair here when there is
+not one. The list is of the pairs there are. `Closed` is not one of the Status
+chips either, and `?status=closed` falls back to what the screen opens on. It
+is off the printed sheet and off the search for the same reason, and the
+dashboard's **Linked Pairs** counts the same set. None of it is deletion: the
+pair's own address still opens it, and the recipient's record keeps every donor
+it ever had.
+
 An archived tab carries its own dates and the reason it ended, so the tabs are
 the history: *Linked 30/09/2026, archived 04/10/2026. Delinked from the pair.* There is no separate archive, because `pairs` **is** the log —
 one row per link ever made, and closing one is how a link ends.

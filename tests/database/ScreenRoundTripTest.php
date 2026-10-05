@@ -1849,11 +1849,12 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
-     * The chain offers only people who are Active, wherever they were found.
+     * The four lists the chain draws on, and the condition on each.
      *
-     * On Hold, Declined and Transplanted are three ways of not being on the
-     * programme now, and a chain built on one of them is a chain somebody has
-     * to come back and unpick.
+     * A donor from a pair whose status is Paired Exchange, and Active there,
+     * which is what tells the pair's own donor from its reserves. A donor from
+     * the donors list who is Active. A recipient from a pair whose status is
+     * Paired Exchange. A recipient from the waiting list who is Active.
      */
     public function testTheChainOffersOnlyActivePeople(): void
     {
@@ -1888,9 +1889,20 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('Free Recipient', $offered);
         $this->assertStringNotContainsString('Held Recipient', $offered);
 
-        // And from a pair: both sides of pair B are Active and on offer.
+        // And from a pair whose status is Paired Exchange: its own donor,
+        // and its recipient.
         $this->assertStringContainsString('Donor B', $offered);
         $this->assertStringContainsString('Recipient B', $offered);
+
+        // A reserve on that pair is not the pair's to give away, so the chain
+        // is not offered them.
+        $this->post('donors/new?pair=8201', [
+            'pair' => '8201', 'mrn' => '8307', 'name' => 'Reserve Donor',
+            'age' => '30', 'bloodType' => 'A', 'donorStatus' => 'On Hold',
+        ]);
+
+        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
+        $this->assertStringNotContainsString('Reserve Donor', $offered);
     }
 
     /** Every name the builder's choice lists offer, as one string. */
@@ -2033,8 +2045,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->post('exchange/build', ['action' => 'discard'])->assertRedirectTo(site_url('exchange'));
 
         // Nothing was ever written, so both pairs stand exactly as they were.
-        $this->seeInDatabase('pairs', ['id' => $pairA, 'status' => 'active']);
-        $this->seeInDatabase('pairs', ['id' => $pairB, 'status' => 'active']);
+        $this->seeInDatabase('pairs', ['id' => $pairA, 'status' => 'paired_exchange']);
+        $this->seeInDatabase('pairs', ['id' => $pairB, 'status' => 'paired_exchange']);
         $this->assertSame(2, $this->db->table('pairs')->countAllResults());
     }
 
@@ -2071,20 +2083,28 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringNotContainsString('Recipient C', $this->get('exchange')->getBody());
     }
 
-    /** Somebody in a pair nobody offered is not on the table to displace. */
+    /** Somebody in a pair that is not a paired exchange is not on the table. */
     public function testAPairNotOfferedCannotBeBrokenByAnExchange(): void
     {
-        [$pairA, $pairB] = $this->twoPairsToExchange();
-        $this->post('pairs/' . $pairB, ['section' => 'exchange', 'forExchange' => '0']);
+        [$pairA] = $this->twoPairsToExchange();
+
+        // An ordinary pair: its status is Active, so it is on nobody's
+        // exchange list — and its donor could otherwise give to Recipient A.
+        $this->post('pairs/new', [
+            'rMrn' => '8501', 'dMrn' => '8502',
+            'rName' => 'Recipient D', 'rAge' => '44', 'rBloodType' => 'AB', 'rStatus' => 'active',
+            'dName' => 'Donor D', 'dAge' => '33', 'dBloodType' => 'O', 'dStatus' => 'Active',
+        ]);
+        $pairD = (int) $this->db->table('pairs')->where('recipient_mrn', 8501)->get()->getRowArray()['id'];
 
         $this->post('exchange/start/' . $pairA);
 
-        $html = $this->get('exchange/build')->getBody();
-        $this->assertStringNotContainsString('Donor B', $html, 'pair B was withdrawn, so its donor is not on offer');
+        $offered = $this->exchangeChoices($this->get('exchange/build')->getBody());
+        $this->assertStringNotContainsString('Donor D', $offered, 'their pair is not a paired exchange');
 
-        $this->post('exchange/build', ['action' => 'chooseDonor', 'recipientMrn' => '8101', 'donorMrn' => '8202']);
+        $this->post('exchange/build', ['action' => 'chooseDonor', 'recipientMrn' => '8101', 'donorMrn' => '8502']);
         $this->assertStringContainsString('not been put forward', (string) session()->getFlashdata('ui_error'));
-        $this->seeInDatabase('pairs', ['id' => $pairB, 'status' => 'active']);
+        $this->seeInDatabase('pairs', ['id' => $pairD, 'status' => 'active']);
     }
 
     /** The list offers only pairs an exchange can move, and can be searched. */
@@ -2144,8 +2164,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         $ids = array_column($this->db->table('pairs')->orderBy('id')->get()->getResultArray(), 'id');
 
+        // Their status says it, which is what puts them on the exchange list
+        // and what the chain's own lists look for.
         foreach ($ids as $id) {
-            $this->post('pairs/' . $id, ['section' => 'exchange', 'forExchange' => '1']);
+            $this->post('pairs/' . $id, ['section' => 'pair', 'pairStatus' => 'paired_exchange']);
         }
 
         return [(int) $ids[0], (int) $ids[1]];

@@ -424,13 +424,25 @@ cannot sit inside another.
 
 #### Who the chain may offer
 
-One rule besides the blood groups and the consent above: **Active only.** On
-Hold, Declined and Transplanted are three ways of not being on the programme
-now, and a chain built on one of them is a chain somebody has to come back and
-unpick. The rule reads the *person's* own status, so it holds wherever they
-were found — in a pair, on the waiting list, or on the donors list. Worth
-knowing when a new donor seems to be missing: Add Donor starts on **On Hold**,
-and the exchange will not see them until somebody says Active.
+Four lists, and a condition on each. Blood group decides the rest: a donor has
+to be able to give to the recipient they are offered to.
+
+| Offered to | From | On condition |
+| --- | --- | --- |
+| A recipient needing a donor | a pair whose **status is Paired Exchange** | the donor's own status is **Active** — which is what tells the pair's own donor from its reserves |
+| A recipient needing a donor | the **Donors List** | their own status is **Active** |
+| A donor needing a recipient | a pair whose **status is Paired Exchange** | — a pair has one recipient, and they are it whatever word they are on |
+| A donor needing a recipient | the **waiting list** | their own status is **Active** |
+
+Two things follow from reading them closely. A pair reaches these lists by its
+**status**, not by the Pair Exchange button: the button puts a pair on the
+exchange list and lets one be started from it, and setting the status to Paired
+Exchange does both of those as well *and* makes its two people reachable by a
+chain. And a reserve donor on an exchange pair is never offered — the pair is
+going ahead with one donor, and the others are not its to give away.
+
+Worth knowing when a new donor seems to be missing: Add Donor starts on **On
+Hold**, and the exchange will not see them until somebody says Active.
 
 It is why saving an exchange no longer writes **Paired Exchange** onto the
 recipient. That was already at odds with the rest of the platform — a person is

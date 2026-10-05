@@ -55,13 +55,17 @@ final class ExchangeDraft
     private const NOT_EXCHANGEABLE = [PairModel::CLOSED, 'completed'];
 
     /**
-     * The one word a person has to be on to be offered to a chain.
+     * The word a person has to be on to be offered to a chain.
      *
-     * On Hold, Declined and Transplanted are three ways of not being on the
-     * programme now, and a chain built on one of them is a chain somebody has
-     * to come back and unpick. It is the *person's* own status, so the rule
-     * holds wherever they were found — in a pair, on the waiting list, or on
-     * the donors list.
+     * On the register it means available: a donor On Hold or Declined is not
+     * somebody a chain can be built on, and nor is a recipient the waiting
+     * list is holding. In a pair it means something narrower and just as
+     * necessary — a pair can be worked up against several donors and only one
+     * of them is the donor it is going ahead with, so Active is what tells
+     * that one from the reserves.
+     *
+     * A recipient in a pair is not asked: there is only one of them, and they
+     * are their pair's recipient whatever word they are on.
      */
     private const AVAILABLE = 'active';
 
@@ -376,8 +380,19 @@ final class ExchangeDraft
 
     /**
      * Compatible donors for one recipient, each labelled with where they came
-     * from, and never one this exchange has already spoken for — nor anybody
-     * whose own status is not Active.
+     * from, and never one this exchange has already spoken for.
+     *
+     * Two places a donor can come from, and each has its own condition:
+     *
+     *   - **A pair whose status is Paired Exchange**, where they are the
+     *     donor the pair is going ahead with — their own status is Active. A
+     *     pair can hold several donors and only one of them is its donor; the
+     *     reserves are not the pair's to give away.
+     *   - **The donors list**, where they are in no pair at all and their own
+     *     status is Active.
+     *
+     * Blood group decides the rest: the donor has to be able to give to this
+     * recipient.
      *
      * @param array<string, mixed> $recipient
      *
@@ -393,6 +408,8 @@ final class ExchangeDraft
                 continue;
             }
 
+            // Active either way: on the register it means available, and in a
+            // pair it means they are the donor that pair is going ahead with.
             if (($donor['status'] ?? '') !== self::AVAILABLE) {
                 continue;
             }
@@ -403,8 +420,9 @@ final class ExchangeDraft
 
             $holding = $this->pairs->openPairForDonor((int) $donor['mrn']);
 
-            // In a pair nobody offered? Then they are not this chain's to take.
-            if ($holding !== null && ! self::isExchangeable($holding)) {
+            // In a pair that is not itself a paired exchange? Then they are
+            // not this chain's to take.
+            if ($holding !== null && (string) $holding['status'] !== PairModel::EXCHANGE) {
                 continue;
             }
 
@@ -418,8 +436,13 @@ final class ExchangeDraft
     }
 
     /**
-     * Compatible recipients for one donor, the mirror of the above — Active
-     * only, as there.
+     * Compatible recipients for one donor, the mirror of the above:
+     *
+     *   - **A pair whose status is Paired Exchange.** Their own status is not
+     *     asked after — a recipient is their pair's recipient whatever word
+     *     they are on, there being only one of them.
+     *   - **The waiting list**, where they are in no pair and their own status
+     *     is Active.
      *
      * @param array<string, mixed> $donor
      *
@@ -434,17 +457,19 @@ final class ExchangeDraft
                 continue;
             }
 
-            if (($recipient['status'] ?? '') !== self::AVAILABLE) {
-                continue;
-            }
-
             if (! self::canGive((string) $donor['blood_group'], (string) $recipient['blood_group'])) {
                 continue;
             }
 
             $holding = $this->pairs->openPairForRecipient((int) $recipient['mrn']);
 
-            if ($holding !== null && ! self::isExchangeable($holding)) {
+            if ($holding === null) {
+                // On the waiting list, so the word they are on is the whole
+                // answer to whether they are waiting.
+                if (($recipient['status'] ?? '') !== self::AVAILABLE) {
+                    continue;
+                }
+            } elseif ((string) $holding['status'] !== PairModel::EXCHANGE) {
                 continue;
             }
 

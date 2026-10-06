@@ -131,7 +131,9 @@ $groupBar = static function (array $p): void {
     <?php
 };
 ?>
-<<?= $box ?> class="card card--pad<?= $foldable ? ' card-fold' : '' ?>" data-lab-section<?= $foldable && $open ? ' open' : '' ?>>
+<?php // Named, so Edit and Cancel can send the browser straight back to it
+      // rather than to the top of a seventy-card screen. ?>
+<<?= $box ?> class="card card--pad<?= $foldable ? ' card-fold' : '' ?>"<?= $section === null ? '' : ' id="card-' . esc($section, 'attr') . '"' ?> data-lab-section<?= $foldable && $open ? ' open' : '' ?>>
     <<?= $head ?> class="card-head<?= $foldable ? ' card-fold-head' : '' ?>">
         <?php if ($foldable): ?>
             <span class="card-fold-mark" aria-hidden="true"><?= ui_icon('chevron') ?></span>
@@ -149,7 +151,9 @@ $groupBar = static function (array $p): void {
             </div>
         </div>
         <?php if (! $editing && $editUrl !== null): ?>
-            <a class="btn-edit" href="<?= esc($editUrl) ?>"><?= ui_icon('edit') ?>Edit</a>
+            <?php // To this card, so pressing Edit on a workup two screens
+                  // down does not send somebody back to the top of the page. ?>
+            <a class="btn-edit" href="<?= esc($editUrl . ($section === null ? '' : '#card-' . $section)) ?>"><?= ui_icon('edit') ?>Edit</a>
         <?php endif; ?>
         <?php // Shut, the card is one line — so the line carries the groups:
               // the names and how far each has got, which is what somebody
@@ -237,6 +241,9 @@ $groupBar = static function (array $p): void {
             $nameId   = $field . '-' . $i . '-name';
             // A test the record added is anchored, so its own Edit can bring
             // the page back to this card rather than to the top of the workup.
+            // Every card is named, not only the ones a record added: a card
+            // that cannot be linked to cannot be pointed at, and "Edit
+            // results" has been linking to its own card from the start.
             $cardId   = 'lab-' . $test['id'];
             // What the card calls this answer and what colour it is — its own
             // word for it when somebody wrote one, ours otherwise.
@@ -261,7 +268,7 @@ $groupBar = static function (array $p): void {
                 $cardTone = ' lab-card--toned lab-card--' . substr($tone($test['status']), strlen('tone-'));
             }
             ?>
-            <div class="lab-card<?= $animated ? ' lab-card--animated' : '' ?><?= $freeText ? ' lab-card--free' : '' ?><?= $cardTone ?> status-<?= esc($test['status']) ?>"<?= $custom ? ' id="' . esc($cardId) . '"' : '' ?> data-idx="<?= $i ?>">
+            <div class="lab-card<?= $animated ? ' lab-card--animated' : '' ?><?= $freeText ? ' lab-card--free' : '' ?><?= $cardTone ?> status-<?= esc($test['status']) ?>" id="<?= esc($cardId) ?>" data-idx="<?= $i ?>">
                 <input type="hidden" name="<?= $base ?>[id]" value="<?= esc($test['id']) ?>">
                 <?php if (! $custom): ?>
                     <input type="hidden" name="<?= $base ?>[name]" value="<?= esc($test['name']) ?>">
@@ -381,7 +388,7 @@ $groupBar = static function (array $p): void {
 
     <?php if ($editing && $viewUrl !== null): ?>
         <div class="card-actions">
-            <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+            <a class="btn-outline" href="<?= esc($viewUrl . ($section === null ? '' : '#card-' . $section)) ?>">Cancel</a>
             <button type="submit" class="btn-save">Save</button>
         </div>
     <?php endif; ?>

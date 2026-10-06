@@ -1507,7 +1507,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $html = $this->get('pairs/' . $pairId)->getBody();
 
         // Both of them — the recipient's and the open donor tab's.
-        $this->assertSame(2, substr_count($html, '<details class="card card--pad card-fold" data-lab-section>'));
+        $this->assertSame(2, preg_match_all('/<details class="card card--pad card-fold"[^>]*data-lab-section>/', $html));
         // Shut, and still saying where the workup stands.
         $this->assertStringContainsString('of 74 completed', $html);
 
@@ -1747,7 +1747,8 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             $html = $this->get($screen)->getBody();
 
             // Open when the screen arrives, every one of them.
-            $this->assertStringContainsString('<details class="card card--pad card-fold" open>', $html, $screen);
+            // Named, so Edit and Cancel can link back to the card itself.
+            $this->assertMatchesRegularExpression('/<details class="card card--pad card-fold" id="card-[^"]+" open>/', $html, $screen);
             $this->assertStringNotContainsString('class="card card--pad card-fold">', $html, $screen);
             $this->assertStringContainsString('class="card-head card-fold-head"', $html, $screen);
         }

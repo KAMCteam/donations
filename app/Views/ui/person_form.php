@@ -66,7 +66,10 @@ $eyebrow = $mode === 'add' ? 'New' : ($person['id'] ?? '');
 // of the form commits the lot — below the fields it saves, not above them.
 $viewUrl  = $mode === 'add' ? null : site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id']));
 $editable = static fn (string $section): bool => $mode === 'add' || $editing === $section;
-$editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $section;
+// Both carry the card's own anchor, so opening one for editing and closing it
+// again land on the card rather than at the top of the screen.
+$editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $section . '#card-' . $section;
+$closeUrl = static fn (string $section): string => $viewUrl . '#card-' . $section;
 ?>
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
@@ -135,7 +138,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
               // arrives: the details are what a record is. Shut, the summary
               // keeps the name and the status, which are what anybody scans
               // this card for. ?>
-        <details class="card card--pad card-fold" open>
+        <details class="card card--pad card-fold" id="card-personal" open>
             <summary class="card-head card-fold-head">
                 <span class="card-fold-mark" aria-hidden="true"><?= ui_icon('chevron') ?></span>
                 <h2 class="card-title">Personal Information</h2>
@@ -402,7 +405,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
             <?php if ($mode !== 'add' && $editable('personal')): ?>
                 <div class="card-actions">
-                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                    <a class="btn-outline" href="<?= esc($closeUrl('personal')) ?>">Cancel</a>
                     <button type="submit" class="btn-save">Save</button>
                 </div>
             <?php endif; ?>
@@ -419,7 +422,9 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             'foldable'  => true,
             'open'      => true,
             'editing'   => $editable('labs'),
-            'editUrl'   => $mode === 'add' ? null : $editUrl('labs'),
+            // Bare: the workup card adds the fragment itself, once for its
+            // own head and once for each test's "Edit results".
+            'editUrl'   => $mode === 'add' ? null : $viewUrl . '?edit=labs',
             'viewUrl'   => $mode === 'add' ? null : $viewUrl,
             'section'   => $mode === 'add' ? null : 'labs',
             // Nothing to add a test to until the record exists.
@@ -430,7 +435,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             // reads with `??` would otherwise be the last caller's.
         ], ['saveData' => false]) ?>
 
-        <div class="card card--pad">
+        <div class="card card--pad" id="card-notes">
             <div class="card-head">
                 <h2 class="card-title">Clinical Notes</h2>
                 <?php if (! $editable('notes')): ?>
@@ -446,7 +451,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
             <?php if ($mode !== 'add' && $editable('notes')): ?>
                 <div class="card-actions">
-                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                    <a class="btn-outline" href="<?= esc($closeUrl('notes')) ?>">Cancel</a>
                     <button type="submit" class="btn-save">Save</button>
                 </div>
             <?php endif; ?>

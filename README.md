@@ -416,6 +416,38 @@ is no screen behind it to open. A donor already in an open pair is sent to
 that pair rather than offered a second one, and a person who holds a row in both
 registers under one MRN is not offered as their own counterpart.
 
+### A press does not throw away your place
+
+Pressing **Edit**, or **Save**, or **Cancel**, or **Add lab** loads a page, and
+a page starts at the top. On a record seventy cards long that means the card
+somebody was working on is a screen and a half away again — every time, for
+every card.
+
+Two things keep it from happening, and they work together:
+
+- **The cards are named.** Every one of them carries an `id`, and the Edit and
+  Cancel links carry it as a `#card-…` on the end: `?edit=notes#card-notes`.
+  That needs nothing switched on — the browser lands on the card itself — and
+  it is what a link somebody is given does when they open it cold.
+- **`ui.js` remembers the offset.** The exact position is kept as a page is
+  left and put back when that same screen comes round again, keyed by its
+  path: a record remembers its own place and not another record's, and opening
+  one for the first time still starts at the top. A handful of screens' worth
+  and no more — nobody is retracing twenty, and a store that only grows is one
+  that eventually holds something wrong.
+
+Where both apply the offset wins, because the anchor puts the card at the top
+of the window and the offset puts it back exactly where it was. Back and
+forward are left alone: the browser restores those itself, and better.
+
+The one press that cannot be honoured exactly is **Save** on the workup, which
+replaces a card where every test is open for answering with one where none is
+and takes a couple of thousand pixels of page with it. The browser clamps to
+what is left, which lands on the foot of the card — where the button was.
+
+An enhancement, like the rest of `ui.js`: with the script blocked every button
+does exactly what it did before, and the anchors still work.
+
 ### The back arrow goes back
 
 Every back arrow used to name one fixed destination. A donor's record said

@@ -18,11 +18,18 @@ class UserModel extends Model
     protected $returnType    = 'array';
     protected $useTimestamps = true;
     protected $allowedFields = [
-        'login_id', 'name', 'password_hash', 'role', 'is_active', 'last_login_at',
+        'login_id', 'name', 'password_hash', 'role', 'is_admin', 'mrp_id',
+        'is_active', 'last_login_at',
     ];
 
-    /** The three words a role can be, and the only three. */
-    public const ROLES = ['admin', 'doctor', 'coordinator'];
+    /**
+     * The two words a role can be, and the only two.
+     *
+     * Admin is not among them, and that is the point: everybody who uses this
+     * system is a doctor or a coordinator, and looking after the register is a
+     * permission laid over that job rather than a third job. {@see is_admin}
+     */
+    public const ROLES = ['doctor', 'coordinator'];
 
     /**
      * A hash that no password matches, for the lookup that found nobody.
@@ -54,6 +61,12 @@ class UserModel extends Model
         }
 
         return $user;
+    }
+
+    /** The account a registered person signs in with, or null. */
+    public function forMrp(int|string $mrpId): ?array
+    {
+        return $this->where('mrp_id', (int) $mrpId)->first();
     }
 
     /** Stamps the moment somebody got in. */

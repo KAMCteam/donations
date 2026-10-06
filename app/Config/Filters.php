@@ -2,6 +2,7 @@
 
 namespace Config;
 
+use App\Filters\AdminFilter;
 use App\Filters\AuthFilter;
 use App\Filters\RoleFilter;
 use CodeIgniter\Config\Filters as BaseFilters;
@@ -43,6 +44,9 @@ class Filters extends BaseFilters
         // added to a guarded group is guarded by being there.
         'auth'          => AuthFilter::class,
         'role'          => RoleFilter::class,
+        // The permission over the role: the screens that look after the
+        // register, open to a doctor or a coordinator who has it.
+        'admin'         => AdminFilter::class,
     ];
 
     /**

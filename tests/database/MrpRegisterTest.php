@@ -36,7 +36,7 @@ final class MrpRegisterTest extends CIUnitTestCase
             $this->markTestSkipped('This schema is MySQL-specific; the tests group uses ' . $this->db->DBDriver . '.');
         }
 
-        $this->withSession(['auth_id' => 1, 'auth_login_id' => '1', 'auth_name' => 'Test User', 'auth_role' => 'admin', 'ui_organ' => 'kidney']);
+        $this->withSession(['auth_id' => 1, 'auth_login_id' => '1', 'auth_name' => 'Test User', 'auth_role' => 'doctor', 'auth_is_admin' => true, 'ui_organ' => 'kidney']);
     }
 
     /** @param array<string, mixed>|null $params */
@@ -75,19 +75,19 @@ final class MrpRegisterTest extends CIUnitTestCase
 
     public function testTheScreenOffersBothKindsAndASearch(): void
     {
-        $html = $this->get('mrp')->getBody();
+        $html = $this->get('admin')->getBody();
 
         $this->assertStringContainsString('name="kind" value="doctor"', $html);
         $this->assertStringContainsString('name="kind" value="coordinator"', $html);
         // One form, two actions: Search goes to the directory, Add registers.
-        $this->assertStringContainsString('formaction="' . site_url('mrp/lookup') . '"', $html);
+        $this->assertStringContainsString('formaction="' . site_url('admin/users/lookup') . '"', $html);
         $this->assertStringContainsString('Search', $html);
     }
 
     public function testADoctorAndACoordinatorAreBothRegistered(): void
     {
-        $this->post('mrp', ['id' => 'MRP-100', 'name' => 'Dr. Amira Hassan', 'kind' => 'doctor']);
-        $this->post('mrp', ['id' => 'CO-200', 'name' => 'Nora Al-Zahrani', 'kind' => 'coordinator']);
+        $this->post('admin/users', ['id' => 'MRP-100', 'name' => 'Dr. Amira Hassan', 'kind' => 'doctor']);
+        $this->post('admin/users', ['id' => 'CO-200', 'name' => 'Nora Al-Zahrani', 'kind' => 'coordinator']);
 
         $this->seeInDatabase('mrp', ['code' => 'MRP-100', 'name' => 'Dr. Amira Hassan', 'kind' => 'doctor']);
         $this->seeInDatabase('mrp', ['code' => 'CO-200', 'name' => 'Nora Al-Zahrani', 'kind' => 'coordinator']);
@@ -100,8 +100,8 @@ final class MrpRegisterTest extends CIUnitTestCase
     /** A record's MRP field asks for the physician, so only physicians are offered. */
     public function testOnlyDoctorsAreOfferedAsARecordsMrp(): void
     {
-        $this->post('mrp', ['id' => 'MRP-101', 'name' => 'Dr. Offered', 'kind' => 'doctor']);
-        $this->post('mrp', ['id' => 'CO-201', 'name' => 'Not Offered', 'kind' => 'coordinator']);
+        $this->post('admin/users', ['id' => 'MRP-101', 'name' => 'Dr. Offered', 'kind' => 'doctor']);
+        $this->post('admin/users', ['id' => 'CO-201', 'name' => 'Not Offered', 'kind' => 'coordinator']);
 
         $html = $this->get('recipients/new')->getBody();
 
@@ -117,8 +117,8 @@ final class MrpRegisterTest extends CIUnitTestCase
 
     public function testAnIdCannotBeRegisteredTwice(): void
     {
-        $this->post('mrp', ['id' => 'MRP-102', 'name' => 'First', 'kind' => 'doctor']);
-        $this->post('mrp', ['id' => 'MRP-102', 'name' => 'Second', 'kind' => 'doctor']);
+        $this->post('admin/users', ['id' => 'MRP-102', 'name' => 'First', 'kind' => 'doctor']);
+        $this->post('admin/users', ['id' => 'MRP-102', 'name' => 'Second', 'kind' => 'doctor']);
 
         $this->assertSame(1, $this->db->table('mrp')->where('code', 'MRP-102')->countAllResults());
         $this->assertStringContainsString('already registered', (string) session('ui_mrp_error'));
@@ -126,7 +126,7 @@ final class MrpRegisterTest extends CIUnitTestCase
 
     public function testAUserNeedsBothAnIdAndAName(): void
     {
-        $this->post('mrp', ['id' => 'MRP-103', 'name' => '', 'kind' => 'doctor']);
+        $this->post('admin/users', ['id' => 'MRP-103', 'name' => '', 'kind' => 'doctor']);
 
         $this->dontSeeInDatabase('mrp', ['code' => 'MRP-103']);
         $this->assertStringContainsString('both an ID and a name', (string) session('ui_mrp_error'));
@@ -141,9 +141,9 @@ final class MrpRegisterTest extends CIUnitTestCase
      */
     public function testTheDirectorySearchSaysItIsNotConnectedYet(): void
     {
-        $this->post('mrp/lookup', ['id' => 'MRP-104', 'kind' => 'coordinator']);
+        $this->post('admin/users/lookup', ['id' => 'MRP-104', 'kind' => 'coordinator']);
 
-        $html = $this->get('mrp')->getBody();
+        $html = $this->get('admin')->getBody();
 
         $this->assertStringContainsString('Directory lookup', $html);
         $this->assertStringContainsString('not connected yet', $html);
@@ -156,19 +156,19 @@ final class MrpRegisterTest extends CIUnitTestCase
 
     public function testSearchingWithNoIdSaysSo(): void
     {
-        $this->post('mrp/lookup', ['id' => '']);
+        $this->post('admin/users/lookup', ['id' => '']);
 
-        $this->assertStringContainsString('Enter the ID to search for.', $this->get('mrp')->getBody());
+        $this->assertStringContainsString('Enter the ID to search for.', $this->get('admin')->getBody());
     }
 
     // ---- The register ------------------------------------------------------
 
     public function testTheRegisterShowsNameIdTypeAndStatus(): void
     {
-        $this->post('mrp', ['id' => 'MRP-105', 'name' => 'Dr. Listed', 'kind' => 'doctor']);
-        $this->post('mrp', ['id' => 'CO-205', 'name' => 'Coordinator Listed', 'kind' => 'coordinator']);
+        $this->post('admin/users', ['id' => 'MRP-105', 'name' => 'Dr. Listed', 'kind' => 'doctor']);
+        $this->post('admin/users', ['id' => 'CO-205', 'name' => 'Coordinator Listed', 'kind' => 'coordinator']);
 
-        $html = $this->get('mrp')->getBody();
+        $html = $this->get('admin')->getBody();
 
         foreach (['Name', 'MRP ID', 'Type', 'Status'] as $heading) {
             $this->assertStringContainsString('<th>' . $heading . '</th>', $html);
@@ -185,15 +185,15 @@ final class MrpRegisterTest extends CIUnitTestCase
 
     public function testARegisteredUserCanBeEdited(): void
     {
-        $this->post('mrp', ['id' => 'MRP-106', 'name' => 'Dr. Typo', 'kind' => 'doctor']);
+        $this->post('admin/users', ['id' => 'MRP-106', 'name' => 'Dr. Typo', 'kind' => 'doctor']);
         $id = (int) $this->db->table('mrp')->where('code', 'MRP-106')->get()->getRowArray()['id'];
 
         // Edit opens the row as a form, where the row is.
-        $open = $this->get('mrp?edit=' . $id)->getBody();
-        $this->assertStringContainsString('action="' . site_url('mrp/' . $id) . '"', $open);
+        $open = $this->get('admin?edit=' . $id)->getBody();
+        $this->assertStringContainsString('action="' . site_url('admin/users/' . $id) . '"', $open);
         $this->assertStringContainsString('value="Dr. Typo"', $open);
 
-        $this->post('mrp/' . $id, ['id' => 'MRP-107', 'name' => 'Dr. Corrected', 'kind' => 'coordinator']);
+        $this->post('admin/users/' . $id, ['id' => 'MRP-107', 'name' => 'Dr. Corrected', 'kind' => 'coordinator']);
 
         $this->seeInDatabase('mrp', ['id' => $id, 'code' => 'MRP-107', 'name' => 'Dr. Corrected', 'kind' => 'coordinator']);
         // Changed to a coordinator, so they are one where records look.
@@ -202,11 +202,11 @@ final class MrpRegisterTest extends CIUnitTestCase
 
     public function testAnEditCannotTakeAnIdSomebodyElseHolds(): void
     {
-        $this->post('mrp', ['id' => 'MRP-108', 'name' => 'One', 'kind' => 'doctor']);
-        $this->post('mrp', ['id' => 'MRP-109', 'name' => 'Two', 'kind' => 'doctor']);
+        $this->post('admin/users', ['id' => 'MRP-108', 'name' => 'One', 'kind' => 'doctor']);
+        $this->post('admin/users', ['id' => 'MRP-109', 'name' => 'Two', 'kind' => 'doctor']);
         $id = (int) $this->db->table('mrp')->where('code', 'MRP-109')->get()->getRowArray()['id'];
 
-        $this->post('mrp/' . $id, ['id' => 'MRP-108', 'name' => 'Two', 'kind' => 'doctor']);
+        $this->post('admin/users/' . $id, ['id' => 'MRP-108', 'name' => 'Two', 'kind' => 'doctor']);
 
         $this->seeInDatabase('mrp', ['id' => $id, 'code' => 'MRP-109']);
         $this->assertStringContainsString('already registered', (string) session('ui_mrp_error'));
@@ -218,22 +218,22 @@ final class MrpRegisterTest extends CIUnitTestCase
      */
     public function testDeactivatingTakesAUserOffTheChoicesAndNotOffTheList(): void
     {
-        $this->post('mrp', ['id' => 'MRP-110', 'name' => 'Dr. Retiring', 'kind' => 'doctor']);
+        $this->post('admin/users', ['id' => 'MRP-110', 'name' => 'Dr. Retiring', 'kind' => 'doctor']);
         $id = (int) $this->db->table('mrp')->where('code', 'MRP-110')->get()->getRowArray()['id'];
 
-        $this->post('mrp/' . $id . '/active', ['active' => '0']);
+        $this->post('admin/users/' . $id . '/active', ['active' => '0']);
 
         $this->seeInDatabase('mrp', ['id' => $id, 'is_active' => 0]);
 
-        $html = $this->get('mrp')->getBody();
+        $html = $this->get('admin')->getBody();
         $this->assertStringContainsString('Dr. Retiring', $html);
-        $this->assertStringContainsString('>Inactive</span>', $html);
+        $this->assertStringContainsString('>Deactivated</span>', $html);
         $this->assertStringContainsString('Reactivate', $html);
 
         // And gone from where a record would assign them.
         $this->assertStringNotContainsString('Dr. Retiring', $this->get('recipients/new')->getBody());
 
-        $this->post('mrp/' . $id . '/active', ['active' => '1']);
+        $this->post('admin/users/' . $id . '/active', ['active' => '1']);
         $this->seeInDatabase('mrp', ['id' => $id, 'is_active' => 1]);
     }
 

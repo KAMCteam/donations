@@ -44,7 +44,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->db->table('mrp')->insert(['code' => 'MRP-001', 'name' => 'Dr. Test']);
         $this->mrpId = (int) $this->db->insertID();
 
-        $this->withSession(['auth_id' => 1, 'auth_login_id' => '1', 'auth_name' => 'Test User', 'auth_role' => 'admin', 'ui_organ' => 'kidney']);
+        $this->withSession(['auth_id' => 1, 'auth_login_id' => '1', 'auth_name' => 'Test User', 'auth_role' => 'doctor', 'auth_is_admin' => true, 'ui_organ' => 'kidney']);
     }
 
     /**
@@ -1425,10 +1425,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
      */
     public function testTheCoordinatorIsChosenFromTheRegistered(): void
     {
-        $this->post('mrp', ['id' => 'C-7001', 'kind' => 'coordinator', 'name' => 'First Coordinator']);
-        $this->post('mrp', ['id' => 'C-7002', 'kind' => 'coordinator', 'name' => 'Second Coordinator']);
+        $this->post('admin/users', ['id' => 'C-7001', 'kind' => 'coordinator', 'name' => 'First Coordinator']);
+        $this->post('admin/users', ['id' => 'C-7002', 'kind' => 'coordinator', 'name' => 'Second Coordinator']);
         // A doctor is not one of them: the list is coordinators.
-        $this->post('mrp', ['id' => 'D-7003', 'kind' => 'doctor', 'name' => 'A Doctor']);
+        $this->post('admin/users', ['id' => 'D-7003', 'kind' => 'doctor', 'name' => 'A Doctor']);
 
         $this->post('recipients/new', ['mrn' => '4220', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
 
@@ -1464,7 +1464,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
      */
     public function testADeactivatedCoordinatorIsKeptButNotOffered(): void
     {
-        $this->post('mrp', ['id' => 'C-7004', 'kind' => 'coordinator', 'name' => 'Was A Coordinator']);
+        $this->post('admin/users', ['id' => 'C-7004', 'kind' => 'coordinator', 'name' => 'Was A Coordinator']);
         $this->post('recipients/new', ['mrn' => '4221', 'name' => 'R', 'age' => '40', 'bloodType' => 'A']);
         $this->post('recipients/4221', [
             'section' => 'personal', 'name' => 'R', 'age' => '40', 'bloodType' => 'A',
@@ -1472,7 +1472,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         ]);
 
         $mrpId = (int) $this->db->table('mrp')->where('code', 'C-7004')->get()->getRowArray()['id'];
-        $this->post('mrp/' . $mrpId . '/active', ['active' => '0']);
+        $this->post('admin/users/' . $mrpId . '/active', ['active' => '0']);
 
         // Both rows, because a coordinator is two of them.
         $this->seeInDatabase('coordinators', ['name' => 'Was A Coordinator', 'is_active' => 0]);
@@ -2368,7 +2368,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         // Switched to the liver programme; the kidney register is not its
         // to delete from, even though an MRN finds a record either way.
-        $this->withSession(['auth_id' => 1, 'auth_login_id' => '1', 'auth_name' => 'Test User', 'auth_role' => 'admin', 'ui_organ' => 'liver']);
+        $this->withSession(['auth_id' => 1, 'auth_login_id' => '1', 'auth_name' => 'Test User', 'auth_role' => 'doctor', 'auth_is_admin' => true, 'ui_organ' => 'liver']);
         $this->post('recipients/9211/delete');
 
         $this->seeInDatabase('recipients', ['mrn' => 9211]);
@@ -2750,7 +2750,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             $this->assertStringContainsString('class="app-search"', $this->get($screen)->getBody(), $screen . ' carries the search');
         }
 
-        foreach (['dashboard', 'mrp'] as $screen) {
+        foreach (['dashboard', 'admin'] as $screen) {
             $this->assertStringNotContainsString('class="app-search"', $this->get($screen)->getBody(), $screen . ' does not');
         }
 
@@ -4643,7 +4643,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
     public function testAddingAnMrpStoresIt(): void
     {
-        $this->post('mrp', ['id' => 'MRP-010', 'name' => 'Dr. Sara Nephro']);
+        $this->post('admin/users', ['id' => 'MRP-010', 'name' => 'Dr. Sara Nephro']);
 
         $this->seeInDatabase('mrp', ['code' => 'MRP-010', 'name' => 'Dr. Sara Nephro']);
     }

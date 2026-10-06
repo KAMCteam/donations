@@ -39,9 +39,30 @@ $routes->get('logout', 'Auth::logout');
 $routes->group('', ['filter' => 'auth'], static function ($routes): void {
     // Where each role lands after signing in. Placeholders for now — the
     // platform's own screens are below, and each dashboard links across.
-    $routes->get('admin/dashboard', 'Admin\Dashboard::index', ['filter' => 'role:admin']);
+    // Two, because there are two roles: an administrator is a doctor or a
+    // coordinator who also looks after the register, and lands on their own.
     $routes->get('doctor/dashboard', 'Doctor\Dashboard::index', ['filter' => 'role:doctor']);
     $routes->get('coordinator/dashboard', 'Coordinator\Dashboard::index', ['filter' => 'role:coordinator']);
+
+    /*
+     * The register, and who may sign into it: one screen, behind the one
+     * permission. `admin` asks whether this session carries it and nothing
+     * about which role holds it, because it sits over both.
+     *
+     * Hiding the link from the sidebar is a courtesy; this is the lock. Every
+     * address that can change the register is in here, including the three
+     * deletes further down, which are the other thing only an administrator
+     * may do.
+     */
+    $routes->group('admin', ['filter' => 'admin'], static function ($routes): void {
+        $routes->get('/', 'Admin\Users::index');
+        $routes->post('users', 'Admin\Users::add');
+        $routes->post('users/lookup', 'Admin\Users::lookup');
+        $routes->post('users/(:num)', 'Admin\Users::update/$1');
+        $routes->post('users/(:num)/active', 'Admin\Users::setActive/$1');
+        $routes->post('users/(:num)/admin', 'Admin\Users::setAdmin/$1');
+        $routes->post('users/(:num)/password', 'Admin\Users::resetPassword/$1');
+    });
 
     // Programme picker. Its own screen rather than a filter, since the UI asks
     // for the programme once per session, right after signing in.
@@ -68,7 +89,9 @@ $routes->group('', ['filter' => 'auth'], static function ($routes): void {
     $routes->post('recipients/(:segment)/labs', 'Ui::addLab/recipient/$1');
     $routes->post('recipients/(:segment)/labs/(:num)/delete', 'Ui::removeLab/recipient/$1/$2');
     $routes->get('recipients/(:segment)/print', 'Ui::printRecipient/$1');
-    $routes->post('recipients/(:segment)/delete', 'Ui::deleteRecipient/$1');
+    // Only an administrator removes a record. The button is not rendered for
+    // anybody else either, but the button is the courtesy and this is the lock.
+    $routes->post('recipients/(:segment)/delete', 'Ui::deleteRecipient/$1', ['filter' => 'admin']);
     $routes->match(['get', 'post'], 'recipients/(:segment)', 'Ui::recipient/$1');
 
     $routes->get('donors', 'Ui::donors');
@@ -77,7 +100,7 @@ $routes->group('', ['filter' => 'auth'], static function ($routes): void {
     $routes->post('donors/(:segment)/labs', 'Ui::addLab/donor/$1');
     $routes->post('donors/(:segment)/labs/(:num)/delete', 'Ui::removeLab/donor/$1/$2');
     $routes->get('donors/(:segment)/print', 'Ui::printDonor/$1');
-    $routes->post('donors/(:segment)/delete', 'Ui::deleteDonor/$1');
+    $routes->post('donors/(:segment)/delete', 'Ui::deleteDonor/$1', ['filter' => 'admin']);
     $routes->get('donors/(:segment)/link', 'Ui::linkDonor/$1');
     $routes->post('donors/(:segment)/link/existing', 'Ui::linkDonorExisting/$1');
     $routes->match(['get', 'post'], 'donors/(:segment)', 'Ui::donor/$1');
@@ -98,7 +121,7 @@ $routes->group('', ['filter' => 'auth'], static function ($routes): void {
     $routes->post('pairs/(:segment)/labs/(:segment)', 'Ui::addPairLab/$1/$2');
     $routes->post('pairs/(:segment)/labs/(:segment)/(:num)/delete', 'Ui::removePairLab/$1/$2/$3');
     $routes->get('pairs/(:segment)/print', 'Ui::printPair/$1');
-    $routes->post('pairs/(:segment)/delete', 'Ui::deletePair/$1');
+    $routes->post('pairs/(:segment)/delete', 'Ui::deletePair/$1', ['filter' => 'admin']);
     $routes->match(['get', 'post'], 'pairs/(:segment)', 'Ui::pair/$1');
 
     // Paired exchange. `build` is one address for the screen and its four
@@ -112,13 +135,8 @@ $routes->group('', ['filter' => 'auth'], static function ($routes): void {
     $routes->get('reports', 'Reports::index');
     $routes->get('reports/export/(:segment)', 'Reports::export/$1');
 
-    // The one screen that makes users — physicians and coordinators both. The
-    // lookup route is the hospital directory's, and comes back saying it is not
-    // connected yet until it is.
-    $routes->get('mrp', 'Ui::mrp');
-    $routes->post('mrp', 'Ui::addMrp');
-    $routes->post('mrp/lookup', 'Ui::lookupMrp');
-    $routes->post('mrp/(:num)/active', 'Ui::setMrpActive/$1');
-    $routes->post('mrp/(:num)', 'Ui::updateMrp/$1');
+    // Add MRP moved into the Admin screen with everything else about a user,
+    // and this is the way a bookmark gets there.
+    $routes->get('mrp', static fn () => redirect()->to(site_url('admin')));
 
 });

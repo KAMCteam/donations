@@ -328,10 +328,12 @@ again moves the whole section back onto the new pair, the archived tabs
 included, because it is the same list either way — every donor they have ever
 had.
 
-The donor's half of it is a sentence rather than a section. Their record says
-*This donor was previously linked with …*, with the dates, the reason, and a
-link to that recipient — because the pair's record is kept on the recipient's
-screen, and the donor's job is to say where it went. It stays said if they are
+The donor's half of it is a line rather than a section, and it sits **under
+their name** in the header: *Previously linked with [Mishal Al-Harthy
+(980101)] · archived 04/10/2026*, with the reason after it. The name is the
+link, styled as one, because the pair's record is kept on the recipient's
+screen and getting there is the whole point of the line — somebody reading
+"who is this donor" is already looking at the name. It stays said if they are
 linked again: an ended link is history a new pair does not cancel.
 
 #### Where it is stored

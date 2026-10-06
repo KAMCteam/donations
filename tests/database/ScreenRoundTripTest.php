@@ -3378,25 +3378,39 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
-     * The donor's half of it: where their pair went.
+     * The donor's half of it: where their pair went, under their name.
      *
      * Their own record does not carry the pair — the recipient's does — so it
-     * carries the sentence that says so, and the way across.
+     * carries a link that says so, in the header under the name, where
+     * somebody reading "who is this" is already looking.
      */
-    public function testADonorsRecordSaysWhoTheyWereLinkedWith(): void
+    public function testADonorsRecordLinksToWhoTheyWereLinkedWith(): void
     {
         [$pairId] = $this->pairWith('8740', '8741', 'The Donor');
         [$first]  = $this->pairLinks(8740);
 
         // Nothing to say while the pair is theirs.
-        $this->assertStringNotContainsString('previously linked with', $this->get('donors/8741')->getBody());
+        $this->assertStringNotContainsString('Previously linked with', $this->get('donors/8741')->getBody());
 
         $this->post('pairs/' . $pairId . '/donors/' . $first . '/delink', ['outcome' => 'dissolve']);
 
         $html = $this->get('donors/8741')->getBody();
-        $this->assertStringContainsString('previously linked with', $html);
-        $this->assertStringContainsString(site_url('recipients/8740'), $html);
-        $this->assertStringContainsString('R 8740', $html);
+        $this->assertStringContainsString('Previously linked with', $html);
+        $this->assertStringContainsString('<a class="was-linked-to" href="' . site_url('recipients/8740') . '">', $html);
+        $this->assertStringContainsString('R 8740 (8740)', $html);
+
+        // Under the name, not somewhere further down the screen.
+        $this->assertLessThan(
+            (int) strpos($html, 'class="card'),
+            (int) strpos($html, 'class="page-subtitle was-linked"'),
+            'the link comes before the first card'
+        );
+        $this->assertGreaterThan(
+            (int) strpos($html, 'class="page-title"'),
+            (int) strpos($html, 'class="page-subtitle was-linked"'),
+            'and after the name'
+        );
+
         // The section itself belongs to the recipient, not to them.
         $this->assertStringNotContainsString('donor-tabs', $html);
     }

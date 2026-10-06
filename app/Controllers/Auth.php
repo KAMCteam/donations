@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Models\LoginActivityModel;
 use App\Models\UserModel;
 use CodeIgniter\HTTP\RedirectResponse;
 
@@ -28,9 +29,15 @@ use CodeIgniter\HTTP\RedirectResponse;
  */
 class Auth extends BaseController
 {
-    /** Where each role lands. The one place this mapping is written. */
+    /**
+     * Where each role lands. The one place this mapping is written.
+     *
+     * Two of them, because there are two roles. An administrator is a doctor
+     * or a coordinator who also looks after the register, so they land where
+     * their own job is and reach the Admin screen from the sidebar — a
+     * dashboard of their own would be a dashboard with no patients on it.
+     */
     public const HOME = [
-        'admin'       => 'admin/dashboard',
         'doctor'      => 'doctor/dashboard',
         'coordinator' => 'coordinator/dashboard',
     ];
@@ -72,15 +79,30 @@ class Auth extends BaseController
         }
 
         $users = model(UserModel::class);
+        $log   = model(LoginActivityModel::class);
         $user  = $users->authenticate($loginId, $password);
 
         if ($user === null) {
+            // An account registered but never given a password is a different
+            // thing from a wrong password, and only the administrator who
+            // reads the log can tell them apart — the screen says the same
+            // sentence either way, because to anybody typing numbers in they
+            // are the same event.
+            $known  = $users->where('login_id', $loginId)->first();
+            $reason = ($known['password_hash'] ?? 'x') === ''
+                ? LoginActivityModel::NO_PASSWORD
+                : LoginActivityModel::BAD_CREDENTIALS;
+
+            $log->record($loginId, false, $known, $reason);
+
             return $this->screen($loginId, self::BAD_CREDENTIALS);
         }
 
         // The password was right, so this is their account and they can be
         // told what is the matter with it.
         if ((int) $user['is_active'] !== 1) {
+            $log->record($loginId, false, $user, LoginActivityModel::INACTIVE);
+
             return $this->screen($loginId, self::INACTIVE);
         }
 
@@ -92,9 +114,14 @@ class Auth extends BaseController
             'auth_login_id' => (string) $user['login_id'],
             'auth_name'     => (string) $user['name'],
             'auth_role'     => (string) $user['role'],
+            // The permission, carried with the role rather than instead of
+            // it. Read on every screen that has something only an
+            // administrator may see.
+            'auth_is_admin' => (int) $user['is_admin'] === 1,
         ]);
 
         $users->touchLogin($user['id']);
+        $log->record($loginId, true, $user);
 
         return redirect()->to(site_url(self::homeFor($user['role'])));
     }
@@ -138,6 +165,18 @@ class Auth extends BaseController
     public static function name(): string
     {
         return (string) (session('auth_name') ?? '');
+    }
+
+    /**
+     * Whether they look after the register.
+     *
+     * Not a role but a permission over one, so this is asked *as well as* the
+     * role and never instead of it. Everything an administrator can do, they
+     * can do on top of everything their own job already lets them do.
+     */
+    public static function isAdmin(): bool
+    {
+        return session('auth_is_admin') === true;
     }
 
     /**

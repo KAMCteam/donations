@@ -1,5 +1,7 @@
 <?php
 
+use App\Controllers\Auth;
+
 /**
  * Application shell — sidebar, top bar and page host.
  *
@@ -21,8 +23,17 @@ $navItems = [
     ['page' => 'pairs',      'label' => 'Pairs List',         'icon' => 'link17',    'url' => site_url('pairs')],
     ['page' => 'exchange',   'label' => 'Paired Exchange',    'icon' => 'shuffle',   'url' => site_url('exchange')],
     ['page' => 'reports',    'label' => 'Reports',            'icon' => 'clipboard', 'url' => site_url('reports')],
-    ['page' => 'add-mrp',    'label' => 'Add MRP',            'icon' => 'userPlus',  'url' => site_url('mrp')],
 ];
+
+// Everything about a user — registering one, editing one, the sign-in log —
+// is one screen behind one permission, so it is one item and only for the
+// people who hold it. Add MRP used to sit here for everybody.
+//
+// Leaving it out is a courtesy and not the lock: `admin` on the route is what
+// keeps anybody else out, and the address is typeable either way.
+if (Auth::isAdmin()) {
+    $navItems[] = ['page' => 'admin', 'label' => 'Admin', 'icon' => 'userPlus', 'url' => site_url('admin')];
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -160,6 +171,8 @@ $navItems = [
     <form id="confirm-post" method="post" hidden><?= csrf_field() ?></form>
 
     <script src="<?= base_url('assets/ui/js/ui.js') ?>"></script>
+    <?php // What a single screen needs and the others do not. ?>
+    <?= $this->renderSection('scripts') ?>
 </body>
 
 </html>

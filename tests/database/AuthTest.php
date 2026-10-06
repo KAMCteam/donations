@@ -41,12 +41,13 @@ final class AuthTest extends CIUnitTestCase
     }
 
     /** One account, made the way the seeder makes one. */
-    private function account(string $loginId, string $role, string $password = 'A', bool $active = true): int|string
+    private function account(string $loginId, string $role, string $password = 'A', bool $active = true, bool $admin = false): int|string
     {
         return $this->users->store([
             'login_id'  => $loginId,
             'name'      => ucfirst($role) . ' ' . $loginId,
             'role'      => $role,
+            'is_admin'  => $admin ? 1 : 0,
             'is_active' => $active ? 1 : 0,
         ], $password);
     }
@@ -54,13 +55,23 @@ final class AuthTest extends CIUnitTestCase
     /** Posts the form the way the screen does, token and all. */
     private function signIn(string $loginId, string $password): \CodeIgniter\Test\TestResponse
     {
+        return $this->post('login', ['login_id' => $loginId, 'password' => $password]);
+    }
+
+    /**
+     * Posts the way a screen does.
+     *
+     * Every form emits `csrf_field()` and the filter checks it, so a post
+     * without one is refused — as it should be. There is no page here to take
+     * the token from, so this mints one and sends it the way the field would.
+     *
+     * @param array<string, mixed>|null $params
+     */
+    public function post($path, ?array $params = null): \CodeIgniter\Test\TestResponse
+    {
         $security = service('security');
 
-        return $this->call('post', 'login', [
-            'login_id'                 => $loginId,
-            'password'                 => $password,
-            $security->getTokenName()  => $security->getHash(),
-        ]);
+        return $this->call('post', $path, ($params ?? []) + [$security->getTokenName() => $security->getHash()]);
     }
 
     // ---- What is stored ----------------------------------------------------
@@ -74,7 +85,7 @@ final class AuthTest extends CIUnitTestCase
      */
     public function testAPasswordIsStoredAsAHashEvenWhenItIsOneLetter(): void
     {
-        $this->account('1', 'admin', 'A');
+        $this->account('1', 'doctor', 'A');
 
         $row = $this->db->table('users')->where('login_id', '1')->get()->getRowArray();
 
@@ -86,7 +97,7 @@ final class AuthTest extends CIUnitTestCase
     /** Two accounts cannot answer to one User ID. */
     public function testAUserIdIsTakenOnlyOnce(): void
     {
-        $this->account('1', 'admin');
+        $this->account('1', 'doctor');
 
         $this->expectException(\Throwable::class);
         $this->account('1', 'doctor');
@@ -94,9 +105,9 @@ final class AuthTest extends CIUnitTestCase
 
     // ---- Signing in --------------------------------------------------------
 
-    public function testTheThreeRolesEachLandOnTheirOwnDashboard(): void
+    public function testEachRoleLandsOnItsOwnDashboard(): void
     {
-        foreach (['admin', 'doctor', 'coordinator'] as $i => $role) {
+        foreach (['doctor', 'coordinator'] as $i => $role) {
             $this->account((string) ($i + 1), $role);
 
             $this->signIn((string) ($i + 1), 'A')
@@ -112,7 +123,7 @@ final class AuthTest extends CIUnitTestCase
     /** And the moment is stamped on the row. */
     public function testSigningInStampsLastLoginAt(): void
     {
-        $id = $this->account('1', 'admin');
+        $id = $this->account('1', 'doctor');
 
         $this->assertNull($this->users->find($id)['last_login_at']);
 
@@ -129,7 +140,7 @@ final class AuthTest extends CIUnitTestCase
      */
     public function testAWrongUserIdAndAWrongPasswordReadIdentically(): void
     {
-        $this->account('1', 'admin', 'A');
+        $this->account('1', 'doctor', 'A');
 
         $wrongPassword = $this->signIn('1', 'nope')->getBody();
         $wrongId       = $this->signIn('99999', 'A')->getBody();
@@ -174,7 +185,7 @@ final class AuthTest extends CIUnitTestCase
      */
     public function testAnInactiveAccountIsRefusedAndToldWhy(): void
     {
-        $this->account('1', 'admin', 'A', false);
+        $this->account('1', 'doctor', 'A', false);
 
         $this->assertStringContainsString(
             'Your account is inactive. Please contact the administrator.',
@@ -200,7 +211,7 @@ final class AuthTest extends CIUnitTestCase
     /** The form is not postable from another site. */
     public function testTheLoginFormIsCsrfProtected(): void
     {
-        $this->account('1', 'admin');
+        $this->account('1', 'doctor');
 
         $this->assertStringContainsString('name="csrf_test_name"', $this->get('login')->getBody());
 
@@ -218,7 +229,7 @@ final class AuthTest extends CIUnitTestCase
      */
     public function testSigningInRegeneratesTheSession(): void
     {
-        $this->account('1', 'admin');
+        $this->account('1', 'doctor');
         $this->withSession([]);
 
         $this->assertFalse(service('session')->didRegenerate);
@@ -254,7 +265,7 @@ final class AuthTest extends CIUnitTestCase
 
     public function testLogoutEmptiesTheSessionAndReturnsToTheLoginScreen(): void
     {
-        $this->withSession(['auth_id' => 1, 'auth_role' => 'admin', 'auth_name' => 'A', 'ui_organ' => 'liver'])
+        $this->withSession(['auth_id' => 1, 'auth_role' => 'doctor', 'auth_name' => 'A', 'ui_organ' => 'liver'])
             ->get('logout')
             ->assertRedirectTo(site_url('login'));
 
@@ -269,7 +280,7 @@ final class AuthTest extends CIUnitTestCase
     /** `auth`: no session, no screen — and it says why on the way. */
     public function testAProtectedScreenSendsASignedOutVisitorToTheLogin(): void
     {
-        foreach (['dashboard', 'recipients', 'donors', 'pairs', 'reports', 'mrp', 'admin/dashboard'] as $screen) {
+        foreach (['dashboard', 'recipients', 'donors', 'pairs', 'reports', 'mrp', 'admin'] as $screen) {
             $this->get($screen)->assertRedirectTo(site_url('login'), $screen . ' is behind the login');
         }
 
@@ -286,9 +297,8 @@ final class AuthTest extends CIUnitTestCase
     public function testARoleCannotReachAnotherRolesDashboard(): void
     {
         $wrong = [
-            'admin'       => ['doctor/dashboard', 'coordinator/dashboard'],
-            'doctor'      => ['admin/dashboard', 'coordinator/dashboard'],
-            'coordinator' => ['admin/dashboard', 'doctor/dashboard'],
+            'doctor'      => ['coordinator/dashboard'],
+            'coordinator' => ['doctor/dashboard'],
         ];
 
         foreach ($wrong as $role => $screens) {
@@ -305,10 +315,250 @@ final class AuthTest extends CIUnitTestCase
         }
     }
 
+    // ---- Admin, which is a permission and not a role -----------------------
+
+    /**
+     * It is laid over the job rather than instead of it.
+     *
+     * An administrator is a doctor or a coordinator who also looks after the
+     * register. They land where their own job lands, they keep every screen
+     * their role has, and what the permission adds is on top.
+     */
+    public function testAnAdminKeepsTheirOwnRoleAndLandsWithIt(): void
+    {
+        $this->account('1', 'doctor', 'A', true, true);
+
+        $this->signIn('1', 'A')->assertRedirectTo(site_url('doctor/dashboard'));
+
+        $this->assertSame('doctor', session('auth_role'));
+        $this->assertTrue(session('auth_is_admin'));
+
+        // And a coordinator holds it the same way, still a coordinator.
+        $this->account('2', 'coordinator', 'A', true, true);
+        $this->withSession([])->signIn('2', 'A')->assertRedirectTo(site_url('coordinator/dashboard'));
+        $this->assertSame('coordinator', session('auth_role'));
+        $this->assertTrue(session('auth_is_admin'));
+    }
+
+    /** Somebody without it carries the fact that they do not have it. */
+    public function testAnOrdinaryUserIsNotAnAdmin(): void
+    {
+        $this->account('1', 'doctor');
+
+        $this->signIn('1', 'A');
+
+        $this->assertNotTrue(session('auth_is_admin'));
+    }
+
+    /** The Admin screen is the permission's, and it is open to both roles. */
+    public function testTheAdminScreenNeedsThePermissionAndNotARole(): void
+    {
+        foreach (['doctor', 'coordinator'] as $role) {
+            $body = $this->withSession($this->session($role, true))->get('admin')->getBody();
+
+            $this->assertStringContainsString('Add MRP', $body, $role . ' with the permission');
+            $this->assertStringContainsString('Login Activity', $body);
+        }
+
+        foreach (['doctor', 'coordinator'] as $role) {
+            $response = $this->withSession($this->session($role, false))->get('admin');
+
+            $response->assertStatus(403);
+            $this->assertStringContainsString('Not your screen', $response->getBody(), $role . ' without it');
+        }
+    }
+
+    /**
+     * The delete buttons, which are the permission's other half.
+     *
+     * Not rendered for anybody else — and refused as well, because a hidden
+     * button is a courtesy and the route is the lock.
+     */
+    public function testOnlyAnAdminCanDeleteARecord(): void
+    {
+        // A programme for the record to belong to. This class does not run the
+        // workup seeder — it is about signing in, and seeding seventy tests
+        // for one row would be most of its running time.
+        $this->db->table('organ_programs')->insert([
+            'code' => 'kidney', 'label' => 'Kidney', 'description' => 'Renal transplant program',
+            'sort_order' => 1, 'is_active' => 1,
+        ]);
+
+        $this->withSession($this->session('doctor', true))
+            ->post('recipients/new', ['mrn' => '6600', 'name' => 'Still Here', 'age' => '40', 'bloodType' => 'O']);
+
+        // Shown to one and not the other.
+        $this->assertStringContainsString(
+            'Delete recipient',
+            $this->withSession($this->session('doctor', true))->get('recipients')->getBody()
+        );
+        $this->assertStringNotContainsString(
+            'Delete recipient',
+            $this->withSession($this->session('doctor', false))->get('recipients')->getBody()
+        );
+
+        // And refused when posted anyway.
+        $security = service('security');
+        $this->withSession($this->session('coordinator', false))
+            ->call('post', 'recipients/6600/delete', [$security->getTokenName() => $security->getHash()])
+            ->assertStatus(403);
+
+        $this->seeInDatabase('recipients', ['mrn' => 6600]);
+    }
+
+    /** Granting it changes the permission and nothing about the person. */
+    public function testGrantingAndTakingBackThePermission(): void
+    {
+        $this->withSession($this->session('doctor', true))
+            ->post('admin/users', ['id' => '7701', 'name' => 'Dr. Ordinary', 'kind' => 'doctor']);
+
+        $mrp     = $this->db->table('mrp')->where('code', '7701')->get()->getRowArray();
+        $account = $this->users->where('login_id', '7701')->first();
+
+        // Registering somebody makes their account — with no password, so it
+        // exists and cannot be signed into until one is set.
+        $this->assertNotNull($account);
+        $this->assertSame('', $account['password_hash']);
+        $this->assertSame((int) $mrp['id'], (int) $account['mrp_id']);
+        $this->assertSame(0, (int) $account['is_admin']);
+
+        $this->withSession($this->session('doctor', true))
+            ->post('admin/users/' . $mrp['id'] . '/admin', ['admin' => '1']);
+
+        $this->seeInDatabase('users', ['login_id' => '7701', 'is_admin' => 1, 'role' => 'doctor']);
+        // Their type is untouched: Admin is not a kind of person.
+        $this->seeInDatabase('mrp', ['id' => $mrp['id'], 'kind' => 'doctor']);
+
+        // The register says both, separately.
+        $html = $this->withSession($this->session('doctor', true))->get('admin')->getBody();
+        $this->assertStringContainsString('>Doctor</span>', $html);
+        $this->assertStringContainsString('Admin', $html);
+
+        $this->withSession($this->session('doctor', true))
+            ->post('admin/users/' . $mrp['id'] . '/admin', ['admin' => '0']);
+        $this->seeInDatabase('users', ['login_id' => '7701', 'is_admin' => 0]);
+    }
+
+    /** Deactivating is the register's delete, and it shuts the door. */
+    public function testDeactivatingAUserStopsThemSigningIn(): void
+    {
+        $this->withSession($this->session('doctor', true))
+            ->post('admin/users', ['id' => '7702', 'name' => 'Dr. Leaving', 'kind' => 'doctor']);
+
+        $mrp = $this->db->table('mrp')->where('code', '7702')->get()->getRowArray();
+
+        // Give them a password, so the only thing refusing them is the flag.
+        $this->users->update(
+            (int) $this->users->where('login_id', '7702')->first()['id'],
+            ['password_hash' => password_hash('A', PASSWORD_DEFAULT)]
+        );
+
+        $this->withSession([])->signIn('7702', 'A')->assertRedirectTo(site_url('doctor/dashboard'));
+
+        $this->withSession($this->session('doctor', true))
+            ->post('admin/users/' . $mrp['id'] . '/active', ['active' => '0']);
+
+        // The row stays, on both sides, and the sign-in is refused.
+        $this->seeInDatabase('mrp', ['id' => $mrp['id'], 'is_active' => 0]);
+        $this->seeInDatabase('users', ['login_id' => '7702', 'is_active' => 0]);
+        // From a clean session, or the admin's own would send them straight on.
+        $this->assertStringContainsString(
+            'Your account is inactive',
+            $this->withSession([])->signIn('7702', 'A')->getBody()
+        );
+    }
+
+    /** Resetting a password is the screen and nothing behind it, and says so. */
+    public function testResettingAPasswordChangesNothingYetAndSaysSo(): void
+    {
+        $this->withSession($this->session('doctor', true))
+            ->post('admin/users', ['id' => '7703', 'name' => 'Dr. Forgetful', 'kind' => 'doctor']);
+
+        $mrp    = $this->db->table('mrp')->where('code', '7703')->get()->getRowArray();
+        $before = $this->users->where('login_id', '7703')->first()['password_hash'];
+
+        $this->withSession($this->session('doctor', true))
+            ->post('admin/users/' . $mrp['id'] . '/password', ['password' => 'TemporaryOne1']);
+
+        $this->assertSame($before, $this->users->where('login_id', '7703')->first()['password_hash']);
+        $this->assertStringContainsString('not connected yet', (string) session('ui_mrp_saved'));
+
+        // The dialog on the screen warns before anybody presses it.
+        $this->assertStringContainsString(
+            'what is typed here is not stored',
+            $this->withSession($this->session('doctor', true))->get('admin')->getBody()
+        );
+    }
+
+    // ---- The log ------------------------------------------------------------
+
+    /**
+     * Every attempt, successful or not, and the password in none of them.
+     */
+    public function testEveryAttemptToSignInIsRecorded(): void
+    {
+        $this->account('1', 'doctor', 'Correct1');
+
+        $this->signIn('1', 'Correct1');
+        $this->signIn('1', 'WrongOne');
+        $this->signIn('9999', 'WrongOne');
+
+        $rows = $this->db->table('login_activity')->orderBy('id')->get()->getResultArray();
+
+        $this->assertCount(3, $rows);
+        $this->assertSame('1', $rows[0]['login_id']);
+        $this->assertSame(1, (int) $rows[0]['succeeded']);
+        $this->assertSame('Doctor 1', $rows[0]['name']);
+
+        $this->assertSame(0, (int) $rows[1]['succeeded']);
+        $this->assertSame('Wrong User ID or password', $rows[1]['reason']);
+
+        // Nobody holds that number, so there is no name and no account — and
+        // what was typed is kept, because that is the thing worth reading.
+        $this->assertSame('9999', $rows[2]['login_id']);
+        $this->assertSame('', $rows[2]['name']);
+        $this->assertNull($rows[2]['user_id']);
+
+        foreach ($rows as $row) {
+            $this->assertStringNotContainsString('Correct1', implode(' ', array_map('strval', $row)));
+            $this->assertStringNotContainsString('WrongOne', implode(' ', array_map('strval', $row)));
+        }
+    }
+
+    /** And the Admin screen shows them, read-only. */
+    public function testTheAdminScreenShowsTheLogAndOffersNothingOnIt(): void
+    {
+        $this->account('1', 'doctor', 'Correct1');
+        $this->signIn('1', 'Correct1');
+        $this->signIn('4242', 'nope');
+
+        $html = $this->withSession($this->session('doctor', true))->get('admin')->getBody();
+
+        $this->assertStringContainsString('Login Activity', $html);
+        $this->assertStringContainsString('>Successful</span>', $html);
+        $this->assertStringContainsString('>Failed</span>', $html);
+        $this->assertStringContainsString('4242', $html);
+        // Nothing posts to it and nothing edits it.
+        $this->assertStringNotContainsString('login_activity', $html);
+    }
+
+    /** A session, as the filters read one. */
+    private function session(string $role, bool $admin): array
+    {
+        return [
+            'auth_id'       => 1,
+            'auth_login_id' => '1',
+            'auth_name'     => 'Somebody',
+            'auth_role'     => $role,
+            'auth_is_admin' => $admin,
+            'ui_organ'      => 'kidney',
+        ];
+    }
+
     /** And their own is open. */
     public function testEachRoleReachesItsOwnDashboard(): void
     {
-        foreach (['admin', 'doctor', 'coordinator'] as $role) {
+        foreach (['doctor', 'coordinator'] as $role) {
             $body = $this->withSession([
                 'auth_id' => 1, 'auth_role' => $role, 'auth_name' => 'Somebody',
             ])->get($role . '/dashboard')->getBody();

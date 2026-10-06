@@ -159,3 +159,81 @@
   border-radius: 999px;
   padding: 0.2rem 0.6rem;
 }
+
+/* =========================================================
+   The Admin screen
+   =========================================================
+
+   The register of users and the sign-in log. Borrows the Add MRP screen's own
+   type and spacing — it *is* that screen, grown — and adds only what the
+   permission and the log needed. */
+
+/* The permission, beside the type and not instead of it. A word rather than a
+   badge: a badge would read as a second type, which is the one thing it is
+   not. */
+.admin-mark {
+  margin-left: 0.4rem;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 600;
+  color: var(--blue-700);
+  white-space: nowrap;
+}
+
+/* The checkbox on the row's own form. */
+.admin-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--slate-700);
+  cursor: pointer;
+}
+
+.admin-toggle input[disabled] + span { color: var(--slate-400); }
+
+/* An account that exists and cannot be signed into yet: said on the name,
+   because it is the one thing about that row somebody has to do something
+   about. */
+.mrp-flag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-full);
+  background-color: var(--amber-50);
+  border: 1px solid var(--amber-200);
+  color: var(--amber-700);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Why a sign-in failed, under the word Failed. Small and grey: the red badge
+   above it is the statement, and this is the detail. */
+.activity-why {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  color: var(--slate-500);
+}
+
+/* The reset dialog's standing warning. Amber and not red: nothing is broken,
+   it simply does not do the thing yet, and saying so loudly is the point. */
+.reset-warning {
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-lg);
+  background-color: var(--amber-50);
+  border: 1px solid var(--amber-200);
+  color: var(--amber-700);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+/* The register's row of actions: Edit, Reset password, Deactivate. Each is a
+   phrase, so none of them wraps — a button broken over two lines reads as two
+   buttons. */
+.mrp-table .cell-action .btn-outline,
+.mrp-table .cell-action .btn-edit { white-space: nowrap; }

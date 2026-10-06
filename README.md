@@ -125,8 +125,9 @@ Options -Indexes
 | --- | --- |
 | `/` | Entry point — the login screen, or the dashboard when already signed in |
 | `/login` | Sign in — User ID and password, checked against `users` |
+| `/admin` | The register, and who may sign into it. Admin permission only |
 | `/logout` | Empties the session and returns to the login screen |
-| `/admin/dashboard`, `/doctor/dashboard`, `/coordinator/dashboard` | Where each role lands |
+| `/doctor/dashboard`, `/coordinator/dashboard` | Where each role lands |
 | `/organ` | Programme picker (kidney / liver) |
 | `/dashboard` | Programme statistics and high-priority waitlist |
 | `/recipients` | Recipient waitlist, filterable by blood type and status |
@@ -141,7 +142,7 @@ Options -Indexes
 | `/exchange` | Paired exchange: the chains, and the builder; filterable by the recipient's blood type |
 | `/reports` | Both registers read across, under nine filters |
 | `/reports/export/{general\|internal}` | The filtered report as a printable sheet |
-| `/mrp` | Register users: physicians and coordinators |
+| `/admin` | The register: Add MRP, Registered MRPs and Login Activity. Admin permission only |
 
 Auto-routing is off, so `app/Config/Routes.php` lists every reachable endpoint.
 The programme is chosen once per session on `/organ` and kept in the `ui_organ`
@@ -190,7 +191,7 @@ dialog, and the date fields (slashes as you type, and the calendar button).
 
 The result was checked against the design package screen by screen with
 full-page screenshot diffs at 1440px. Login, the programme picker, the pairs
-register and Add MRP are pixel-identical; the rest differ by under 400 pixels
+register and the user register are pixel-identical; the rest differ by under 400 pixels
 out of 1.4–3.3 million, all of it antialiasing on a single character boundary in
 labels such as "4 unmatched donors" or "Back to Recipient Waitlist". The
 package built those strings with a helper that inserted an empty HTML comment
@@ -419,7 +420,7 @@ registers under one MRN is not offered as their own counterpart.
 
 Above the page header and centred in the content, on the five screens that
 have a list to narrow — Recipient Waitlist, Donors List, Pairs List, Paired
-Exchange, Reports. The dashboard, Add MRP and the record screens have nothing
+Exchange, Reports. The dashboard, the Admin screen and the record screens have nothing
 for it to do, so they do not carry it.
 
 It never leaves the screen. The form posts back to the same address with the
@@ -1014,9 +1015,9 @@ workup, one per page — built from `App\Libraries\RecordBlocks`, the same
 blocks a single record's own printed sheet is made of, so the two sheets cannot
 drift apart.
 
-### Add MRP is where users are made
+### The Admin screen is where users are made
 
-It is the one screen that creates somebody a record can be assigned to, and a
+**Add MRP**, its first section, creates somebody a record can be assigned to, and a
 transplant programme assigns two kinds. The form asks which — **Doctor** or
 **Coordinator** — before it asks the name, because that is what the name is
 being entered as. `mrp.kind` holds it, and everybody registered before the
@@ -1050,12 +1051,26 @@ a copied credential is a credential in two places, and the point of looking
 somebody up in the directory is that the directory is where their sign-in is
 checked. There is no password field on this screen for that reason.
 
+Registering somebody does make their **sign-in account**, with no password at
+all: an empty hash matches nothing, so the account exists and cannot be signed
+into until an administrator sets one. The two were separate tables describing
+the same staff, and the register's row is now the one place a person is edited,
+deactivated, granted the permission, and given a password.
+
 **Registered MRPs** under it is a table — Name, MRP ID, Type, Status, and the
-two controls. **Edit** turns the row into a form where the row is, as a
-record's card does. **Deactivate** is never a delete: the records they are on
-still name them, and a physician who has left is part of what those records
-say. A deactivated user stays on the list, greyed, with **Reactivate**, and
-stops being offered on new records.
+row's controls. **Edit** turns the row into a form where the row is, as a
+record's card does, and carries the **Admin** checkbox. **Deactivate** is never
+a delete: the records they are on still name them, and a physician who has left
+is part of what those records say. A deactivated user stays on the list, marked
+*Deactivated*, with **Reactivate** — and cannot sign in, because deactivating
+reaches their account as well as their row. **Reset password** sets one without
+sending them round the directory again; it is the screen and nothing behind it
+so far, and says so on the dialog.
+
+**Login Activity**, the third section, is every attempt to sign in — name, User
+ID, when, and whether it worked, with why when it did not. Read-only: there is
+no button on it, because the reason it exists is the attempts nobody meant to
+be read, and a log somebody can tidy is not a log.
 
 ### Dates
 
@@ -1182,31 +1197,51 @@ field is an ordinary password box and the button an ordinary submit, and
 signing in works exactly the same. Nothing about what is accepted is decided in
 the browser.
 
-#### Three roles, three doors
+#### Two roles, and a permission over both
 
 | Role | Lands on |
 | --- | --- |
-| `admin` | `/admin/dashboard` |
 | `doctor` | `/doctor/dashboard` |
 | `coordinator` | `/coordinator/dashboard` |
 
-Those three are placeholders and say so: a name, a role and the way out, with a
-link into the platform. The mapping is written once, in `Auth::HOME`.
+Both are placeholders and say so: a name, a role and the way out, with a link
+into the platform. The mapping is written once, in `Auth::HOME`.
 
-Two filters guard everything else, put on the routes rather than on URI
-patterns so that a guard is read next to the address it guards:
+**Admin is not a third role.** Everybody who uses this system is a doctor or a
+coordinator; some of them also look after the register, and `users.is_admin`
+says which. An administrator keeps their own role, lands on their own
+dashboard, and keeps every screen their role already had — what the permission
+adds is on top:
+
+- the **Admin** item in the sidebar, and the screen behind it;
+- the **delete** button on the three lists, which nobody else is shown.
+
+It was a role, briefly, and that was wrong in a way worth recording: an
+"admin" had no clinical job at all, which is why their dashboard had no
+patients on it and why granting somebody the register meant taking their role
+away. The migration that undid it reads every `role = 'admin'` as a doctor who
+has the permission.
+
+Three filters guard the rest, put on the routes rather than on URI patterns so
+that a guard is read next to the address it guards:
 
 - **`auth`** — no session, no screen. It redirects to `/login` rather than
   refusing, because not being signed in is a state somebody can leave, and the
   way out is the screen they are being sent to.
-- **`role:admin`, `role:doctor,coordinator`** — allowing rather than denying,
+- **`role:doctor`, `role:doctor,coordinator`** — allowing rather than denying,
   so a role added later is kept out of every screen until somebody writes it
-  down. Signed in as the wrong role is a refusal, and gets a 403 built on the
-  login screen's own panel (`app/Views/errors/403.php`), naming their own
-  dashboard as the way out and not naming the screen they asked for.
+  down.
+- **`admin`** — the permission, asked of doctors and coordinators alike.
+
+Signed in and refused either way gets a 403 built on the login screen's own
+panel (`app/Views/errors/403.php`), naming their own dashboard as the way out
+and not naming the screen they asked for.
 
 Every address in `Config\Routes` but `/login` and `/logout` is inside the
-`auth` group, so a route added to that file later is protected by being there.
+`auth` group, so a route added to that file later is protected by being there;
+the Admin screen and the three deletes are inside `admin` as well. Hiding a
+button or a sidebar item is a courtesy — the address is still typeable, so the
+filter is what actually refuses.
 
 ## Database
 
@@ -1245,7 +1280,8 @@ writes.
 
 | Table | Exists because |
 | --- | --- |
-| `users` | Who may sign in, and as what: `login_id`, a password hash, a role |
+| `users` | Who may sign in, and as what: `login_id`, a password hash, a role, and whether they look after the register |
+| `login_activity` | Every attempt to sign in, successful or not. Written by the login screen, read by the Admin screen, edited by nothing |
 | `staff` | Superseded by `users`; kept, empty and unread, pending a decision to drop it |
 | `organ_programs` | The picker's cards are content — label, description, icon — not code |
 | `mrp` | Every record screen assigns a most responsible physician |
@@ -1378,11 +1414,11 @@ For development there are three, one per role:
 php spark db:seed UserSeeder
 ```
 
-| User ID | Password | Role |
-| --- | --- | --- |
-| `1` | `A` | admin |
-| `2` | `A` | doctor |
-| `3` | `A` | coordinator |
+| User ID | Password | Role | Admin |
+| --- | --- | --- | --- |
+| `1` | `A` | doctor | yes |
+| `2` | `A` | doctor | no |
+| `3` | `A` | coordinator | no |
 
 **It refuses to run outside `development`.** The passwords are a single letter;
 they exist so somebody building a screen can get past the login, and they would
@@ -1397,7 +1433,9 @@ somebody asks for it by name. Re-running it leaves accounts that already exist
 exactly as they are, password included.
 
 The first real account is the same row written by hand or from a console, with
-`is_active = 1` and a role.
+`is_active = 1`, a role, and `is_admin = 1` so that there is somebody who can
+register everybody else. After that, registering a person on the Admin screen
+makes their account for them.
 
 ## Migration notes (CodeIgniter 3 → 4)
 

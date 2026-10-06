@@ -12,6 +12,7 @@ use App\Models\MrpModel;
 use App\Models\OrganProgramModel;
 use App\Models\PairModel;
 use App\Models\RecipientModel;
+use App\Models\UserModel;
 use CodeIgniter\Model;
 use CodeIgniter\Session\Session;
 
@@ -1037,6 +1038,7 @@ final class UiStore
         }
 
         $this->mrp->insert(['code' => $code, 'name' => $name, 'kind' => $kind]);
+        $this->accountFor((int) $this->mrp->getInsertID(), $code, $name, $kind, true);
 
         if ($kind === MrpModel::COORDINATOR) {
             $this->coordinatorId($name);
@@ -1046,19 +1048,116 @@ final class UiStore
     }
 
     /**
+     * The sign-in account that goes with a registered person.
+     *
+     * Registering somebody and giving them a way in are one act, so this
+     * happens with the row rather than on a second screen somebody has to
+     * remember. **Without a password**: an empty hash matches nothing, so the
+     * account exists and cannot be signed into until an administrator sets
+     * one. The directory returns a name and an ID and never a credential to
+     * copy in here, which is the whole reason Add MRP looks people up rather
+     * than inventing them.
+     *
+     * An account already answering to that staff number is linked rather than
+     * duplicated: one person, one way in, whichever was made first.
+     */
+    private function accountFor(int $mrpId, string $code, string $name, string $kind, bool $active): void
+    {
+        if ($mrpId === 0 || $code === '') {
+            return;
+        }
+
+        $users    = model(UserModel::class);
+        $existing = $users->where('login_id', $code)->first();
+
+        if ($existing !== null) {
+            $users->update((int) $existing['id'], ['mrp_id' => $mrpId]);
+
+            return;
+        }
+
+        $users->insert([
+            'login_id'      => $code,
+            'name'          => $name,
+            'role'          => $kind === MrpModel::COORDINATOR ? 'coordinator' : 'doctor',
+            'password_hash' => '',
+            'is_active'     => $active ? 1 : 0,
+            'mrp_id'        => $mrpId,
+        ]);
+    }
+
+    /**
      * Everybody the MRP screen has registered, for its own list.
      *
      * @return list<array<string, mixed>>
      */
     public function mrpRegister(): array
     {
-        return array_map(static fn (array $row): array => [
-            'id'     => (string) $row['id'],
-            'code'   => (string) $row['code'],
-            'name'   => (string) $row['name'],
-            'kind'   => (string) $row['kind'],
-            'active' => (int) $row['is_active'] === 1,
-        ], $this->mrp->register());
+        $users = model(UserModel::class);
+
+        return array_map(static function (array $row) use ($users): array {
+            // Their sign-in account, when they have one. The permission and
+            // whether a password has ever been set are facts about the
+            // account, not about the person, so they are read from it.
+            $account = $users->forMrp((int) $row['id']);
+
+            return [
+                'id'        => (string) $row['id'],
+                'code'      => (string) $row['code'],
+                'name'      => (string) $row['name'],
+                'kind'      => (string) $row['kind'],
+                'active'    => (int) $row['is_active'] === 1,
+                'hasLogin'  => $account !== null,
+                'isAdmin'   => $account !== null && (int) $account['is_admin'] === 1,
+                'hasPassword' => $account !== null && (string) $account['password_hash'] !== '',
+                'lastLogin' => (string) ($account['last_login_at'] ?? ''),
+            ];
+        }, $this->mrp->register());
+    }
+
+    /**
+     * One registered person, as the Admin screen reads them.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function mrpPerson(string $id): ?array
+    {
+        foreach ($this->mrpRegister() as $person) {
+            if ($person['id'] === $id) {
+                return $person;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Grants somebody the register, or takes it back. '' on success.
+     *
+     * The permission lives on their sign-in account, because that is what has
+     * to carry it into a session — and not on their row in the register,
+     * which is the clinical fact of who they are. A registered person with no
+     * account cannot be granted anything, and saying so is more use than
+     * silently writing a permission nobody can use.
+     */
+    public function setMrpAdmin(string $id, bool $admin): string
+    {
+        $row = $this->mrp->find((int) $id);
+
+        if ($row === null) {
+            return 'That user could not be found.';
+        }
+
+        $users   = model(UserModel::class);
+        $account = $users->forMrp((int) $row['id']);
+
+        if ($account === null) {
+            return $row['name'] . ' has no sign-in account, so there is nothing to grant the permission to.';
+        }
+
+        $users->update((int) $account['id'], ['is_admin' => $admin ? 1 : 0]);
+
+        return '';
     }
 
     /** Changes a registered user's ID, name or kind. '' on success. */
@@ -1086,6 +1185,22 @@ final class UiStore
 
         $this->mrp->update((int) $row['id'], ['code' => $code, 'name' => $name, 'kind' => $kind]);
 
+        // Their account says the same three things, and a register that
+        // disagreed with the login screen about somebody's name or staff
+        // number would be two answers to one question.
+        $users   = model(UserModel::class);
+        $account = $users->forMrp((int) $row['id']);
+
+        if ($account === null) {
+            $this->accountFor((int) $row['id'], $code, $name, $kind, (int) $row['is_active'] === 1);
+        } elseif ($users->where('login_id', $code)->where('id !=', (int) $account['id'])->first() === null) {
+            $users->update((int) $account['id'], [
+                'login_id' => $code,
+                'name'     => $name,
+                'role'     => $kind === MrpModel::COORDINATOR ? 'coordinator' : 'doctor',
+            ]);
+        }
+
         if ($kind === MrpModel::COORDINATOR) {
             $this->coordinatorId($name);
         }
@@ -1108,6 +1223,16 @@ final class UiStore
         }
 
         $this->mrp->update((int) $row['id'], ['is_active' => $active ? 1 : 0]);
+
+        // And shuts the door. Deactivating is what the register's delete
+        // button does, and somebody taken out of service who could still sign
+        // in would have been taken out of service in name only.
+        $users   = model(UserModel::class);
+        $account = $users->forMrp((int) $row['id']);
+
+        if ($account !== null) {
+            $users->update((int) $account['id'], ['is_active' => $active ? 1 : 0]);
+        }
 
         // A coordinator is two rows — the directory's and the one the records
         // point at — so deactivating has to reach both, or they would go on

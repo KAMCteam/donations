@@ -27,11 +27,17 @@ use CodeIgniter\Database\Seeder;
  */
 class UserSeeder extends Seeder
 {
-    /** [login_id, name, role] — the password is the same single letter for all three. */
+    /**
+     * [login_id, name, role, admin?] — one password, the same single letter.
+     *
+     * Three accounts and two roles, because Admin is not a role: the first is
+     * a doctor who also looks after the register, which is what an
+     * administrator is here.
+     */
     private const USERS = [
-        ['1', 'Development Admin', 'admin'],
-        ['2', 'Development Doctor', 'doctor'],
-        ['3', 'Development Coordinator', 'coordinator'],
+        ['1', 'Development Admin', 'doctor', true],
+        ['2', 'Development Doctor', 'doctor', false],
+        ['3', 'Development Coordinator', 'coordinator', false],
     ];
 
     private const PASSWORD = 'A';
@@ -52,7 +58,7 @@ class UserSeeder extends Seeder
         $added  = 0;
         $kept   = 0;
 
-        foreach (self::USERS as [$loginId, $name, $role]) {
+        foreach (self::USERS as [$loginId, $name, $role, $admin]) {
             if ($users->where('login_id', $loginId)->first() !== null) {
                 $kept++;
 
@@ -66,6 +72,7 @@ class UserSeeder extends Seeder
                 'login_id'  => $loginId,
                 'name'      => $name,
                 'role'      => $role,
+                'is_admin'  => $admin ? 1 : 0,
                 'is_active' => 1,
             ], self::PASSWORD);
 
@@ -73,7 +80,8 @@ class UserSeeder extends Seeder
         }
 
         echo sprintf(
-            'UserSeeder: %d added, %d already there. Sign in with User ID 1, 2 or 3 and the password %s.%s',
+            'UserSeeder: %d added, %d already there. Sign in with User ID 1 (doctor + admin), '
+                . '2 (doctor) or 3 (coordinator) and the password %s.%s',
             $added,
             $kept,
             self::PASSWORD,

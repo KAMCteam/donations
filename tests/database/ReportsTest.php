@@ -73,7 +73,7 @@ final class ReportsTest extends CIUnitTestCase
             'relationship' => 'Brother', 'registered_on' => '2024-02-10',
         ]);
 
-        $this->withSession(['auth_id' => 1, 'auth_login_id' => '1', 'auth_name' => 'Test User', 'auth_role' => 'admin', 'ui_organ' => 'kidney']);
+        $this->withSession(['auth_id' => 1, 'auth_login_id' => '1', 'auth_name' => 'Test User', 'auth_role' => 'doctor', 'auth_is_admin' => true, 'ui_organ' => 'kidney']);
     }
 
     /** @param array<string, mixed>|null $params */

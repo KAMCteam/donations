@@ -41,12 +41,19 @@ foreach ($v as $field => $value) {
 }
 
 $isRecipient = $personType === 'recipient';
-// Entered from a pair's screen, Back belongs to that pair rather than to the
-// register the donor has not been read on yet.
-$backUrl     = $forPair !== ''
-    ? site_url('recipients/' . rawurlencode($forPair))
-    : site_url($isRecipient ? 'recipients' : 'donors');
-$backLabel   = $isRecipient ? 'Back to Recipient Waitlist' : 'Donors List';
+// Entered from a pair's screen, Back belongs to that pair and to nothing else
+// — that is what the screen was opened to do, so it is fixed. Otherwise it is
+// wherever this record was opened from, which is usually a list and is
+// sometimes a pair, with whatever was narrowed down on it still narrowed.
+$back = ui_back(
+    site_url($isRecipient ? 'recipients' : 'donors'),
+    $isRecipient ? 'Recipient Waitlist' : 'Donors List',
+    $forPair !== ''
+);
+
+if ($forPair !== '') {
+    $back = ['url' => site_url('recipients/' . rawurlencode($forPair)), 'label' => 'the pair'];
+}
 $title       = $mode === 'add'
     ? ($isRecipient ? 'Add Recipient' : 'Add Donor')
     : ($person['name'] ?? ($isRecipient ? 'Recipient Profile' : 'Donor Profile'));
@@ -64,7 +71,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
         <div>
-            <a class="back-link" href="<?= $backUrl ?>"><?= ui_icon('back') ?>Back to <?= esc($forPair !== '' ? 'the pair' : ($isRecipient ? 'Recipient Waitlist' : 'Donors List')) ?></a>
+            <a class="back-link" href="<?= esc($back['url']) ?>"><?= ui_icon('back') ?>Back to <?= esc($back['label']) ?></a>
             <div class="eyebrow"><?= esc($eyebrow) ?></div>
             <h1 class="page-title"><?= esc($title) ?></h1>
             <?php if ($forPair !== ''): ?>
@@ -449,7 +456,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
               // card instead, because it is edited a card at a time. ?>
         <?php if ($mode === 'add'): ?>
             <div class="form-actions">
-                <a class="btn-outline" href="<?= $backUrl ?>">Cancel</a>
+                <a class="btn-outline" href="<?= esc($back['url']) ?>">Cancel</a>
                 <button type="submit" class="btn-save">Save <?= esc($isRecipient ? 'Recipient' : 'Donor') ?></button>
             </div>
         <?php endif; ?>

@@ -4530,6 +4530,104 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertSame('tone-amber', $tones['negative']);
     }
 
+    // ---- The back arrow ----------------------------------------------------
+
+    /**
+     * It goes back to where somebody came from, not to one fixed list.
+     *
+     * A donor's record said *Back to Donors List* whether you had reached it
+     * from the register, from a pair or from the search — so pressing it took
+     * you somewhere you had not been, and whatever you had narrowed the list
+     * down to was gone.
+     */
+    public function testTheBackArrowReturnsToTheScreenYouCameFrom(): void
+    {
+        [$pairId] = $this->pairWith('8410', '8411', 'The Donor');
+
+        // From the waitlist, narrowed: back to the waitlist, still narrowed.
+        $this->get('recipients?bt=A&status=active');
+        $this->assertStringContainsString(
+            'href="' . site_url('recipients') . '?bt=A&amp;status=active"',
+            $this->get('recipients/8410')->getBody()
+        );
+
+        // From the pairs list: back to the pairs list.
+        $this->get('pairs?status=all');
+        $this->assertStringContainsString(
+            'href="' . site_url('pairs') . '?status=all"',
+            $this->get('pairs/' . $pairId)->getBody()
+        );
+
+        // The same donor, reached from the pair rather than the register.
+        $this->get('pairs/' . $pairId);
+        $this->assertStringContainsString(
+            'Back to the pair',
+            $this->get('donors/8411')->getBody()
+        );
+
+        $this->get('donors?bt=A');
+        $this->assertStringContainsString(
+            'Back to Donors List',
+            $this->get('donors/8411')->getBody()
+        );
+    }
+
+    /**
+     * Answering again is not going somewhere.
+     *
+     * Opening a card for editing, saving it and switching a donor tab are all
+     * the same screen rendering a second time. If any of them counted as a
+     * step, the arrow would take somebody back one card instead of back to the
+     * list they came from.
+     */
+    public function testEditingACardDoesNotMoveWhereTheArrowGoes(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8410', 'name' => 'Opened', 'age' => '40', 'bloodType' => 'O']);
+
+        $this->get('recipients?bt=O');
+        $this->get('recipients/8410');
+
+        foreach (['recipients/8410?edit=personal', 'recipients/8410?edit=labs', 'recipients/8410'] as $screen) {
+            $this->assertStringContainsString(
+                'href="' . site_url('recipients') . '?bt=O"',
+                $this->get($screen)->getBody(),
+                $screen . ' still goes back to the list'
+            );
+        }
+    }
+
+    /**
+     * Add Donor opened for a pair keeps its own way back.
+     *
+     * That screen exists to put somebody on that pair, so the arrow is the
+     * pair and not wherever the person happened to be beforehand.
+     */
+    public function testAddDonorForAPairAlwaysGoesBackToThePair(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8420', 'name' => 'Waiting', 'age' => '40', 'bloodType' => 'A']);
+
+        $this->get('reports');
+        $html = $this->get('donors/new?pair=8420')->getBody();
+
+        $this->assertStringContainsString('Back to the pair', $html);
+        $this->assertStringContainsString('href="' . site_url('recipients/8420') . '"', $html);
+        $this->assertStringNotContainsString('Back to Reports', $html);
+    }
+
+    /** With nothing behind it, the arrow still names somewhere real. */
+    public function testTheArrowFallsBackToTheListItAlwaysNamed(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8430', 'name' => 'Alone', 'age' => '40', 'bloodType' => 'A']);
+
+        // A session that has been nowhere: the fallback is the screen's own.
+        $this->withSession(['auth_id' => 1, 'auth_role' => 'doctor', 'auth_name' => 'T', 'ui_organ' => 'kidney']);
+
+        $this->assertStringContainsString(
+            'Back to Recipient Waitlist',
+            $this->get('recipients/8430')->getBody()
+        );
+    }
+
     private function cardFor(string $html, string $test): string
     {
         $cards = explode('class="lab-card', $html);

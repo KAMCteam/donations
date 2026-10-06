@@ -1864,6 +1864,26 @@
   background-color: var(--slate-50);
 }
 
+/* Where a delinked donor came from, under their own name.
+
+   The one thing their screen cannot otherwise say — the pair is kept on the
+   recipient's record — so it is a link, and it is made to look like one. */
+.was-linked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+.was-linked-to {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.was-linked-why { font-style: italic; }
+
 /* The reason a link was ended, in the words somebody typed. */
 .tab-note-why {
   display: block;

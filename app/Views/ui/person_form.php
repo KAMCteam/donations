@@ -70,6 +70,24 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             <?php if ($forPair !== ''): ?>
                 <p class="page-subtitle">Being entered for a pair. Saving adds them to it on the status chosen below &mdash; Active is only open to them when the pair has nobody active.</p>
             <?php endif; ?>
+
+            <?php // Where this donor has been, under their name. They are back
+                  // on the register, so their own screen says nothing about
+                  // the pair they were worked up for — and the workup, the
+                  // crossmatch and the rest of it are kept on that
+                  // recipient's record. This is the way across to it, and it
+                  // is under the name because that is where somebody reading
+                  // "who is this" is already looking. ?>
+            <?php if ($mode === 'view' && ! $isRecipient): ?>
+                <?php foreach ($pastRecipients as $past): ?>
+                    <p class="page-subtitle was-linked">
+                        <span>Previously linked with</span>
+                        <a class="was-linked-to" href="<?= site_url('recipients/' . rawurlencode($past['id'])) ?>"><?= esc($past['name'] !== '' ? $past['name'] : $past['id']) ?><?= $past['name'] !== '' ? ' (' . esc($past['id']) . ')' : '' ?></a>
+                        <span>&middot; archived <?= esc(UiStore::isoToDMY($past['endedOn'])) ?></span>
+                        <?php if ($past['reason'] !== ''): ?><span class="was-linked-why"><?= esc($past['reason']) ?></span><?php endif; ?>
+                    </p>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </div>
         <div class="header-actions">
             <?php // A record has nothing to print until it has been saved. ?>
@@ -96,22 +114,6 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
     <?php if ($error !== ''): ?>
         <div class="form-error" role="alert"><?= esc($error) ?></div>
-    <?php endif; ?>
-
-    <?php // Where this donor has been. They are back on the register, so
-          // their own screen says nothing about the pair they were worked up
-          // for — and the workup, the crossmatch and the rest of it are kept
-          // on that recipient's record. This is the way across to it. ?>
-    <?php if ($mode === 'view' && ! $isRecipient && $pastRecipients !== []): ?>
-        <?php foreach ($pastRecipients as $past): ?>
-            <p class="tab-note">
-                This donor was previously linked with
-                <a href="<?= site_url('recipients/' . rawurlencode($past['id'])) ?>"><?= esc($past['name'] !== '' ? $past['name'] : $past['id']) ?></a><?= $past['name'] !== '' ? ' (' . esc($past['id']) . ')' : '' ?>,
-                whose record keeps the pair in full &mdash; this donor's tab on it, their workup and the dates.
-                Linked <?= esc(UiStore::isoToDMY($past['linkedOn'])) ?>, archived <?= esc(UiStore::isoToDMY($past['endedOn'])) ?>.
-                <?php if ($past['reason'] !== ''): ?><span class="tab-note-why"><?= esc($past['reason']) ?></span><?php endif; ?>
-            </p>
-        <?php endforeach; ?>
     <?php endif; ?>
 
     <form id="person-form" class="stack-5" method="post" action="<?= current_url() ?>">

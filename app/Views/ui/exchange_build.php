@@ -68,7 +68,8 @@ $chooser = static function (string $action, string $ownField, string $ownMrn, st
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
         <div>
-            <a class="back-link" href="<?= site_url('exchange') ?>"><?= ui_icon('back') ?>Back to Paired Exchange</a>
+            <?php $back = ui_back(site_url('exchange'), 'Paired Exchange'); ?>
+            <a class="back-link" href="<?= esc($back['url']) ?>"><?= ui_icon('back') ?>Back to <?= esc($back['label']) ?></a>
             <div class="eyebrow">Exchange</div>
             <h1 class="page-title">Build the exchange</h1>
         </div>

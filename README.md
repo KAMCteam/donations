@@ -416,6 +416,41 @@ is no screen behind it to open. A donor already in an open pair is sent to
 that pair rather than offered a second one, and a person who holds a row in both
 registers under one MRN is not offered as their own counterpart.
 
+### The back arrow goes back
+
+Every back arrow used to name one fixed destination. A donor's record said
+*Back to Donors List* whether you had reached it from the register, from a
+pair, or from the search — so pressing it took you somewhere you had not been,
+and whatever you had narrowed the list down to was gone.
+
+It goes back to the screen you were actually on, with its filters and its
+search still on it, and it says where that is: *Back to Pairs List*, *Back to
+the pair*, *Back to Recipient Waitlist*.
+
+`App\Filters\TrailFilter` keeps two addresses in the session — here, and the
+one before here — and `ui_back()` picks between them. One rule makes it behave:
+**"before" means a different screen, not a different address.** Opening a card
+for editing, saving it, switching a donor tab and paging a list are all the
+same screen answering again; if any of them counted as a step, the arrow would
+take somebody back one card instead of back to the list they came from. So a
+new address on the path you are already on refreshes *here* and leaves *before*
+alone.
+
+Two kinds of arrow are deliberately not this:
+
+- **Add Donor opened for a pair** says *Back to the pair* and means it. The
+  screen exists to put somebody on that pair, so its arrow is the pair and not
+  wherever the person happened to be beforehand.
+- **The printable sheets** open in a tab of their own and already carry the way
+  back to the list that opened them, filters and all. The trail does not record
+  them for the same reason: a sheet is not a screen somebody was on.
+
+Nothing here is JavaScript, and nothing depends on the browser's own history or
+on a `Referer` header: the trail is in the session, so it survives a reload, a
+bookmark and a form post that comes back to the same address. With no trail at
+all — the first screen of a session, a record opened cold — the arrow falls
+back to the list it always named.
+
 ### The search narrows the list you are on
 
 Above the page header and centred in the content, on the five screens that

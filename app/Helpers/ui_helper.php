@@ -100,3 +100,49 @@ if (! function_exists('ui_plural')) {
         return $count . ' ' . $singular . ($count === 1 ? '' : 's');
     }
 }
+
+if (! function_exists('ui_back')) {
+    /**
+     * The back arrow: where somebody actually came from.
+     *
+     * Each screen passes the destination it would have named anyway, and gets
+     * that one back whenever there is nothing better — a record opened from a
+     * bookmark, the first screen of a session, a reload after signing in. When
+     * there *is* something better, which is most of the time, it is the screen
+     * before this one, with the filters and the search it had on it.
+     *
+     * {@see \App\Filters\TrailFilter} is what remembers, and the rule that
+     * makes it behave: "before" means a different screen, so opening a card,
+     * saving it or switching a tab does not become the thing the arrow goes
+     * back to.
+     *
+     * A screen with a back that means something particular — Add Donor opened
+     * for a pair, which must return to that pair — passes it as `$fixed` and
+     * gets it honoured.
+     *
+     * @return array{url: string, label: string}
+     */
+    function ui_back(string $fallbackUrl, string $fallbackLabel, bool $fixed = false): array
+    {
+        if ($fixed) {
+            return ['url' => $fallbackUrl, 'label' => $fallbackLabel];
+        }
+
+        // The trail is written *after* a response, so while this screen is
+        // being rendered `ui_here` is still the screen before it — which is
+        // exactly the one the arrow wants. `ui_back` is the one before that,
+        // and it is what the arrow wants when this screen is answering a
+        // second time: a card opened for editing, a save that came back, a
+        // donor tab. Then `ui_here` is this screen, and going "back" to it
+        // would be going nowhere.
+        $here    = (array) (session('ui_here') ?? []);
+        $current = trim(service('request')->getPath(), '/');
+        $to      = ($here['path'] ?? null) === $current ? (array) (session('ui_back') ?? []) : $here;
+
+        if (($to['url'] ?? '') === '' || ($to['path'] ?? null) === $current) {
+            return ['url' => $fallbackUrl, 'label' => $fallbackLabel];
+        }
+
+        return ['url' => (string) $to['url'], 'label' => (string) $to['label']];
+    }
+}

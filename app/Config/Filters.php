@@ -5,6 +5,7 @@ namespace Config;
 use App\Filters\AdminFilter;
 use App\Filters\AuthFilter;
 use App\Filters\RoleFilter;
+use App\Filters\TrailFilter;
 use CodeIgniter\Config\Filters as BaseFilters;
 use CodeIgniter\Filters\Cors;
 use CodeIgniter\Filters\CSRF;
@@ -47,6 +48,8 @@ class Filters extends BaseFilters
         // The permission over the role: the screens that look after the
         // register, open to a doctor or a coordinator who has it.
         'admin'         => AdminFilter::class,
+        // Remembers the screen somebody was on, for the back arrows.
+        'trail'         => TrailFilter::class,
     ];
 
     /**
@@ -102,6 +105,9 @@ class Filters extends BaseFilters
             'csrf' => [],
         ],
         'after' => [
+            // After every screen, because what it records is the screen that
+            // was served. It writes a session key and nothing else.
+            'trail',
         ],
     ];
 

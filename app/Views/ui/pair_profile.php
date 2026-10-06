@@ -44,7 +44,8 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
         <div>
-            <a class="back-link" href="<?= site_url('pairs') ?>"><?= ui_icon('back') ?>Back to Pairs List</a>
+            <?php $back = ui_back(site_url('pairs'), 'Pairs List'); ?>
+            <a class="back-link" href="<?= esc($back['url']) ?>"><?= ui_icon('back') ?>Back to <?= esc($back['label']) ?></a>
             <div class="eyebrow"><?= esc($pair['id']) ?></div>
             <h1 class="page-title">Pair Profile</h1>
         </div>

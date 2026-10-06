@@ -1,7 +1,11 @@
 #-------------------------
 # Composer
 #-------------------------
-vendor/
+# Everything composer writes, except the one guard that stops a web server
+# listing the folder. `vendor/*` rather than `vendor/` so git still looks
+# inside it for that one file.
+vendor/*
+!vendor/index.html
 
 #-------------------------
 # Environment / secrets
@@ -27,7 +31,8 @@ writable/uploads/*
 #-------------------------
 # Test / build output
 #-------------------------
-build/
+build/*
+!build/index.html
 phpunit*.xml
 !phpunit.dist.xml
 .phpunit.*.cache

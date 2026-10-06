@@ -75,6 +75,46 @@ Point the web server's document root at **`public/`**, not at the project root �
 project root under a `/donations/` sub-path; if that URL has to be kept, use an
 alias to `public/` rather than the old `.htaccess` rewrite.
 
+### When the project root is served anyway
+
+On XAMPP it usually is: the whole folder sits under `htdocs/` and the address is
+`http://localhost:8080/donations/`, which is the project root rather than
+`public/`. Apache, finding no index file, lists the folder — `app/`, `vendor/`,
+`writable/`, the `.env` — and anybody who can reach the port can open them.
+
+Two things are in the repository against that:
+
+- **`index.html` at the root**, which Apache serves instead of the listing. It
+  sends the browser on to `public/` three ways — a `<meta http-equiv="refresh">`
+  for a browser with scripting off, `window.location.replace()` so Back does not
+  come straight back to it, and a plain link if both are blocked.
+- **`index.html` in every other folder**, saying *Directory access is
+  forbidden*. CodeIgniter ships these in the folders it creates; the rest were
+  written by `scripts/guard-directories.php`, which writes one into any folder
+  that has no index file and never touches an existing one. Run it after
+  `composer install` or `composer update`, which replace the whole of `vendor/`
+  and take its guards with them:
+
+  ```bash
+  php scripts/guard-directories.php
+  ```
+
+Those stop the *listing*. They do not stop a direct URL: with the project root
+served, `…/donations/.env` still returns the database password to anybody who
+asks for it by name. The document root is the fix, and until it is moved an
+`.htaccess` at this level is the next best thing:
+
+```apache
+Options -Indexes
+
+<FilesMatch "^\.env|\.md$|composer\.(json|lock)$">
+    Require all denied
+</FilesMatch>
+```
+
+`public/` needs none of this: its own `.htaccess` already carries
+`Options -Indexes`, and `index.php` is what Apache serves there anyway.
+
 ## Screens
 
 | Route | Purpose |

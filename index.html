@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Redirecting&hellip;</title>
+
+    <!--
+        The project root is not the application. `public/` is: it holds the
+        only PHP file a browser is meant to reach, and everything above it —
+        app/, system/, writable/, the .env — is support that nobody should be
+        reading over HTTP.
+
+        Apache serves this file instead of listing the folder, and it sends
+        anybody who lands here on to the app. Three ways, so a browser with
+        scripting off still arrives:
+
+          1. the meta refresh below, which needs nothing switched on,
+          2. window.location.replace(), which leaves no entry in the history
+             so Back does not come straight back here,
+          3. a link, if both are blocked.
+    -->
+    <meta http-equiv="refresh" content="0; url=public/">
+
+    <script>
+        // Relative to this folder, and correct whether or not the address
+        // arrived with its trailing slash: without one, "public/" would
+        // resolve against the parent and leave the project folder behind.
+        (function () {
+            var path = window.location.pathname;
+
+            if (path.charAt(path.length - 1) !== '/') {
+                path += '/';
+            }
+
+            window.location.replace(path + 'public/');
+        }());
+    </script>
+
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+            color: #334155;
+            background-color: #f8fafc;
+        }
+        p { font-size: 0.95rem; }
+        a { color: #1d4ed8; }
+    </style>
+</head>
+<body>
+
+<p>Taking you to the application&hellip; <a href="public/">Continue</a> if nothing happens.</p>
+
+</body>
+</html>

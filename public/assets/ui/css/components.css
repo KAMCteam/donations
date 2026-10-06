@@ -526,20 +526,22 @@
   transition-duration: var(--dur);
 }
 
-/* The fill and the text colour are only for the unchosen. A chosen chip also
-   carries its tone class, and the two rules have the same specificity — so
-   whichever is written later wins, and these are written later. Scoping them
-   this way leaves the tone's own fill, colour and border alone instead of
-   quietly painting over them. */
-.lab-status-btn:not(.is-active):not(.lab-status-btn--tinted) {
+/* A colour on a medical record is a statement, and a row of them all shouting
+   at once is four statements about a test nobody has answered yet. So an
+   answer wears its colour only once it is the answer: until then every chip
+   on the row is the same quiet white, whatever tone it carries, and the card
+   says nothing it has not been told.
+
+   Written to beat the tone classes it paints over. `.tone-red` and its
+   neighbours are one class each; `:not(.is-active)` makes this two, so this
+   wins wherever both apply without needing `!important` to say so. The border
+   is the shorthand because the tones set the shorthand. */
+.lab-status-btn:not(.is-active) {
   background-color: #fff;
   color: var(--slate-500);
+  border: 1px solid var(--slate-200);
+  opacity: 1;
 }
-
-/* A test somebody added answers in colours they chose, so each answer wears
-   its own whether or not it is the one recorded — the colours are the point of
-   having chosen them. The one recorded is still told apart by its weight. */
-.lab-status-btn--tinted:not(.is-active) { opacity: 0.72; }
 
 /* Chosen: the tone brings the fill, the text colour and the border, so the
    only thing left to add is the weight. No shadow — it made the chip float
@@ -594,13 +596,13 @@
   .input:hover,
   .textarea:hover    { border-color: var(--slate-300); }
   .chip:not(.is-active):hover { border-color: var(--slate-300); }
-  .lab-status-btn:not(.is-active):not(.lab-status-btn--tinted):hover {
+  /* The same for every unchosen chip now, coloured or not: what it looks
+     like before it is pressed is what it looks like before it is pressed. */
+  .lab-status-btn:not(.is-active):hover {
     border-color: var(--slate-300);
     background-color: var(--slate-50);
     color: var(--slate-700);
   }
-  /* A coloured answer brightens rather than greys: its colour is its name. */
-  .lab-status-btn--tinted:not(.is-active):hover { opacity: 1; }
   .btn-add-lab:hover { border-color: var(--slate-300); background-color: var(--slate-50); }
   .lab-name-field:hover { border-color: var(--slate-200); }
   .lab-remove-link:hover { color: #b91c1c; }

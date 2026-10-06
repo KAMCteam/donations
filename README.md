@@ -648,14 +648,42 @@ rather than against the form.
 Red marks the answer somebody has to act on — Positive, Abnormal, Not cleared
 — not merely an unwelcome one.
 
-The colours are on the answers themselves, every one of them and not only the
-one recorded, and **the answer recorded colours the whole card**: a workup is
-seventy cards read by running down it, and a colour you have to look twice for
-is not read at all. The wash on the card is a shade lighter than the answer's
-own chip, because the card is a surface and a surface in the chip's strength
-would shout over what is sitting on it. The neutral answers — Not done, Not
-applicable, Not required — colour nothing: every card would be wearing grey,
-which is another way of saying nothing.
+**An answer wears its colour only once it is the answer.** Until then every
+chip on the row is the same quiet white: a colour on a medical record is a
+statement, and four of them side by side are four statements about a test
+nobody has looked at yet. Pressing one paints it, and **the answer recorded
+colours the whole card** — a workup is seventy cards read by running down it,
+and a colour you have to look twice for is not read at all. The wash on the
+card is a shade lighter than the chip, because the card is a surface and a
+surface in the chip's strength would shout over what is sitting on it. The
+neutral answers — Not done, Not applicable, Not required — colour nothing:
+every card would be wearing grey, which is another way of saying nothing.
+
+#### Where the sheet disagrees with that
+
+Red is the answer somebody has to act on, and on most of the sheet that is
+Positive. On a handful of serologies it is the other way round, so
+`UiStore::SHEET_ANSWER_TONES` says where — by side, then by heading, then by
+test, because the recipient's sheet asks VZV twice and a jab is not a serology:
+
+| Side | Heading | Tests | Reads |
+| --- | --- | --- | --- |
+| Recipient | Infectious workup | HbsAb, Mumps, Rubella, CMV, Measles, VZV | Positive **green**, Negative **red** |
+| Recipient | Vaccinations | every line | Not given **red** |
+| Donor | Infectious workup | HbsAb, Mumps, Measles | Positive **blue** |
+
+A recipient with antibodies to measles, mumps, rubella, VZV, CMV or hepatitis B
+is a recipient who is protected: the positive is the reassuring answer, and the
+one worth chasing is the negative. Painting Positive red there said the
+opposite of what the result means, on the colour alone, which is how a card is
+read at a glance. The donor's sheet asks the same serologies for a different
+question — what the donor carries, not whether they are covered — so a positive
+is neither good news nor bad but a fact the transplant is planned around, which
+is blue. A vaccination not given is one somebody still has to give.
+
+Everything not named there keeps the colour it carries everywhere else. And a
+colour chosen by hand through **Edit results** wins over all of it: the sheet's
+colours are what a test wears when nobody has said otherwise.
 
 Pressing **Not done** on a test that has an answer takes the answer back. An
 unanswered test still writes no row — there is nothing to write — but once

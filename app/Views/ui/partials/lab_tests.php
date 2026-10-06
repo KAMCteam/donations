@@ -296,7 +296,7 @@ $groupBar = static function (array $p): void {
                               // added wears the ones it was given, and an
                               // answer nobody coloured is plain. ?>
                         <?php $answerTone = (string) $answer['tone']; ?>
-                        <button type="button" class="lab-status-btn<?= $answerTone === '' ? '' : ' lab-status-btn--tinted ' . esc($answerTone) ?><?= $test['status'] === $answer['key'] ? ' is-active' : '' ?>" data-lab-status="<?= esc($answer['key']) ?>" data-lab-tone="<?= esc($answerTone) ?>" data-lab-label="<?= esc($answer['label']) ?>"<?= in_array($answer['key'], UiStore::RESULT_UNANSWERED, true) ? ' data-lab-unanswered' : '' ?>><?= esc($answer['label']) ?></button>
+                        <button type="button" class="lab-status-btn<?= $answerTone === '' ? '' : ' ' . esc($answerTone) ?><?= $test['status'] === $answer['key'] ? ' is-active' : '' ?>" data-lab-status="<?= esc($answer['key']) ?>" data-lab-tone="<?= esc($answerTone) ?>" data-lab-label="<?= esc($answer['label']) ?>"<?= in_array($answer['key'], UiStore::RESULT_UNANSWERED, true) ? ' data-lab-unanswered' : '' ?>><?= esc($answer['label']) ?></button>
                     <?php endforeach; ?>
                 </div>
                 <?php endif; ?>

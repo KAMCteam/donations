@@ -36,7 +36,7 @@ final class MrpRegisterTest extends CIUnitTestCase
             $this->markTestSkipped('This schema is MySQL-specific; the tests group uses ' . $this->db->DBDriver . '.');
         }
 
-        $this->withSession(['ui_signed_in' => true, 'ui_organ' => 'kidney']);
+        $this->withSession(['auth_id' => 1, 'auth_login_id' => '1', 'auth_name' => 'Test User', 'auth_role' => 'admin', 'ui_organ' => 'kidney']);
     }
 
     /** @param array<string, mixed>|null $params */

@@ -413,11 +413,6 @@ final class UiStore
         $this->programs     = model(OrganProgramModel::class);
     }
 
-    /** Signs out: clears the session keys, never the records. */
-    public function reset(): void
-    {
-        $this->session->remove(['ui_organ', 'ui_staff_id']);
-    }
 
     // ---- Session-level selections -----------------------------------------
 
@@ -469,15 +464,6 @@ final class UiStore
         }
     }
 
-    public function isSignedIn(): bool
-    {
-        return (string) $this->session->get('ui_staff_id') !== '';
-    }
-
-    public function signIn(string $staffId): void
-    {
-        $this->session->set('ui_staff_id', $staffId);
-    }
 
     // ---- Reads -------------------------------------------------------------
 

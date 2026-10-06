@@ -1,0 +1,161 @@
+/* =========================================================
+   Signing in
+   =========================================================
+
+   What the login screen grew when it started being able to refuse somebody:
+   a message that is not an error, a way to read the password back, and a
+   button that says it is working. The screen itself is unchanged — these
+   borrow its type, its radii and its colours rather than bringing their own.
+
+   Loaded by the login screen and the 403 page only. The rest of the platform
+   never asks for it. */
+
+/* ---- Why somebody was sent here ----------------------------------------
+
+   Not red. Being asked to sign in is not a mistake somebody made, and the
+   error style under it has to stay the loud one for when it is. */
+.login-notice {
+  color: var(--slate-600);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  background-color: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-lg);
+  padding: 0.5rem 0.75rem;
+}
+
+/* ---- Reading the password back -----------------------------------------
+
+   The button sits over the right-hand end of the field rather than beside it,
+   so the row keeps the width every other box on this screen has. The input
+   gets padding to match, and only once the button is actually there —
+   `login.js` adds the class, so with scripting off nothing is reserved. */
+.login-field { position: relative; }
+
+.login-field .input { width: 100%; }
+
+.login-field--revealable .input { padding-right: 4.25rem; }
+
+.login-reveal {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-md, 0.375rem);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 500;
+  color: var(--slate-500);
+  transition-property: color, background-color;
+  transition-timing-function: var(--ease);
+  transition-duration: 150ms;
+}
+
+.login-reveal:focus-visible {
+  outline: 2px solid #15508A;
+  outline-offset: 1px;
+}
+
+@media (hover: hover) {
+  .login-reveal:hover {
+    color: var(--slate-700);
+    background-color: var(--slate-100);
+  }
+}
+
+/* ---- The button, while it is working -----------------------------------
+
+   Dimmed and not spinning. The post takes one round trip on a hospital
+   network; something turning would be an animation nobody finishes watching.
+   `pointer-events` is belt to the `disabled` braces — a second press would
+   post the form twice. */
+.login-submit[data-busy] {
+  opacity: 0.7;
+  cursor: progress;
+  pointer-events: none;
+}
+
+/* ---- The 403 page ------------------------------------------------------
+
+   The login screen's panel, holding a sentence instead of a form: the two
+   screens somebody meets before the platform should look like one thing. */
+.auth-message {
+  text-align: center;
+}
+
+.auth-message-code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--slate-400);
+  margin-bottom: 0.5rem;
+}
+
+.auth-message-body {
+  color: var(--slate-500);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  margin-top: 0.75rem;
+}
+
+.auth-message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+/* The same button as the form's, as a link: inline-block so the padding
+   makes a box rather than overlapping the line above. */
+.auth-message-actions .login-submit {
+  display: inline-block;
+  width: auto;
+  padding: 0.625rem 1.5rem;
+  text-align: center;
+}
+
+.auth-link {
+  align-self: center;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--slate-500);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---- A role's own dashboard --------------------------------------------
+
+   One card, because there is one thing on it so far: who is signed in. */
+.role-home-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.role-home-name {
+  font-size: var(--text-lg);
+  line-height: var(--lh-lg);
+  font-weight: 600;
+  color: var(--slate-800);
+}
+
+.role-home-role {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--slate-500);
+  background-color: var(--slate-100);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+}

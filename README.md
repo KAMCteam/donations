@@ -29,6 +29,10 @@ php spark serve      # http://localhost:8080
 php spark migrate                          # whatever the new commits added
 ```
 
+On a machine set up before the sign-in went in, that `migrate` creates the
+`users` table and the login screen will refuse everybody until it has a row in
+it — see [Creating accounts](#creating-accounts).
+
 The screens are code; the check list, the programmes and the words a status
 can take are **data**. A commit that adds an answer to a test, or a word to a
 status, ships a migration that writes it — and until the migration is run, the
@@ -120,7 +124,9 @@ Options -Indexes
 | Route | Purpose |
 | --- | --- |
 | `/` | Entry point — the login screen, or the dashboard when already signed in |
-| `/login` | Staff login |
+| `/login` | Sign in — User ID and password, checked against `users` |
+| `/logout` | Empties the session and returns to the login screen |
+| `/admin/dashboard`, `/doctor/dashboard`, `/coordinator/dashboard` | Where each role lands |
 | `/organ` | Programme picker (kidney / liver) |
 | `/dashboard` | Programme statistics and high-priority waitlist |
 | `/recipients` | Recipient waitlist, filterable by blood type and status |
@@ -1109,14 +1115,70 @@ refusal is now printed **once**, because the layout prints what a redirecting
 action left behind and a screen with a slot of its own was printing the same
 flash again underneath it.
 
-### Not wired up yet
+### Signing in
 
-One thing still stands between these screens and production use:
+`/login` is a real sign-in. It was not: it took any non-empty pair of boxes,
+exactly as the design package's did, and that was the one thing standing
+between these screens and being used.
 
-- **No real login.** `/login` accepts any non-empty Staff ID and password,
-  exactly as the design package's did. The `staff` table is there for it to
-  check against; until `Ui::attemptLogin()` does, this must not be deployed
-  anywhere reachable.
+A row in `users` is an account — the staff number typed into **User ID**, a
+`password_hash()` digest, and one of three roles. `App\Controllers\Auth` is
+the whole of it, and two rules shape what the screen says back:
+
+- **One message for a bad sign-in.** A wrong User ID and a wrong password both
+  answer *Invalid User ID or password*. Saying which was wrong turns the form
+  into a way of asking which staff numbers exist.
+- **A switched-off account is told so** — *Your account is inactive. Please
+  contact the administrator.* — but only once the password has been checked, so
+  the sentence is only ever shown to the person whose account it is. Asking the
+  question the other way round would answer it for anybody typing numbers in.
+
+The User ID is checked for shape before either, because a staff number is
+digits and anything else is a typing mistake rather than a failed sign-in:
+*User ID must be numbers only.* There is no minimum length on it or on the
+password yet. A refused attempt keeps the number in the box and never the
+password — retyping a number is the annoying half, and a password echoed into
+HTML is a password in the page source, in the browser's cache and in anything
+that logs a body.
+
+A successful one regenerates the session id, stores the account's id, name and
+role, and stamps `last_login_at`. `/logout` empties the session and comes back
+here.
+
+The screen itself is the one that was designed — the same panel, the same two
+fields, the same button. What was added is what a form that can now refuse
+somebody needs: the message, a **Show / Hide** on the password, and a button
+that says *Signing in…* while it works. The last two are
+`public/assets/ui/js/login.js`, which only ever adds; with scripting off the
+field is an ordinary password box and the button an ordinary submit, and
+signing in works exactly the same. Nothing about what is accepted is decided in
+the browser.
+
+#### Three roles, three doors
+
+| Role | Lands on |
+| --- | --- |
+| `admin` | `/admin/dashboard` |
+| `doctor` | `/doctor/dashboard` |
+| `coordinator` | `/coordinator/dashboard` |
+
+Those three are placeholders and say so: a name, a role and the way out, with a
+link into the platform. The mapping is written once, in `Auth::HOME`.
+
+Two filters guard everything else, put on the routes rather than on URI
+patterns so that a guard is read next to the address it guards:
+
+- **`auth`** — no session, no screen. It redirects to `/login` rather than
+  refusing, because not being signed in is a state somebody can leave, and the
+  way out is the screen they are being sent to.
+- **`role:admin`, `role:doctor,coordinator`** — allowing rather than denying,
+  so a role added later is kept out of every screen until somebody writes it
+  down. Signed in as the wrong role is a refusal, and gets a 403 built on the
+  login screen's own panel (`app/Views/errors/403.php`), naming their own
+  dashboard as the way out and not naming the screen they asked for.
+
+Every address in `Config\Routes` but `/login` and `/logout` is inside the
+`auth` group, so a route added to that file later is protected by being there.
 
 ## Database
 
@@ -1155,7 +1217,8 @@ writes.
 
 | Table | Exists because |
 | --- | --- |
-| `staff` | The login screen needs something to authenticate against |
+| `users` | Who may sign in, and as what: `login_id`, a password hash, a role |
+| `staff` | Superseded by `users`; kept, empty and unread, pending a decision to drop it |
 | `organ_programs` | The picker's cards are content — label, description, icon — not code |
 | `mrp` | Every record screen assigns a most responsible physician |
 | `coordinators` | Every record screen assigns a coordinator |
@@ -1276,12 +1339,37 @@ database.tests.DBDriver = MySQLi
 database.tests.DBPrefix =
 ```
 
-### Creating the first staff account
+### Creating accounts
 
-Nothing is seeded, and `Ui::attemptLogin()` does not check `staff` yet — it
-still accepts any non-empty credentials. Once it does, an account is a row with
-a `password_hash()` digest; `StaffModel::authenticate()` is already written for
-it.
+An account is a row in `users` with a `password_hash()` digest — never a
+password — and `UserModel::store()` is the one line that hashes one.
+
+For development there are three, one per role:
+
+```bash
+php spark db:seed UserSeeder
+```
+
+| User ID | Password | Role |
+| --- | --- | --- |
+| `1` | `A` | admin |
+| `2` | `A` | doctor |
+| `3` | `A` | coordinator |
+
+**It refuses to run outside `development`.** The passwords are a single letter;
+they exist so somebody building a screen can get past the login, and they would
+be a way in for anybody who can read this file. The seeder reads `ENVIRONMENT`
+and on anything else writes nothing and says why — so if it reports being
+skipped, `CI_ENVIRONMENT` in `.env` is not `development`, which on a fresh
+CodeIgniter `.env` it is not.
+
+It is deliberately not part of `DatabaseSeeder`, which runs on every install.
+These are made people, and nothing invents people into this system unless
+somebody asks for it by name. Re-running it leaves accounts that already exist
+exactly as they are, password included.
+
+The first real account is the same row written by hand or from a console, with
+`is_active = 1` and a role.
 
 ## Migration notes (CodeIgniter 3 → 4)
 
@@ -1384,8 +1472,8 @@ where behaviour differs from the CodeIgniter 3 original:
 collected recipient and donor arrays instead of saving them — and the migration
 preserved that. The controller has since been removed with the rest of the old
 screens, and `UiStore` now writes through `App\Models\*` to the tables, so
-adding a recipient, a donor or a pair saves. What remains open is the login,
-under [Not wired up yet](#not-wired-up-yet).
+adding a recipient, a donor or a pair saves. The login was the last thing left
+open and is now wired up too, under [Signing in](#signing-in).
 
 ## Licence
 

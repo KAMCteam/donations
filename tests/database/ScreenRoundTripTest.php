@@ -44,7 +44,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->db->table('mrp')->insert(['code' => 'MRP-001', 'name' => 'Dr. Test']);
         $this->mrpId = (int) $this->db->insertID();
 
-        $this->withSession(['ui_signed_in' => true, 'ui_organ' => 'kidney']);
+        $this->withSession(['auth_id' => 1, 'auth_login_id' => '1', 'auth_name' => 'Test User', 'auth_role' => 'admin', 'ui_organ' => 'kidney']);
     }
 
     /**
@@ -2368,7 +2368,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         // Switched to the liver programme; the kidney register is not its
         // to delete from, even though an MRN finds a record either way.
-        $this->withSession(['ui_signed_in' => true, 'ui_organ' => 'liver']);
+        $this->withSession(['auth_id' => 1, 'auth_login_id' => '1', 'auth_name' => 'Test User', 'auth_role' => 'admin', 'ui_organ' => 'liver']);
         $this->post('recipients/9211/delete');
 
         $this->seeInDatabase('recipients', ['mrn' => 9211]);

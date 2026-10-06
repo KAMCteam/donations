@@ -2,6 +2,8 @@
 
 namespace Config;
 
+use App\Filters\AuthFilter;
+use App\Filters\RoleFilter;
 use CodeIgniter\Config\Filters as BaseFilters;
 use CodeIgniter\Filters\Cors;
 use CodeIgniter\Filters\CSRF;
@@ -34,6 +36,13 @@ class Filters extends BaseFilters
         'forcehttps'    => ForceHTTPS::class,
         'pagecache'     => PageCache::class,
         'performance'   => PerformanceMetrics::class,
+
+        // Signing in, and what a role may reach once it has. Put on routes in
+        // Config\Routes rather than on URI patterns here: the routes file is
+        // where it can be read next to the address it guards, and a route
+        // added to a guarded group is guarded by being there.
+        'auth'          => AuthFilter::class,
+        'role'          => RoleFilter::class,
     ];
 
     /**
@@ -80,7 +89,13 @@ class Filters extends BaseFilters
             // delete buttons went in, nothing checked the token. A page on
             // another site could not read this one, but it could post to it,
             // and one of the things it can post to now removes a patient.
-            'csrf' => ['except' => ['login']],
+            //
+            // `login` used to be excepted, from when the screen let anybody
+            // through and there was nothing behind it worth forging. It is a
+            // real sign-in now, so it is checked like every other post: the
+            // token comes from the login page itself, so an honest attempt
+            // always carries one.
+            'csrf' => [],
         ],
         'after' => [
         ],

@@ -4020,9 +4020,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('data-lab-tone="tone-emerald"', $view);
         $this->assertStringContainsString('data-lab-status="not_seen" data-lab-tone="tone-emerald"', $view);
         $this->assertStringNotContainsString('What this test answers', $view);
-        // Every answer wears the colour it was given, not only the one
-        // recorded: being able to tell them apart is why they were chosen.
-        $this->assertStringContainsString('lab-status-btn lab-status-btn--tinted tone-emerald', $view);
+        // Every answer carries the colour it was given, ready for when it is
+        // pressed — the stylesheet keeps an unchosen chip white, and the class
+        // is what it wears once it is the answer.
+        $this->assertStringContainsString('lab-status-btn tone-emerald', $view);
         // And the saved test carries its own way back into the list.
         $this->assertStringContainsString('recipients/4081?edit=labs#lab-' . $lab['id'] . '"', $view);
         $this->assertStringContainsString('Edit results', $view);
@@ -4083,8 +4084,9 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $html = $this->get('recipients/4097')->getBody();
         $this->assertStringContainsString('data-lab-status="pending" data-lab-tone="tone-amber"', $html);
         $this->assertStringContainsString('data-lab-status="done" data-lab-tone=""', $html);
-        // The coloured one is tinted on the card; the plain ones are not.
-        $this->assertStringContainsString('lab-status-btn--tinted tone-amber', $html);
+        // The coloured one carries its tone class; the plain ones carry none.
+        $this->assertStringContainsString('lab-status-btn tone-amber', $html);
+        $this->assertStringContainsString('class="lab-status-btn"', $html);
     }
 
     /**
@@ -4115,10 +4117,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertSame($before + 1, substr_count($html, 'lab-card--toned'));
         $this->assertStringContainsString('lab-card--toned lab-card--red', $html);
 
-        // And the check list's own answers wear the sheet's colours again,
-        // every one of them rather than only the one recorded.
+        // And the check list's own answers carry the sheet's colours again,
+        // every one of them — worn by whichever is pressed.
         $this->assertStringContainsString('data-lab-status="negative" data-lab-tone="tone-emerald"', $html);
-        $this->assertStringContainsString('lab-status-btn--tinted tone-emerald', $html);
+        $this->assertStringContainsString('lab-status-btn tone-emerald', $html);
 
         // Not done is the resting state, so it colours nothing: the card gives
         // its colour back.
@@ -4395,6 +4397,139 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /** @return string The markup of one test's card. */
+    // ---- What the sheet paints its answers ---------------------------------
+
+    /**
+     * A colour is a statement, so a chip makes it only once it is the answer.
+     *
+     * A row of four chips each shouting its own colour is four statements
+     * about a test nobody has answered yet. The unchosen ones carry their tone
+     * for when they are pressed, and the stylesheet keeps them white until
+     * they are — so the markup must put nothing else on them.
+     */
+    public function testAnUnchosenAnswerCarriesItsToneAndNothingElse(): void
+    {
+        $this->post('recipients/new', ['mrn' => '7700', 'name' => 'Palette', 'age' => '40', 'bloodType' => 'O']);
+
+        $card = $this->cardFor($this->get('recipients/7700?edit=labs')->getBody(), 'HIV');
+
+        // The chosen one and the rest are told apart by `is-active` alone.
+        $this->assertStringContainsString('class="lab-status-btn tone-slate is-active"', $card);
+        $this->assertStringContainsString('class="lab-status-btn tone-red"', $card);
+        $this->assertStringNotContainsString('lab-status-btn--tinted', $card);
+    }
+
+    /**
+     * The six serologies the recipient's sheet reads the other way round.
+     *
+     * A recipient with antibodies to measles, mumps, rubella, VZV, CMV or
+     * hepatitis B is protected, so the positive is the reassuring answer and
+     * the negative is the one somebody has to act on. Everywhere else on the
+     * sheet — HIV, HCV, the rest — Positive is still red.
+     */
+    public function testTheRecipientsImmunitySerologiesReadPositiveAsGoodNews(): void
+    {
+        $tests = UiStore::defaultLabTests('kidney', 'recipient');
+        $tone  = static function (array $tests, string $name, string $group, string $answer): string {
+            foreach ($tests as $test) {
+                if ($test['name'] !== $name || $test['group'] !== $group) {
+                    continue;
+                }
+
+                foreach ($test['answers'] as $option) {
+                    if ($option['key'] === $answer) {
+                        return $option['tone'];
+                    }
+                }
+            }
+
+            return 'no such answer';
+        };
+
+        foreach (['HbsAb', 'Mumps', 'Rubella', 'CMV', 'Measles', 'VZV'] as $name) {
+            $this->assertSame('tone-emerald', $tone($tests, $name, 'Infectious workup', 'positive'), $name . ' positive');
+            $this->assertSame('tone-red', $tone($tests, $name, 'Infectious workup', 'negative'), $name . ' negative');
+        }
+
+        // And the sheet is otherwise untouched.
+        foreach (['HIV', 'HCV', 'Toxoplasma', 'Syphilis'] as $name) {
+            $this->assertSame('tone-red', $tone($tests, $name, 'Infectious workup', 'positive'), $name . ' positive');
+            $this->assertSame('tone-emerald', $tone($tests, $name, 'Infectious workup', 'negative'), $name . ' negative');
+        }
+    }
+
+    /** A jab that was not given is a jab somebody still has to give. */
+    public function testEveryVaccinationPaintsNotGivenRed(): void
+    {
+        $seen = 0;
+
+        foreach (UiStore::defaultLabTests('kidney', 'recipient') as $test) {
+            if ($test['group'] !== 'Vaccinations') {
+                continue;
+            }
+
+            $seen++;
+            $tones = array_column($test['answers'], 'tone', 'key');
+
+            $this->assertSame('tone-red', $tones['not_given'] ?? '', $test['name']);
+            $this->assertSame('tone-emerald', $tones['given'] ?? '', $test['name']);
+        }
+
+        $this->assertGreaterThan(0, $seen, 'the sheet has a Vaccinations group');
+    }
+
+    /**
+     * The donor's sheet asks the same serologies for a different reason.
+     *
+     * Not whether they are covered but what they carry, which is neither good
+     * news nor bad — it is a fact the transplant is planned around. Blue.
+     */
+    public function testTheDonorsSerologiesReadPositiveAsAFactAndNotAWarning(): void
+    {
+        $tones = [];
+
+        foreach (UiStore::defaultLabTests('kidney', 'donor') as $test) {
+            if ($test['group'] === 'Infectious workup') {
+                $tones[$test['name']] = array_column($test['answers'], 'tone', 'key');
+            }
+        }
+
+        foreach (['HbsAb', 'Mumps', 'Measles'] as $name) {
+            $this->assertSame('tone-blue', $tones[$name]['positive'] ?? '', $name . ' positive');
+            $this->assertSame('tone-emerald', $tones[$name]['negative'] ?? '', $name . ' negative');
+        }
+
+        foreach (['HIV', 'HCV', 'CMV', 'Rubella', 'VZV'] as $name) {
+            $this->assertSame('tone-red', $tones[$name]['positive'] ?? '', $name . ' positive');
+        }
+
+        // The recipient's rule is the recipient's: the donor has no
+        // Vaccinations group at all, and nothing leaked across.
+        $this->assertSame('tone-red', $tones['Rubella']['positive'] ?? '');
+    }
+
+    /**
+     * And a colour somebody chose by hand still wins.
+     *
+     * The sheet's own colours are what a test wears when nobody has said
+     * otherwise. Edit results is where somebody says otherwise, and the sheet
+     * does not argue with it.
+     */
+    public function testAColourChosenByHandOverridesTheSheets(): void
+    {
+        $chosen = json_encode([
+            ['key' => 'not_done', 'label' => 'Not done', 'tone' => 'tone-slate'],
+            ['key' => 'positive', 'label' => 'Positive', 'tone' => 'tone-blue'],
+            ['key' => 'negative', 'label' => 'Negative', 'tone' => 'tone-amber'],
+        ]);
+
+        $answers = UiStore::answerSet('positive_negative', $chosen, 'recipient', 'Infectious workup', 'Mumps');
+        $tones   = array_column($answers, 'tone', 'key');
+
+        $this->assertSame('tone-blue', $tones['positive']);
+        $this->assertSame('tone-amber', $tones['negative']);
+    }
+
     private function cardFor(string $html, string $test): string
     {
         $cards = explode('class="lab-card', $html);

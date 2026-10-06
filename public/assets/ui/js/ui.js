@@ -293,7 +293,7 @@
       // Every answer that has a colour wears it, whether or not it is the one
       // recorded; the one recorded is told apart by its weight.
       btn.className = "lab-status-btn" +
-        (own ? " lab-status-btn--tinted " + own : "") +
+        (own ? " " + own : "") +
         (btn === chosen ? " is-active" : "");
     });
   }

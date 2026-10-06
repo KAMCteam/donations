@@ -290,6 +290,60 @@ final class UiStore
     public const LAB_TONE_DEFAULT = 'tone-slate';
 
     /**
+     * Where the check list disagrees with {@see self::RESULT_TONE}.
+     *
+     * Red means "somebody has to act on this", and for most of the sheet that
+     * is Positive. On a handful of serologies it is the other way round: a
+     * recipient with antibodies to measles, mumps, rubella, VZV, CMV or
+     * hepatitis B is a recipient who is protected, and the answer worth
+     * chasing is the negative one. Painting those Positive red said the
+     * opposite of what the result means, on the colour alone, which is how a
+     * card is read at a glance.
+     *
+     * The donor's sheet asks the same serologies for a different reason —
+     * what the donor carries, not whether they are covered — so a positive
+     * there is neither good news nor bad: it is a fact the transplant has to
+     * be planned around. Blue, which is the platform's word for that.
+     *
+     * Keyed by side, then by the heading, then by the test — the heading
+     * because the recipient's sheet asks VZV twice, once as a serology and
+     * once as a jab, and these are not the same question. `*` is every test
+     * under that heading.
+     *
+     * This is where the sheet differs, and only that: an answer not named
+     * here keeps the colour it carries everywhere else, and a test not named
+     * here is untouched. {@see self::sheetAnswerSet()} turns it into the
+     * `answer_set` a lab row stores, which is the same field the Edit results
+     * picker writes — so a coordinator can still change any of it afterwards,
+     * and nothing here overwrites a choice they have made.
+     */
+    public const SHEET_ANSWER_TONES = [
+        'recipient' => [
+            // Immunity, not infection: the positive is the reassuring answer.
+            'Infectious workup' => [
+                'HbsAb'   => ['positive' => 'tone-emerald', 'negative' => 'tone-red'],
+                'Mumps'   => ['positive' => 'tone-emerald', 'negative' => 'tone-red'],
+                'Rubella' => ['positive' => 'tone-emerald', 'negative' => 'tone-red'],
+                'CMV'     => ['positive' => 'tone-emerald', 'negative' => 'tone-red'],
+                'Measles' => ['positive' => 'tone-emerald', 'negative' => 'tone-red'],
+                'VZV'     => ['positive' => 'tone-emerald', 'negative' => 'tone-red'],
+            ],
+            // A jab that was not given is a jab somebody still has to give,
+            // on every line of the group without exception.
+            'Vaccinations' => [
+                '*' => ['not_given' => 'tone-red'],
+            ],
+        ],
+        'donor' => [
+            'Infectious workup' => [
+                'HbsAb'   => ['positive' => 'tone-blue'],
+                'Mumps'   => ['positive' => 'tone-blue'],
+                'Measles' => ['positive' => 'tone-blue'],
+            ],
+        ],
+    ];
+
+    /**
      * What a test added under "Other" answers until somebody says otherwise.
      *
      * The three every test has in common: not looked at, being looked at,
@@ -1272,7 +1326,10 @@ final class UiStore
                 // test with nothing to press.
                 'answers'    => self::answerSet(
                     (string) ($lab['result_type'] ?? 'text'),
-                    $lab['answer_set'] ?? null
+                    $lab['answer_set'] ?? null,
+                    $personType,
+                    (string) ($lab['parent_name'] ?? ''),
+                    (string) $lab['name']
                 ),
                 'status'     => 'not_done',
                 'result'     => '',
@@ -1931,7 +1988,10 @@ final class UiStore
                 // one somebody added answers what they chose.
                 'answers'    => self::answerSet(
                     (string) ($row['result_type'] ?? 'text'),
-                    $row['answer_set'] ?? null
+                    $row['answer_set'] ?? null,
+                    $personType,
+                    (string) ($row['parent_name'] ?? ''),
+                    (string) $row['lab_name']
                 ),
                 'status'     => $row['status'],
                 'result'     => (string) $row['value'],
@@ -2262,8 +2322,13 @@ final class UiStore
      *
      * @return list<array{key: string, label: string, tone: string, own: bool}>
      */
-    public static function answerSet(string $resultType, ?string $stored): array
-    {
+    public static function answerSet(
+        string $resultType,
+        ?string $stored,
+        string $personType = '',
+        string $parent = '',
+        string $name = ''
+    ): array {
         $chosen = $stored === null || trim($stored) === '' ? null : json_decode($stored, true);
 
         if (! is_array($chosen)) {
@@ -2273,6 +2338,12 @@ final class UiStore
             $keys = $own
                 ? self::CUSTOM_ANSWER_DEFAULT
                 : (self::RESULT_OPTIONS[$resultType] ?? self::RESULT_OPTIONS['text']);
+
+            // Where the sheet paints an answer differently from everywhere
+            // else. Only here, in the branch for a test nobody has recoloured
+            // by hand: a set somebody chose through Edit results is theirs,
+            // and the sheet does not argue with it.
+            $sheet = $own ? [] : self::sheetTones($personType, $parent, $name);
 
             return array_map(static fn (string $key): array => [
                 'key'   => $key,
@@ -2287,7 +2358,7 @@ final class UiStore
                 // platform would have given these answers anyway — there is
                 // nothing to be gained by making somebody paint Positive red
                 // — and the picker is there to change them.
-                'tone'  => self::labTone(self::RESULT_TONE[$key] ?? ''),
+                'tone'  => self::labTone($sheet[$key] ?? self::RESULT_TONE[$key] ?? ''),
                 'own'   => false,
             ], $keys);
         }
@@ -2328,6 +2399,21 @@ final class UiStore
      *
      * @param array<string, mixed> $posted
      */
+    /**
+     * What this test's answers are painted, where the sheet disagrees.
+     *
+     * An empty map for almost every test, which is the sheet saying there is
+     * nothing special about it. {@see self::SHEET_ANSWER_TONES}
+     *
+     * @return array<string, string>
+     */
+    public static function sheetTones(string $personType, string $parent, string $name): array
+    {
+        $group = self::SHEET_ANSWER_TONES[$personType][$parent] ?? [];
+
+        return $group[$name] ?? $group['*'] ?? [];
+    }
+
     public static function answerSetToJson(array $posted): ?string
     {
         $answers = [];

@@ -861,9 +861,57 @@ and serology is somebody else's — and "16%" does not say which of them is
 waiting.
 
 So every group carries its own bar and percentage beside its heading, counted
-exactly as the card's own is (`UiStore::labProgress`, over that group's tests).
-A group of nothing but free-text lines gets none: there is nothing in it to
-complete, and a percentage of nothing is a number about nothing.
+over that group's tests (`LabProgress::counted()`). A group of nothing but
+free-text lines gets none: there is nothing in it to complete, and a percentage
+of nothing is a number about nothing.
+
+#### The figure at the top weighs the groups
+
+Counting cards gave every test the same say. Seventeen serologies and one cross
+match moved the bar by the same amount each, so a sheet could read 30% on the
+strength of the easy half and 30% again with the immunology untouched — it was
+arithmetic about cards rather than about a transplant.
+
+The groups carry the weight now, and `App\Libraries\LabProgress` is the whole
+of it:
+
+    contribution = the group's weight × how far that group has got
+    the whole    = every contribution added up
+
+| Recipient | | Donor | |
+| --- | --- | --- | --- |
+| Immunology tests | 15% | Clearances | 16% |
+| Infectious workup | 15% | Imaging | 16% |
+| Referrals and Clearances | 15% | Immunology | 16% |
+| Hematology/Biochemistry | 10% | Hematology/Biochem | 16% |
+| Imaging | 10% | Infectious workup | 16% |
+| Transplant Clinic | 10% | Transplant Clinic | 10% |
+| Cancer screening | 10% | Urine/Stool | 10% |
+| Vaccinations | 10% | | |
+| Urine/Stool | 5% | | |
+
+A donor whose Infectious workup is 16 of 17 — 94% of a group worth 16% —
+contributes 15.04%, so the card reads **15%** where counting cards said 30%.
+Finish a group and it hands over its whole weight.
+
+Four headings are spelled the same on both sheets and weighted differently, so
+the side is read off the tests (`labTestsFor()` stamps each one) rather than
+guessed from the name. Each side's table must come to exactly 100 and
+`LabProgress` refuses to answer otherwise: a table summing to 95 gives a bar
+that stops at 95% on a finished workup, and nothing on the screen would say
+why.
+
+Two things deliberately carry no weight. A group with no tests on a record
+contributes nothing and does not hand its weight to anybody else — a sheet
+missing a group cannot reach 100%, which is the true thing to say about it. And
+**Other**, the heading a record's own added tests sit under, is worth 0%: the
+weights are the check list's, and a test added for one patient is not part of
+it. Giving it a share would mean every record's percentage measured a slightly
+different thing.
+
+The sentence beside the bar is untouched. "16 of 54 completed" is still sixteen
+cards out of fifty-four, because that sentence is about cards and is read as
+such — it is only the percentage that weighs them.
 
 Shut, the card shows the groups by name with the same percentages, two or three
 across depending on the width — which is the whole point of being able to shut
@@ -874,8 +922,11 @@ lines go, because each group is saying it over its own tests.
 in is read off the markup (`data-lab-group="3"` on its cards, the same number
 on its heading and on its line in the folded summary), because the Other
 group's heading sits outside the fieldset — to keep **Add lab** pressable while
-the card is read-only — and the numbers are what tie the two together. Without
-the script, every bar is still right: the server renders them.
+the card is read-only — and the numbers are what tie the two together. The
+weight rides along the same way, as `data-lab-weight`, so the figure at the top
+stays weighted while somebody is pressing answers and there is no second copy
+of the table living in the browser. Without the script, every bar is still
+right: the server renders them.
 
 ### Status: three facts, not one
 

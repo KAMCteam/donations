@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Libraries\RecordBlocks;
+use App\Libraries\LabProgress;
 use App\Libraries\UiStore;
 use App\Models\PairModel;
 use CodeIgniter\HTTP\RedirectResponse;
@@ -295,7 +296,7 @@ class Ui extends BaseController
             'printedOn'  => date('d/m/Y'),
             'headers'    => ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs', 'Status'],
             'rows'       => array_map(static function (array $d): array {
-                $progress = UiStore::labProgress($d['labTests']);
+                $progress = LabProgress::counted($d['labTests']);
                 $status   = UiStore::personStatusFromUi((string) $d['donorStatus']);
 
                 return [

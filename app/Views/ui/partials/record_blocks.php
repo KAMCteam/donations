@@ -1,5 +1,6 @@
 <?php
 
+use App\Libraries\LabProgress;
 use App\Libraries\UiStore;
 
 /**
@@ -82,7 +83,7 @@ $dash = '—';
                 // The workup, in the check list's own groups and order. The
                 // progress line is the same count the screen shows, so a
                 // printed sheet and the record it came from agree.
-                $progress = UiStore::labProgress($block['tests']);
+                $progress = LabProgress::weighted($block['tests']);
                 $groups   = [];
 
                 foreach ($block['tests'] as $test) {

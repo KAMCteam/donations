@@ -301,7 +301,7 @@
   /* How far a set of cards has got: the same count the server makes. */
   function labCount(root) {
     // Not the Other box: it has no answer to give, so it is neither done nor
-    // outstanding. `UiStore::labProgress` leaves it out for the same reason,
+    // outstanding. `LabProgress` leaves it out for the same reason,
     // and the two counts have to agree — otherwise the total jumps the moment
     // the first answer is pressed.
     var cards = root.querySelectorAll(".lab-card:not(.lab-card--free)");
@@ -335,24 +335,54 @@
     });
   }
 
+  /* The figure at the top of the card: each group's progress, times what that
+     group is worth.
+
+     The weights are on the markup, one per group, because they are the
+     server's — App\Libraries\LabProgress holds them — and a second copy here
+     would be a second thing to keep in step. A sheet with no weights on it at
+     all (nothing has given that side a table) falls back to counting cards,
+     which is what the server does for it too.
+
+     A group with no cards contributes nothing and keeps its weight out of the
+     total by doing so, exactly as the server has it. */
+  function labWeighted(section, groups, plain) {
+    var weighed = false;
+    var sum = 0;
+
+    groups.forEach(function (group) {
+      var weight = parseInt(group.getAttribute("data-lab-weight"), 10) || 0;
+      if (!weight) return;
+
+      weighed = true;
+      sum += weight * (labCount(group).pct / 100);
+    });
+
+    return weighed ? Math.round(sum) : plain;
+  }
+
   /* "3 of 7 completed", the bar and the percentage — the card's, and each
      group's. */
   function updateLabSummary(section) {
     var whole = labCount(section);
-
-    var count = section.querySelector("[data-lab-count]");
-    if (count) count.textContent = whole.done + " of " + whole.total + " completed";
-
-    var fill = section.querySelector("[data-lab-fill]");
-    if (fill) fill.style.width = whole.pct + "%";
-
-    var label = section.querySelector("[data-lab-pct]");
-    if (label) label.textContent = whole.pct + "%";
-
     // Each group's bar sits beside its heading and its cards are elsewhere —
     // the Other group's heading is outside the fieldset, to keep Add lab
     // pressable — so the number on the markup is what ties them together.
-    section.querySelectorAll("[data-lab-group]").forEach(function (group) {
+    var groups = section.querySelectorAll("[data-lab-group]");
+
+    // Still cards: that sentence is about cards and is read as such.
+    var count = section.querySelector("[data-lab-count]");
+    if (count) count.textContent = whole.done + " of " + whole.total + " completed";
+
+    var pct = labWeighted(section, groups, whole.pct);
+
+    var fill = section.querySelector("[data-lab-fill]");
+    if (fill) fill.style.width = pct + "%";
+
+    var label = section.querySelector("[data-lab-pct]");
+    if (label) label.textContent = pct + "%";
+
+    groups.forEach(function (group) {
       paintGroup(section, group.getAttribute("data-lab-group"), labCount(group).pct);
     });
   }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Database\Seeds\DatabaseSeeder;
+use App\Libraries\LabProgress;
 use App\Libraries\UiStore;
 
 /**
@@ -43,7 +44,9 @@ $section  = $section ?? null;
 // `view()` calls and the page's own `$title` would otherwise land here — which
 // it did, and the recipient's workup was headed with the recipient's name.
 $labsTitle = $labsTitle ?? 'Required Lab Tests';
-$progress = UiStore::labProgress($tests);
+// The figure at the top of the card weighs the groups by what they are worth;
+// each group's own bar below is that group and nothing else.
+$progress = LabProgress::weighted($tests);
 
 // A workup is seventy-odd cards long, which is a screenful and a half between
 // whoever is reading and whatever comes after it. On a screen where what comes
@@ -91,9 +94,19 @@ if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROU
 // bar: `labProgress` leaves those out, so its total is zero and a percentage
 // of them would be a number about nothing.
 $groupProgress = array_map(
-    static fn (array $groupTests): array => UiStore::labProgress($groupTests),
+    static fn (array $groupTests): array => LabProgress::counted($groupTests),
     $groups
 );
+
+// What each group is worth towards the figure at the top. On the markup so
+// that `ui.js` can keep that figure right as answers are pressed, without a
+// second copy of the table living in the browser. {@see LabProgress}
+$side       = LabProgress::sideOf($tests);
+$groupWeight = [];
+
+foreach (array_keys($groups) as $groupName) {
+    $groupWeight[$groupName] = LabProgress::weightFor($side, (string) $groupName);
+}
 
 // The groups are numbered, and a group's bar, its cards and its line in the
 // folded summary all carry the number. Names would do it too, until one of
@@ -204,7 +217,7 @@ $groupBar = static function (array $p): void {
                 <?php $groupBar($groupProgress[$groupName]); ?>
             </div>
         <?php endif; ?>
-        <div class="lab-grid" data-lab-group="<?= (int) $groupNumber[$groupName] ?>">
+        <div class="lab-grid" data-lab-group="<?= (int) $groupNumber[$groupName] ?>" data-lab-weight="<?= (int) ($groupWeight[$groupName] ?? 0) ?>">
         <?php foreach ($groupTests as $i => $test): ?>
             <?php // $field and $i are ours, not user input, so the name needs no escaping. ?>
             <?php $base = $field . '[' . $i . ']'; ?>

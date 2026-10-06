@@ -1,6 +1,7 @@
 <?php
 
 use App\Database\Seeds\DatabaseSeeder;
+use App\Libraries\LabProgress;
 use App\Libraries\UiStore;
 use App\Models\CoordinatorModel;
 use App\Models\DonorModel;
@@ -497,12 +498,12 @@ final class SchemaTest extends CIUnitTestCase
         );
 
         $this->assertCount(74, $workup);
-        $this->assertSame(74, UiStore::labProgress($workup)['total'], 'the catalogue has no free-text card left');
+        $this->assertSame(74, LabProgress::counted($workup)['total'], 'the catalogue has no free-text card left');
 
         // The rule itself, on a card that does have nothing to answer.
         $withBox = array_merge($workup, [['resultType' => 'free_text', 'status' => 'not_done']]);
         $this->assertCount(75, $withBox);
-        $this->assertSame(74, UiStore::labProgress($withBox)['total']);
+        $this->assertSame(74, LabProgress::counted($withBox)['total']);
     }
 
     public function testAnUnrecordedTestStillComesBackAsNotDone(): void

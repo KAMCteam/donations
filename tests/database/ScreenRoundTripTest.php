@@ -1,6 +1,7 @@
 <?php
 
 use App\Database\Seeds\DatabaseSeeder;
+use App\Libraries\LabProgress;
 use App\Libraries\UiStore;
 use CodeIgniter\Exceptions\PageNotFoundException;
 use CodeIgniter\Test\CIUnitTestCase;
@@ -1587,6 +1588,73 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $after = $this->get('recipients/8957')->getBody();
         $this->assertGreaterThan(0, $this->groupPct($after, 0), 'the first group moved');
         $this->assertSame(0, $this->groupPct($after, 1), 'and nobody else did');
+    }
+
+    /**
+     * The figure at the top of the card weighs the groups.
+     *
+     * Counting cards gave every test the same say: finishing a group of
+     * seventeen serologies moved the bar as far as finishing anything else of
+     * seventeen. It is the group's weight times how far that group has got now
+     * — and the sentence beside it still counts cards, because that is what it
+     * says.
+     */
+    public function testTheWholeCardsPercentageIsWeightedByGroup(): void
+    {
+        $this->post('donors/new', ['mrn' => '8960', 'name' => 'Being Worked Up', 'age' => '30', 'bloodType' => 'O']);
+
+        // Answer every test under Infectious workup, which is worth 16% of a
+        // donor's sheet, and nothing else at all.
+        $tests  = (new UiStore(session()))->findDonor('8960')['labTests'];
+        $posted = [];
+        $done   = 0;
+
+        foreach ($tests as $i => $test) {
+            $status = $test['status'];
+
+            if ($test['group'] === 'Infectious workup') {
+                $answers = array_column($test['answers'] ?? [], 'key');
+                $status  = array_values(array_diff($answers, UiStore::RESULT_UNANSWERED))[0] ?? 'done';
+                $done++;
+            }
+
+            $posted[$i] = ['id' => $test['id'], 'name' => $test['name'], 'status' => $status];
+        }
+
+        $this->post('donors/8960', ['section' => 'labs', 'labs' => $posted]);
+
+        $html = $this->get('donors/8960')->getBody();
+
+        // The group itself is finished, so it hands over the whole of its 16%.
+        $this->assertSame(16, $this->wholePct($html));
+        $this->assertStringContainsString('data-lab-weight="16"', $html);
+
+        // And the count is still a count: it went up by every card answered,
+        // which is far more than 16% of the sheet.
+        $this->assertStringContainsString($done . ' of ', $html);
+        $this->assertGreaterThan(16, (int) round($done / count($tests) * 100));
+    }
+
+    /** The weights reach the markup, so `ui.js` keeps the same figure. */
+    public function testEachGroupCarriesItsWeightOnTheMarkup(): void
+    {
+        $this->post('recipients/new', ['mrn' => '8961', 'name' => 'Weighted', 'age' => '40', 'bloodType' => 'O']);
+
+        $html = $this->get('recipients/8961')->getBody();
+
+        foreach (LabProgress::WEIGHTS['recipient'] as $weight) {
+            $this->assertStringContainsString('data-lab-weight="' . $weight . '"', $html);
+        }
+
+        // The heading a record's own tests sit under is worth nothing, and the
+        // markup says so rather than leaving the attribute off.
+        $this->assertStringContainsString('data-lab-weight="0"', $html);
+    }
+
+    /** The whole card's percentage, as the bar is showing it. */
+    private function wholePct(string $html): int
+    {
+        return preg_match('/data-lab-pct[^>]*>(\d+)%/', $html, $m) === 1 ? (int) $m[1] : -1;
     }
 
     /** The percentage one group's bar is showing. */

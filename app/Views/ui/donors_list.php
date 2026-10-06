@@ -3,6 +3,7 @@
 <?= $this->section('content') ?>
 <?php
 
+use App\Libraries\LabProgress;
 use App\Libraries\UiStore;
 
 /**
@@ -119,7 +120,7 @@ $filterQuery = static function () use ($btFilter, $statusFilter, $searchQuery): 
                 <tbody>
                     <?php foreach ($donors as $donor): ?>
                         <?php
-                        $progress = UiStore::labProgress($donor['labTests']);
+                        $progress = LabProgress::counted($donor['labTests']);
                         $url      = site_url('donors/' . rawurlencode($donor['id']));
                         ?>
                         <tr data-href="<?= $url ?>">

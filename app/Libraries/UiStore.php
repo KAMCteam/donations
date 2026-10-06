@@ -1444,6 +1444,9 @@ final class UiStore
                 'name'       => $lab['name'],
                 'group'      => (string) ($lab['parent_name'] ?? ''),
                 'resultType' => (string) ($lab['result_type'] ?? 'text'),
+                // Which sheet this test is from. The two weight their shared
+                // headings differently, so the name cannot say.
+                'side'       => $personType,
                 'custom'     => false,
                 // The same answers a saved record's cards carry, because they
                 // are the same cards: the card renders the answers it is
@@ -2105,6 +2108,7 @@ final class UiStore
                 'name'       => $row['lab_name'],
                 'group'      => (string) ($row['parent_name'] ?? ''),
                 'resultType' => (string) ($row['result_type'] ?? 'text'),
+                'side'       => $personType,
                 // A test this record added for itself: its name is theirs to
                 // type and theirs to take away again.
                 'custom'     => $row['owner_mrn'] !== null,
@@ -2649,28 +2653,4 @@ final class UiStore
         return $try;
     }
 
-    /**
-     * Completed / total for a person's workup.
-     *
-     * @param list<array<string, mixed>> $labTests
-     *
-     * @return array{done: int, total: int, pct: int}
-     */
-    public static function labProgress(array $labTests): array
-    {
-        // A free-text card has no answer to give, so it is neither done nor
-        // outstanding — counting it would hold the bar below 100% for ever.
-        $countable = array_filter(
-            $labTests,
-            static fn (array $t): bool => ! in_array($t['resultType'] ?? '', self::FREE_TEXT_TYPES, true)
-        );
-
-        $total = count($countable);
-        $done  = count(array_filter(
-            $countable,
-            static fn (array $t): bool => ! in_array($t['status'], self::RESULT_UNANSWERED, true)
-        ));
-
-        return ['done' => $done, 'total' => $total, 'pct' => (int) round($done / max($total, 1) * 100)];
-    }
 }

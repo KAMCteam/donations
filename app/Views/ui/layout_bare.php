@@ -25,6 +25,8 @@
     <link rel="stylesheet" href="<?= base_url('assets/ui/css/layout.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/ui/css/components.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/ui/css/pages.css') ?>">
+    <?php // What a single screen needs and the others do not. ?>
+    <?= $this->renderSection('head') ?>
 </head>
 
 <body>
@@ -39,6 +41,7 @@
     </div>
 
     <script src="<?= base_url('assets/ui/js/ui.js') ?>"></script>
+    <?= $this->renderSection('scripts') ?>
 </body>
 
 </html>

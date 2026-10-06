@@ -84,41 +84,18 @@ class Ui extends BaseController
 
     // ---- Session screens ---------------------------------------------------
 
+    /**
+     * The root address, which belongs to whoever is at it.
+     *
+     * Signed in, that is their own dashboard; signed out, the login screen.
+     * Neither is this controller's to decide, so both come from
+     * {@see \App\Controllers\Auth}.
+     */
     public function index(): RedirectResponse
     {
-        return redirect()->to(site_url($this->store->isSignedIn() ? 'dashboard' : 'login'));
-    }
-
-    public function login(): string
-    {
-        return view('ui/login', ['title' => 'User login']);
-    }
-
-    public function attemptLogin(): string|RedirectResponse
-    {
-        $id       = trim((string) $this->request->getPost('id'));
-        $password = trim((string) $this->request->getPost('password'));
-
-        // The prototype accepted any non-empty pair; wire this to the real
-        // staff directory before the screens go anywhere near production.
-        if ($id === '' || $password === '') {
-            return view('ui/login', [
-                'title' => 'User login',
-                'id'    => $id,
-                'error' => 'Please enter your User ID and password.',
-            ]);
-        }
-
-        $this->store->signIn($id);
-
-        return redirect()->to(site_url('organ'));
-    }
-
-    public function logout(): RedirectResponse
-    {
-        $this->store->reset();
-
-        return redirect()->to(site_url('login'));
+        return redirect()->to(site_url(
+            Auth::signedIn() ? Auth::homeFor(Auth::role()) : 'login'
+        ));
     }
 
     public function organSelector(): string

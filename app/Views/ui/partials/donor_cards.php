@@ -34,7 +34,9 @@ use App\Libraries\UiStore;
 // three donors knows which one a save is about.
 $card     = static fn (string $name): string => 'pd' . $tab['id'] . '-' . $name;
 $editable = fn (string $name): bool => ! $tab['archived'] && $editing === $card($name);
-$editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
+$editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name) . '#card-' . $card($name);
+// Where Cancel goes: the card, not the top of the pair.
+$closeUrl = fn (string $name): string => $viewUrl . '#card-' . $card($name);
 ?>
 <?php // Folded away when it is in the road, and open when the screen arrives.
       // Shut, the summary keeps the name and the status, which are what
@@ -43,7 +45,7 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
       // The summary has to be the first thing in the card, so the form starts
       // under it rather than around it — the head holds a link and no fields,
       // so there is nothing in it the form wants. ?>
-<details class="card card--pad card-fold" open>
+<details class="card card--pad card-fold" id="card-<?= esc($card('personal')) ?>" open>
     <summary class="card-head card-fold-head">
         <span class="card-fold-mark" aria-hidden="true"><?= ui_icon('chevron') ?></span>
         <div class="section-head">
@@ -159,7 +161,7 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
 
         <?php if ($editable('personal')): ?>
             <div class="card-actions">
-                <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                <a class="btn-outline" href="<?= esc($closeUrl('personal')) ?>">Cancel</a>
                 <button type="submit" class="btn-save">Save</button>
             </div>
         <?php endif; ?>
@@ -179,7 +181,8 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
         'foldable'     => true,
         'animated'     => true,
         'editing'      => $editable('labs'),
-        'editUrl'      => $tab['archived'] ? null : $editUrl('labs'),
+        // Bare: the workup card adds the fragment itself.
+        'editUrl'      => $tab['archived'] ? null : $viewUrl . '&edit=' . $card('labs'),
         'viewUrl'      => $viewUrl,
         'section'      => $card('labs'),
         'labsTitle'    => 'Donor &mdash; Required Lab Tests',
@@ -190,7 +193,7 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
     ], ['saveData' => false]) ?>
 </form>
 
-<div class="card card--pad">
+<div class="card card--pad" id="card-<?= esc($card('notes')) ?>">
     <form method="post" action="<?= esc($viewUrl) ?>">
         <?= csrf_field() ?>
         <div class="card-head">
@@ -208,7 +211,7 @@ $editUrl  = fn (string $name): string => $viewUrl . '&edit=' . $card($name);
 
         <?php if ($editable('notes')): ?>
             <div class="card-actions">
-                <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                <a class="btn-outline" href="<?= esc($closeUrl('notes')) ?>">Cancel</a>
                 <button type="submit" class="btn-save">Save</button>
             </div>
         <?php endif; ?>

@@ -39,7 +39,10 @@ use App\Models\PairModel;
 // its fields post — saving the notes cannot disturb the crossmatch date.
 $viewUrl  = site_url('pairs/' . rawurlencode($pair['id']));
 $editable = static fn (string $section): bool => $editing === $section;
-$editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $section;
+// Both carry the card's own anchor, so opening one for editing and closing it
+// again land on the card rather than at the top of the pair.
+$editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $section . '#card-' . $section;
+$closeUrl = static fn (string $section): string => $viewUrl . '#card-' . $section;
 ?>
 <div class="page">
     <div class="page-header page-header--start page-header--wrap">
@@ -80,7 +83,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
     <form id="pair-form" class="stack-5" method="post" action="<?= current_url() ?>">
         <?= csrf_field() ?>
 
-        <div class="card card--pad">
+        <div class="card card--pad" id="card-pair">
             <div class="card-head">
                 <h2 class="card-title">Pair Details</h2>
                 <?php if (! $editable('pair')): ?>
@@ -152,7 +155,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
             <?php if ($editable('pair')): ?>
                 <div class="card-actions">
-                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                    <a class="btn-outline" href="<?= esc($closeUrl('pair')) ?>">Cancel</a>
                     <button type="submit" class="btn-save">Save</button>
                 </div>
             <?php endif; ?>
@@ -161,7 +164,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
         <?php // Folded away when it is in the road, and open when the screen
               // arrives. Shut, the summary keeps the name and the status,
               // which are what anybody scans this card for. ?>
-        <details class="card card--pad card-fold" open>
+        <details class="card card--pad card-fold" id="card-recipient" open>
             <summary class="card-head card-fold-head">
                 <span class="card-fold-mark" aria-hidden="true"><?= ui_icon('chevron') ?></span>
                 <div class="section-head">
@@ -293,7 +296,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
             <?php if ($editable('recipient')): ?>
                 <div class="card-actions">
-                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                    <a class="btn-outline" href="<?= esc($closeUrl('recipient')) ?>">Cancel</a>
                     <button type="submit" class="btn-save">Save</button>
                 </div>
             <?php endif; ?>
@@ -306,7 +309,8 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             'field'    => 'rLabs',
             'foldable' => true,
             'editing'  => $editable('rlabs'),
-            'editUrl' => $editUrl('rlabs'),
+            // Bare: the workup card adds the fragment itself.
+            'editUrl' => $viewUrl . '?edit=rlabs',
             'viewUrl' => $viewUrl,
             'section' => 'rlabs',
             // The recipient's own tests, added and removed from this screen but
@@ -318,7 +322,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
             // reads with `??` would otherwise be the last caller's.
         ], ['saveData' => false]) ?>
 
-        <div class="card card--pad">
+        <div class="card card--pad" id="card-rnotes">
             <div class="card-head">
                 <h2 class="card-title">Recipient — Clinical Notes</h2>
                 <?php if (! $editable('rnotes')): ?>
@@ -334,7 +338,7 @@ $editUrl  = static fn (string $section): string => $viewUrl . '?edit=' . $sectio
 
             <?php if ($editable('rnotes')): ?>
                 <div class="card-actions">
-                    <a class="btn-outline" href="<?= esc($viewUrl) ?>">Cancel</a>
+                    <a class="btn-outline" href="<?= esc($closeUrl('rnotes')) ?>">Cancel</a>
                     <button type="submit" class="btn-save">Save</button>
                 </div>
             <?php endif; ?>

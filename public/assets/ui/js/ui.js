@@ -11,6 +11,7 @@
      - the date boxes: typing, the picker, no future dates, the age a date of
        birth comes to, and the field another field closes
      - the Reports filter menus and their counts
+     - putting the page back where it was after a press
 
    Nothing here is required to read a page: every screen renders, navigates and
    submits with scripting switched off.
@@ -805,7 +806,109 @@
     });
   }
 
+  /* ---- Staying where you were ---------------------------------------------
+
+     Pressing Edit, or Save, or Cancel, or Add lab loads a page. A page starts
+     at the top. On a record that is seventy cards long that means the card
+     somebody was working on is now a screen and a half away, and they have to
+     find it again — every time, for every card.
+
+     So the position is remembered as the page is left and put back when that
+     same screen comes round again — keyed by its path, so a record remembers
+     its own place and not some other record's, and opening a record for the
+     first time starts where a page starts.
+
+     A handful of screens' worth and no more. Nobody is retracing twenty
+     screens, and a store that only grows is a store that eventually holds
+     something wrong.
+
+     An enhancement and nothing more. With this file blocked every button does
+     exactly what it did before — the page loads at the top, which is where it
+     always loaded. Nothing about what a press *does* is in here.
+
+     An address with a `#` on it is already being sent somewhere by the
+     browser, and that is the right answer when there is nothing remembered —
+     a link somebody was given, opened cold, lands on the card it names. When
+     there *is* something remembered for that screen this wins, because the
+     anchor puts the card at the top of the window and this puts it back
+     exactly where it was. Back and forward are left alone: the browser
+     restores those itself, and better. */
+  var SCROLL_KEY = "ui-scroll";
+  var SCROLL_KEEP = 8;
+
+  /* What is in the store, or an empty one. Never throws: a private window and
+     storage switched off both look like having nothing remembered, which is
+     the state this started from. */
+  function scrollStore() {
+    try {
+      var read = JSON.parse(window.sessionStorage.getItem(SCROLL_KEY) || "[]");
+      return Array.isArray(read) ? read : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function rememberScroll() {
+    var path = window.location.pathname;
+    var kept = scrollStore().filter(function (entry) {
+      return entry && entry.path !== path;
+    });
+
+    // Newest first, so the oldest is what falls off the end.
+    kept.unshift({ path: path, y: window.scrollY });
+
+    try {
+      window.sessionStorage.setItem(SCROLL_KEY, JSON.stringify(kept.slice(0, SCROLL_KEEP)));
+    } catch (e) {
+      /* Nothing to do: the page loads at the top, which is what it did
+         before any of this. */
+    }
+  }
+
+  function restoreScroll() {
+    var path = window.location.pathname;
+    var found = scrollStore().filter(function (entry) {
+      return entry && entry.path === path;
+    })[0];
+
+    var y = found ? parseInt(found.y, 10) || 0 : 0;
+    if (y <= 0) return;
+
+    window.scrollTo(0, y);
+    // Again once the images and fonts have settled, which is what moves a
+    // long card list under somebody. The browser clamps it to the page, which
+    // is the right answer when the page has got shorter — pressing Save on
+    // the workup replaces a card where every test is open for answering with
+    // one where none is, and there is simply less page to come back to.
+    window.addEventListener("load", function () {
+      window.scrollTo(0, y);
+    });
+  }
+
+  function initScrollMemory() {
+    // Remembered on the way out of every page, whatever brought somebody to
+    // it: a screen reached by an anchor is still a screen they then press
+    // Save on. `pagehide` is the one event that fires on every way out,
+    // including the ones `beforeunload` is not allowed to see.
+    window.addEventListener("pagehide", rememberScroll);
+
+    // Back and forward restore themselves, better than this could.
+    var nav = (window.performance &&
+      window.performance.getEntriesByType &&
+      window.performance.getEntriesByType("navigation")[0]) || null;
+
+    if (nav && nav.type === "back_forward") return;
+
+    // An address with a `#` on it is already being sent somewhere, and that
+    // is the right answer when there is nothing remembered — a link somebody
+    // was given, opened cold. When there *is* something remembered for this
+    // screen it is the better answer: the anchor puts the card at the top of
+    // the window, and this puts it back exactly where it was.
+    restoreScroll();
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
+    initScrollMemory();
     initSidebar();
     initRowLinks();
     initMenus();

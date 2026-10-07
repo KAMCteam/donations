@@ -862,12 +862,19 @@ scripting off. Two kinds have one.
 
 **The workups**, on every screen that shows one. A workup is seventy-odd cards
 — a screenful and a half between whoever is reading the pair and the donors
-underneath it. On the pair's screen both workups, the recipient's and the open
-donor tab's, are **shut** when the screen opens, with the card being edited
-open because that is the card somebody came for. On a record screen the workup
-is most of the screen, so it arrives **open** and shutting it is a choice
-somebody makes. `ui/partials/lab_tests` takes `foldable` and `open`, so which
-it is belongs to the screen rather than to the workup.
+underneath it — so every one of them folds. None of them arrives folded. They
+were **shut** on the pair's screen to begin with, the recipient's and each
+donor tab's alike, and the fold was in the way every single time: a workup is
+what somebody opens a record, a pair or a donor's tab to read, and a line that
+has to be pressed before it says anything asks them to say twice what they
+came for. So they arrive **open** everywhere, and shutting one is a choice
+somebody makes — kept per card by `ui.js`, so shutting a donor's leaves the
+recipient's alone. The card being edited is open whatever was remembered,
+because that is the card somebody came for.
+
+`ui/partials/lab_tests` still takes `foldable` and `open` separately: which it
+is belongs to the screen rather than to the workup, and a screen that wants one
+shut can still have it.
 
 Shut, a workup is one line — so the line carries the groups, as the next
 section says.

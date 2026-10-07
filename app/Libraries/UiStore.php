@@ -683,6 +683,7 @@ final class UiStore
         }
 
         $this->forgetEndedLinks('recipient_mrn', (int) $row['mrn']);
+        $this->forgetOwnTests((int) $row['mrn'], 'recipient');
         $this->recipients->delete($row['mrn']);
 
         return '';
@@ -704,6 +705,7 @@ final class UiStore
         }
 
         $this->forgetEndedLinks('donor_mrn', (int) $row['mrn']);
+        $this->forgetOwnTests((int) $row['mrn'], 'donor');
         $this->donors->delete($row['mrn']);
 
         return '';
@@ -808,6 +810,20 @@ final class UiStore
     private function forgetEndedLinks(string $column, int $mrn): void
     {
         $this->pairs->where($column, $mrn)->where('ended_at !=', null)->delete();
+    }
+
+    /**
+     * The tests this record added for itself, taken off with it.
+     *
+     * The results go by the trigger on the register, but the tests themselves
+     * are rows in `labs` keyed by the person's number, and nothing was taking
+     * them away. They were invisible once the record was gone — until the
+     * hospital issued that number again, and the next patient's workup opened
+     * carrying the last one's extra tests under Other.
+     */
+    private function forgetOwnTests(int $mrn, string $personType): void
+    {
+        $this->labs->where('person_mrn', $mrn)->where('person_type', $personType)->delete();
     }
 
     private function heldByAPair(string $name, array $pair): string
@@ -2040,6 +2056,34 @@ final class UiStore
     }
 
     /**
+     * A blank test, for the group an Add screen shows before there is a
+     * record.
+     *
+     * The same shape {@see self::defaultLabTests()} hands the card, with no
+     * id: nothing exists to carry one until Save. A card whose name is never
+     * typed is not a test and is dropped on the way in, so the blank one costs
+     * nothing — it is a line on the sheet with no writing on it.
+     *
+     * @return array<string, mixed>
+     */
+    public static function blankCustomLab(string $personType): array
+    {
+        return [
+            'id'         => '',
+            'name'       => '',
+            'group'      => DatabaseSeeder::CUSTOM_GROUP,
+            'resultType' => 'custom',
+            'side'       => $personType,
+            'custom'     => true,
+            'answers'    => self::answerSet('custom', null, $personType, DatabaseSeeder::CUSTOM_GROUP, ''),
+            'status'     => 'not_done',
+            'result'     => '',
+            'date'       => '',
+            'notes'      => '',
+        ];
+    }
+
+    /**
      * Adds a test to one record, under the group that heads such tests.
      *
      * Blank to begin with: the card it becomes carries the name field, so it
@@ -2063,6 +2107,21 @@ final class UiStore
             return 0;
         }
 
+        return $this->insertCustomLab((int) $mrn, $personType, '', $organ);
+    }
+
+    /**
+     * The row behind a test a record added. Returns its id, or 0.
+     *
+     * Two ways in. The record screens press **Add lab**, which lays out a
+     * blank card to type into, so the name comes later and the row starts as
+     * its own number — two blank names would collide under the unique key. The
+     * Add screens have no record to press that against, so the name is typed
+     * first and arrives with the save, which is this method's other caller.
+     */
+    private function insertCustomLab(int $mrn, string $personType, string $name = '', string $organ = ''): int
+    {
+        $organ    = $organ === '' ? $this->organ() : $organ;
         $parentId = $this->labs->customGroupId(DatabaseSeeder::CUSTOM_GROUP, $personType);
 
         if ($parentId === null) {
@@ -2070,16 +2129,16 @@ final class UiStore
         }
 
         // After everything the check list asks for, in the order they were
-        // added. Two blank names would collide under the unique key, so each
-        // starts as its own number until somebody types over it.
+        // added.
         $last = $this->labs->lastSortOrder($organ, $personType) + 1;
+        $name = trim($name);
 
         $this->labs->insert([
-            'name'          => 'New test ' . $last,
+            'name'          => $name === '' ? 'New test ' . $last : mb_substr($name, 0, 150),
             'lab_parent_id' => $parentId,
             'organ_code'    => $organ,
             'person_type'   => $personType,
-            'person_mrn'    => (int) $mrn,
+            'person_mrn'    => $mrn,
             'result_type'   => 'custom',
             'sort_order'    => $last,
             'is_active'     => 1,
@@ -2176,8 +2235,25 @@ final class UiStore
      */
     private function saveLabTests(int $mrn, string $personType, array $tests): void
     {
+        // How many tests one save may invent. The screens lay out one blank
+        // card and add more a press at a time, so nobody reaches this by
+        // using the platform — it is here because a posted form is not a
+        // screen, and a loop that creates a row per posted name is a loop
+        // somebody can hand ten thousand names to.
+        $mayCreate = 25;
+
         foreach ($tests as $test) {
             $labId = (int) ($test['id'] ?? 0);
+
+            if ($labId === 0) {
+                // A card the Add screens laid out blank: no row behind it yet,
+                // because there was no record to hang one on when it was
+                // drawn. A name makes it a test; without one it is an empty
+                // line on the sheet and nothing is written down.
+                $labId = trim((string) ($test['name'] ?? '')) === '' || $mayCreate-- <= 0
+                    ? 0
+                    : $this->insertCustomLab($mrn, $personType, (string) $test['name']);
+            }
 
             if ($labId === 0) {
                 continue;

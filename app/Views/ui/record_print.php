@@ -20,10 +20,12 @@ use App\Libraries\UiStore;
  * @var string                     $subject     Whose record it is, for the <title>
  * @var list<string>               $meta        MRN, programme, printed on …
  * @var list<array<string, mixed>> $blocks      What goes on the sheet, in order
+ * @var bool                       $labsSummary Workups as group headings only
  * @var string                     $backUrl
  * @var string                     $backLabel
  */
 $dash = '—';
+$labsSummary ??= false;
 ?>
 <!doctype html>
 <html lang="en">
@@ -55,7 +57,10 @@ $dash = '—';
     </header>
 
     <div class="sheet-body">
-        <?= view('ui/partials/record_blocks', ['blocks' => $blocks], ['saveData' => false]) ?>
+        <?= view('ui/partials/record_blocks', [
+            'blocks'      => $blocks,
+            'labsSummary' => $labsSummary,
+        ], ['saveData' => false]) ?>
     </div>
 
     <footer class="sheet-foot">

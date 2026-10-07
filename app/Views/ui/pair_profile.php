@@ -58,7 +58,9 @@ $closeUrl = static fn (string $section): string => $viewUrl . '#card-' . $sectio
               // there is nothing to press: taking it back means saying
               // something else on the card below. ?>
         <div class="header-actions">
-            <a class="btn-outline" href="<?= site_url('pairs/' . rawurlencode($pair['id'])) ?>/print" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
+            <?php // Two sheets, so the button asks which. See the dialog at
+                  // the foot of this screen. ?>
+            <a class="btn-outline" href="#export-choice" data-dialog="export-choice"><?= ui_icon('printer') ?>Export PDF</a>
             <?php if ($pair['status'] === PairModel::EXCHANGE): ?>
                 <span class="badge tone-teal-soft">On the exchange list</span>
             <?php elseif ($pair['forExchange']): ?>
@@ -378,5 +380,21 @@ $closeUrl = static fn (string $section): string => $viewUrl . '#card-' . $sectio
         'mrps'      => $mrps,
         'coordinators' => $coordinators,
     ], ['saveData' => false]) ?>
+
+    <?php // What the Export button at the top of this screen opens. Outside
+          // every card's form, because a form cannot sit inside another. ?>
+    <?php $printUrl = site_url('pairs/' . rawurlencode($pair['id'])) . '/print'; ?>
+    <dialog id="export-choice" class="dialog">
+        <div class="dialog-body">
+            <form method="dialog" class="dialog-close-form">
+                <button class="dialog-close" aria-label="Close">&times;</button>
+            </form>
+            <?= view('ui/partials/export_choice', [
+                'exportSubject'    => 'pair #' . $pair['id'],
+                'exportFullUrl'    => $printUrl,
+                'exportSummaryUrl' => $printUrl . '?summary=1',
+            ], ['saveData' => false]) ?>
+        </div>
+    </dialog>
 </div>
 <?= $this->endSection() ?>

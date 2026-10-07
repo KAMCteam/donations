@@ -14,8 +14,14 @@ use App\Libraries\UiStore;
  * workup.
  *
  * @var list<array<string, mixed>> $blocks
+ * @var bool $labsSummary  A workup as its group headings only, no results
+ *
+ * Named for this partial, like every other optional one: CodeIgniter keeps
+ * view data between `view()` calls, so a flag called `$summary` would be
+ * whatever the last screen to use that word had in it.
  */
 $dash = '—';
+$labsSummary ??= false;
 ?>
     <?php foreach ($blocks as $block): ?>
         <section class="rec-block">
@@ -92,6 +98,37 @@ $dash = '—';
                 ?>
                 <p class="rec-progress"><?= $progress['done'] ?> of <?= $progress['total'] ?> completed &middot; <?= $progress['pct'] ?>%</p>
 
+                <?php if ($labsSummary): ?>
+                    <?php // One line per group and no result on the page at
+                          // all. What a group has got through is a fact about
+                          // the workup; what any one test said is a fact about
+                          // the patient, and the two are not needed by the same
+                          // reader. A sheet with the second on it has to be
+                          // handled as a result; this one does not.
+                          //
+                          // The same counts the group bars on the screen show,
+                          // from the same `LabProgress::counted()`, so the
+                          // summary and the record cannot drift apart. ?>
+                    <table class="rec-labs rec-labs--summary">
+                        <thead>
+                            <tr>
+                                <th class="l-test">Section</th>
+                                <th class="l-answer">Completed</th>
+                                <th class="l-comment">Progress</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($groups as $groupName => $groupTests): ?>
+                                <?php $groupProgress = LabProgress::counted($groupTests); ?>
+                                <tr>
+                                    <td class="l-test"><?= esc($groupName !== '' ? $groupName : 'Other') ?></td>
+                                    <td class="l-answer"><?= $groupProgress['done'] ?> of <?= $groupProgress['total'] ?></td>
+                                    <td class="l-comment"><?= $groupProgress['pct'] ?>%</td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php else: ?>
                 <?php foreach ($groups as $groupName => $groupTests): ?>
                     <?php if ($groupName !== ''): ?>
                         <h3 class="rec-group-name"><?= esc($groupName) ?></h3>
@@ -136,6 +173,7 @@ $dash = '—';
                         </tbody>
                     </table>
                 <?php endforeach; ?>
+                <?php endif; ?>
             <?php endif; ?>
         </section>
     <?php endforeach; ?>

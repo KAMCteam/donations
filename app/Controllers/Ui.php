@@ -1145,17 +1145,21 @@ class Ui extends BaseController
 
         $subject = trim(($recipient['name'] ?? '?') . ' & ' . ($donor['name'] ?? '?'));
 
+        $summary = $this->summarySheet();
+
         return view('ui/record_print', [
             'sheetTitle' => 'Pair Record',
             'subject'    => $subject,
-            'meta'       => [
+            'meta'       => array_filter([
                 'Pair ' . $pair['id'],
                 $this->store->organLabel() . ' Programme',
+                $summary ? 'Summary' : '',
                 'Printed ' . date('d/m/Y'),
-            ],
-            'blocks'     => $blocks,
-            'backUrl'    => site_url('pairs/' . rawurlencode($pair['id'])),
-            'backLabel'  => 'Back to pair',
+            ]),
+            'blocks'      => $blocks,
+            'labsSummary' => $summary,
+            'backUrl'     => site_url('pairs/' . rawurlencode($pair['id'])),
+            'backLabel'   => 'Back to pair',
         ]);
     }
 
@@ -1167,18 +1171,36 @@ class Ui extends BaseController
      */
     private function recordSheet(string $sheetTitle, array $person, string $backLabel, string $backUrl, array $blocks): string
     {
+        $summary = $this->summarySheet();
+
         return view('ui/record_print', [
             'sheetTitle' => $sheetTitle,
             'subject'    => (string) ($person['name'] ?? ''),
-            'meta'       => [
+            'meta'       => array_filter([
                 'MRN ' . $person['id'],
                 $this->store->organLabel() . ' Programme',
+                // Said on the sheet itself, because a page that leaves the
+                // results off has to say that it did — otherwise it reads as
+                // a record of somebody whose workup is empty.
+                $summary ? 'Summary' : '',
                 'Printed ' . date('d/m/Y'),
-            ],
-            'blocks'     => $blocks,
-            'backUrl'    => $backUrl,
-            'backLabel'  => $backLabel,
+            ]),
+            'blocks'      => $blocks,
+            'labsSummary' => $summary,
+            'backUrl'     => $backUrl,
+            'backLabel'   => $backLabel,
         ]);
+    }
+
+    /**
+     * Which of the two sheets Export was asked for.
+     *
+     * The full one unless the address says otherwise: a link somebody was
+     * handed, or one typed, is the record as it has always printed.
+     */
+    private function summarySheet(): bool
+    {
+        return (string) ($this->request->getGet('summary') ?? '') === '1';
     }
 
     /**

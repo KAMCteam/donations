@@ -950,6 +950,17 @@ across depending on the width — which is the whole point of being able to shut
 it: the workup is out of the way and still readable at a glance. Open, the
 lines go, because each group is saying it over its own tests.
 
+It arrives **open**, on a record and on a pair alike. It used to arrive shut on
+the pair, on the grounds that the donors are below it and a workup is a
+screenful and a half to scroll past — but the recipient's workup is what
+somebody opens a pair to read, so that made them press the same line every
+time. A card somebody does shut **stays shut**: `ui.js` remembers which
+foldable cards were shut, per screen and per card, and puts them back after the
+next press. Only where it differs from what the server sent, so changing a
+default still changes what everybody sees; and never on a card that is open for
+editing, because somebody pressed Edit to see inside it. The donor's workup
+on a pair still arrives shut — their tabs are the thing below it.
+
 `ui.js` keeps all of them in step as answers are pressed: the group a card is
 in is read off the markup (`data-lab-group="3"` on its cards, the same number
 on its heading and on its line in the folded summary), because the Other

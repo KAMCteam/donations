@@ -12,6 +12,7 @@
        birth comes to, and the field another field closes
      - the Reports filter menus and their counts
      - putting the page back where it was after a press
+     - keeping a card somebody shut shut
 
    Nothing here is required to read a page: every screen renders, navigates and
    submits with scripting switched off.
@@ -885,6 +886,77 @@
     });
   }
 
+  /* ---- A card you shut stays shut ----------------------------------------
+
+     The foldable cards arrive the way the screen thinks is most useful — the
+     workup open on a record and on a pair, because that is what somebody
+     opened it to read. Somebody who disagrees shuts it, and then presses
+     Edit, or Save, or a donor tab, and the page comes back with it open
+     again, and they shut it again.
+
+     So which cards are shut is remembered, per screen and per card, and put
+     back. Only where it differs from what the screen sent: a card nobody has
+     touched is left exactly as the server rendered it, so changing a default
+     changes what everybody sees.
+
+     A card that is open *for editing* is left alone whatever is remembered.
+     Somebody pressed Edit to see inside it, and shutting it on them would be
+     this remembering a preference against the thing they just asked for. The
+     Save button inside is how that is known: it is only rendered on a card
+     that is being edited. */
+  var FOLD_KEY = "ui-folds";
+  var FOLD_KEEP = 60;
+
+  function foldStore() {
+    try {
+      var read = JSON.parse(window.sessionStorage.getItem(FOLD_KEY) || "[]");
+      return Array.isArray(read) ? read : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function foldKey(card) {
+    return window.location.pathname + "|" + card.id;
+  }
+
+  function rememberFold(card) {
+    var key = foldKey(card);
+    var kept = foldStore().filter(function (entry) {
+      return entry && entry.key !== key;
+    });
+
+    kept.unshift({ key: key, open: card.open });
+
+    try {
+      window.sessionStorage.setItem(FOLD_KEY, JSON.stringify(kept.slice(0, FOLD_KEEP)));
+    } catch (e) {
+      /* Nothing to do: the cards arrive as the screen sent them, which is
+         what they did before any of this. */
+    }
+  }
+
+  function initFolds() {
+    document.querySelectorAll("details.card-fold[id]").forEach(function (card) {
+      // Open to be edited: left as it is, and not remembered either — that
+      // state is the screen's doing and not a preference.
+      if (card.querySelector(".card-actions button.btn-save")) return;
+
+      var key = foldKey(card);
+      var found = foldStore().filter(function (entry) {
+        return entry && entry.key === key;
+      })[0];
+
+      if (found) card.open = found.open === true;
+
+      // Listening afterwards, so putting back what was remembered does not
+      // count as somebody saying it again.
+      card.addEventListener("toggle", function () {
+        rememberFold(card);
+      });
+    });
+  }
+
   function initScrollMemory() {
     // Remembered on the way out of every page, whatever brought somebody to
     // it: a screen reached by an anchor is still a screen they then press
@@ -908,6 +980,9 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    // Before the scroll is put back: a card unfolding changes how far down
+    // everything under it sits.
+    initFolds();
     initScrollMemory();
     initSidebar();
     initRowLinks();

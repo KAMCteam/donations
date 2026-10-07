@@ -1493,22 +1493,30 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
-     * The pair's workups fold, because what is under them is the point of the
-     * screen.
+     * On a pair the recipient's workup arrives open and the donor's shut.
      *
-     * Seventy-odd cards is a screenful and a half between whoever is reading
-     * and the pair's donors. Shut, the line that says how the workup is going
-     * is still on the screen; the card it is being edited on is open.
+     * Both fold — seventy-odd cards is a screenful and a half between whoever
+     * is reading and the pair's donors — but the recipient's workup is what
+     * somebody opens a pair to read, so arriving at one line that has to be
+     * pressed before it says anything made them press it every time. The
+     * donor's is still shut: their tabs are the thing below it.
+     *
+     * Shut, the line that says how the workup is going is still on the screen;
+     * the card being edited is open whichever it is. Anybody who shuts the
+     * recipient's keeps it shut — that is `ui.js`, not the markup.
      */
-    public function testThePairsWorkupsFoldAway(): void
+    public function testThePairsWorkupsFoldAndTheRecipientsArrivesOpen(): void
     {
         [$pairId] = $this->pairWith('8950', '8951', 'The Donor');
 
         $html = $this->get('pairs/' . $pairId)->getBody();
 
-        // Both of them — the recipient's and the open donor tab's.
-        $this->assertSame(2, preg_match_all('/<details class="card card--pad card-fold"[^>]*data-lab-section>/', $html));
-        // Shut, and still saying where the workup stands.
+        // Two foldable workups: the recipient's and the open donor tab's.
+        $this->assertSame(2, preg_match_all('/<details class="card card--pad card-fold"[^>]*data-lab-section/', $html));
+        // The recipient's open, the donor's shut.
+        $this->assertSame(1, preg_match_all('/id="card-rlabs" data-lab-section open>/', $html));
+        $this->assertSame(1, preg_match_all('/<details class="card card--pad card-fold"[^>]*data-lab-section>/', $html));
+        // And shut or open, it still says where the workup stands.
         $this->assertStringContainsString('of 74 completed', $html);
 
         // The card being edited arrives open.

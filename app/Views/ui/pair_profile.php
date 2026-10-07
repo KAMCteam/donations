@@ -302,12 +302,17 @@ $closeUrl = static fn (string $section): string => $viewUrl . '#card-' . $sectio
             <?php endif; ?>
         </details>
 
-        <?php // Folded shut: the pair's donors are below it, and a workup is a
-              // screenful and a half to scroll past. ?>
+        <?php // Open when the screen arrives: the recipient's workup is what
+              // somebody opens a pair to read, and arriving at one line that
+              // has to be pressed before it says anything was making them
+              // press it every time. It still folds — the pair's donors are
+              // below it and a workup is a screenful and a half to scroll
+              // past — and `ui.js` remembers it shut for anybody who shuts it. ?>
         <?= view('ui/partials/lab_tests', [
             'tests'    => $rLabTests,
             'field'    => 'rLabs',
             'foldable' => true,
+            'open'     => true,
             'editing'  => $editable('rlabs'),
             // Bare: the workup card adds the fragment itself.
             'editUrl' => $viewUrl . '?edit=rlabs',

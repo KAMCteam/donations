@@ -32,7 +32,7 @@ $navItems = [
 // Leaving it out is a courtesy and not the lock: `admin` on the route is what
 // keeps anybody else out, and the address is typeable either way.
 if (Auth::isAdmin()) {
-    $navItems[] = ['page' => 'admin', 'label' => 'Admin', 'icon' => 'userPlus', 'url' => site_url('admin')];
+    $navItems[] = ['page' => 'admin', 'label' => 'User Management', 'icon' => 'userPlus', 'url' => site_url('admin')];
 }
 ?>
 <!doctype html>
@@ -62,19 +62,32 @@ if (Auth::isAdmin()) {
             <aside class="sidebar" id="sidebar">
                 <div class="sidebar-logo">
                     <img src="<?= base_url('assets/ui/img/kamc-white.png') ?>" alt="King Abdullah Medical City">
-                    <button type="button" class="sidebar-close" data-sidebar-close aria-label="Close menu"><?= ui_icon('close') ?></button>
+                    <?php // Narrow, this shuts the sidebar over the page. Wide,
+                          // it narrows it to its icons and widens it again, and
+                          // `ui.js` swaps which of the two marks is showing. ?>
+                    <button type="button" class="sidebar-close" data-sidebar-close aria-label="Close menu">
+                        <span class="sidebar-close-mark" data-when-wide><?= ui_icon('chevronLeft') ?></span>
+                        <span class="sidebar-close-mark" data-when-narrow hidden><?= ui_icon('chevronRight') ?></span>
+                        <?php // Narrow, the sidebar leaves rather than narrows,
+                              // so the mark is the one that has always meant
+                              // that. Which of the three shows is CSS. ?>
+                        <span class="sidebar-close-x"><?= ui_icon('close') ?></span>
+                    </button>
                 </div>
 
                 <nav class="sidebar-nav">
+                    <?php // The name rides in a span of its own so that it can
+                          // be taken off the rail, and on the `title` so that
+                          // hovering an icon still says what it is. ?>
                     <?php foreach ($navItems as $item): ?>
-                        <a class="nav-item<?= ($navPage ?? '') === $item['page'] ? ' is-active' : '' ?>" href="<?= $item['url'] ?>">
-                            <span class="nav-icon"><?= ui_icon($item['icon']) ?></span><?= esc($item['label']) ?>
+                        <a class="nav-item<?= ($navPage ?? '') === $item['page'] ? ' is-active' : '' ?>" href="<?= $item['url'] ?>" title="<?= esc($item['label']) ?>">
+                            <span class="nav-icon"><?= ui_icon($item['icon']) ?></span><span class="nav-label"><?= esc($item['label']) ?></span>
                         </a>
                     <?php endforeach; ?>
                 </nav>
 
                 <div class="sidebar-footer">
-                    <a class="signout-btn" href="<?= site_url('logout') ?>"><?= ui_icon('signOut') ?>Sign out</a>
+                    <a class="signout-btn" href="<?= site_url('logout') ?>" title="Sign out"><?= ui_icon('signOut') ?><span class="nav-label">Sign out</span></a>
                 </div>
             </aside>
 
@@ -87,10 +100,10 @@ if (Auth::isAdmin()) {
                 <div id="page" class="page-host">
                     <?php // The search narrows the list you are looking at,
                           // so it posts back to the screen you are on and
-                          // never leaves it. A screen with a list to narrow
-                          // asks for it by setting `searchOn`; one without —
-                          // the dashboard, Add MRP, a record — has nothing for
-                          // it to do and does not carry it.
+                          // never leaves it. Only a screen with a list to
+                          // narrow has one; everything else — the dashboard,
+                          // User Management, a record, the exchange being
+                          // built — has nothing for it to do.
                           //
                           // A GET form, so the question is in the address,
                           // comes back on a refresh and can be sent to
@@ -98,12 +111,24 @@ if (Auth::isAdmin()) {
                           // along as hidden fields, so searching narrows what
                           // is showing rather than replacing it. ?>
                     <?php
-                    // Which screens have one is decided here, from the nav item
-                    // every screen already declares, rather than from a flag
-                    // each would have to remember to pass: CodeIgniter keeps
-                    // view data between `view()` calls, so a missing flag is
-                    // not a false one — it is the last screen's.
-                    $searchable = in_array($navPage ?? '', ['recipients', 'donors', 'pairs', 'exchange', 'reports'], true);
+                    // Which screens have one is decided here, from the address
+                    // being answered, rather than from a flag each would have
+                    // to remember to pass: CodeIgniter keeps view data between
+                    // `view()` calls, so a missing flag is not a false one —
+                    // it is the last screen's.
+                    //
+                    // The address and not the nav item, which was the rule
+                    // until the exchange grew two more screens under its own:
+                    // Build the exchange and the review are `exchange` in the
+                    // sidebar and have no list on them to narrow, so a search
+                    // box there searched nothing and posted the chain's own
+                    // address back at itself. These five are the lists, by
+                    // name, and nothing else is one.
+                    $searchable = in_array(
+                        trim(service('request')->getPath(), '/'),
+                        ['recipients', 'donors', 'pairs', 'exchange', 'reports'],
+                        true
+                    );
                     ?>
                     <?php if ($searchable): ?>
                         <div class="app-search-bar">

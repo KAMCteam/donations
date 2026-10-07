@@ -173,8 +173,14 @@ $chooser = static function (string $action, string $ownField, string $ownMrn, st
                             <?php endif; ?>
 
                             <?php if ($onlyDonorsLeft): ?>
-                                <p class="node-open-hint">Everyone else is matched. This donor ends the chain &mdash; say what becomes of them.</p>
+                                <p class="node-open-hint">Everyone else is matched. This donor ends the chain &mdash; send them back to the available donors list, and set the word they go back on in the review.</p>
 
+                                <?php // One answer, and it is still pressed rather
+                                      // than assumed: a donor leaving the chain
+                                      // unmatched is a thing somebody says out loud.
+                                      // Deleting them was the other answer and is
+                                      // gone — see ExchangeDraft::FATES. The word
+                                      // they go back on is asked for in the review. ?>
                                 <div class="node-fates">
                                     <form method="post" action="<?= site_url('exchange/build') ?>" class="inline-form">
                                         <?= csrf_field() ?>
@@ -182,15 +188,6 @@ $chooser = static function (string $action, string $ownField, string $ownMrn, st
                                         <input type="hidden" name="donorMrn" value="<?= esc($donor['mrn']) ?>">
                                         <input type="hidden" name="fate" value="available">
                                         <button type="submit" class="btn-fate<?= $donor['fate'] === 'available' ? ' is-chosen' : '' ?>"><?= ui_icon('back') ?><?= esc(ExchangeDraft::FATES['available']) ?></button>
-                                    </form>
-
-                                    <form method="post" action="<?= site_url('exchange/build') ?>" class="inline-form">
-                                        <?= csrf_field() ?>
-                                        <input type="hidden" name="action" value="fate">
-                                        <input type="hidden" name="donorMrn" value="<?= esc($donor['mrn']) ?>">
-                                        <input type="hidden" name="fate" value="delete">
-                                        <?php // Asked before it is set, not only before it is saved. ?>
-                                        <button type="submit" class="btn-fate btn-fate--danger<?= $donor['fate'] === 'delete' ? ' is-chosen' : '' ?>" data-confirm="Delete <?= esc($donor['name']) ?> (MRN <?= esc($donor['mrn']) ?>) from the system? The record, its whole lab workup and the pair records naming them all go with it. This cannot be undone."><?= ui_icon('trash') ?><?= esc(ExchangeDraft::FATES['delete']) ?></button>
                                     </form>
                                 </div>
                             <?php endif; ?>

@@ -105,13 +105,13 @@ final class AuthTest extends CIUnitTestCase
 
     // ---- Signing in --------------------------------------------------------
 
-    public function testEachRoleLandsOnItsOwnDashboard(): void
+    public function testSigningInRemembersWhoItWasAndSendsThemIn(): void
     {
         foreach (['doctor', 'coordinator'] as $i => $role) {
             $this->account((string) ($i + 1), $role);
 
             $this->signIn((string) ($i + 1), 'A')
-                ->assertRedirectTo(site_url($role . '/dashboard'));
+                ->assertRedirectTo(site_url('organ'));
 
             $this->assertSame($role, session('auth_role'));
             $this->assertSame(ucfirst($role) . ' ' . ($i + 1), session('auth_name'));
@@ -173,7 +173,7 @@ final class AuthTest extends CIUnitTestCase
 
         // No minimum length, though: one digit is a User ID.
         $this->account('7', 'doctor');
-        $this->signIn('7', 'A')->assertRedirectTo(site_url('doctor/dashboard'));
+        $this->signIn('7', 'A')->assertRedirectTo(site_url('organ'));
     }
 
     /**
@@ -246,11 +246,49 @@ final class AuthTest extends CIUnitTestCase
     {
         $this->withSession(['auth_id' => 1, 'auth_role' => 'doctor', 'auth_name' => 'D'])
             ->get('login')
-            ->assertRedirectTo(site_url('doctor/dashboard'));
+            ->assertRedirectTo(site_url('organ'));
 
         $this->withSession(['auth_id' => 1, 'auth_role' => 'doctor', 'auth_name' => 'D'])
             ->get('/')
-            ->assertRedirectTo(site_url('doctor/dashboard'));
+            ->assertRedirectTo(site_url('organ'));
+    }
+
+    /**
+     * Signing in opens the platform, and nothing in between.
+     *
+     * Each role used to land on a screen of its own that said who they were
+     * and offered a link onwards — a press between somebody and the work,
+     * telling them something they had just typed. Both roles now land on the
+     * programme picker, which is the one question the platform does have to
+     * ask, and the dashboard is one choice away.
+     */
+    public function testSigningInLandsOnTheProgrammePicker(): void
+    {
+        $this->account('1', 'doctor');
+        $this->account('2', 'coordinator');
+
+        $this->signIn('1', 'A')->assertRedirectTo(site_url('organ'));
+        $this->withSession([])->signIn('2', 'A')->assertRedirectTo(site_url('organ'));
+
+        // And the screens behind the roles are gone, not merely unlinked.
+        foreach (['doctor/dashboard', 'coordinator/dashboard'] as $gone) {
+            $this->withSession(['auth_id' => 1, 'auth_role' => 'doctor', 'auth_name' => 'D']);
+
+            try {
+                $this->get($gone);
+                $this->fail($gone . ' should not be an address any more');
+            } catch (\CodeIgniter\Exceptions\PageNotFoundException) {
+            }
+        }
+    }
+
+    /** A role nothing is known about has nowhere to be but the login screen. */
+    public function testAnUnknownRoleIsSentBackToTheLoginScreen(): void
+    {
+        $this->assertSame('organ', \App\Controllers\Auth::homeFor('doctor'));
+        $this->assertSame('organ', \App\Controllers\Auth::homeFor('coordinator'));
+        $this->assertSame('login', \App\Controllers\Auth::homeFor('admin'));
+        $this->assertSame('login', \App\Controllers\Auth::homeFor(''));
     }
 
     /** And somebody with no session gets the screen itself. */
@@ -293,26 +331,34 @@ final class AuthTest extends CIUnitTestCase
         $this->assertStringContainsString('Please sign in to continue.', $this->get('login')->getBody());
     }
 
-    /** `role`: the right session, the wrong role. */
-    public function testARoleCannotReachAnotherRolesDashboard(): void
+    /**
+     * `role`: the right session, the wrong role.
+     *
+     * No address in `Config\Routes` carries this filter at the moment — the
+     * two it guarded were the landing screens, and those are gone. The filter
+     * stays because role-specific screens are a thing this register will want
+     * again, and a guard nothing exercises is a guard that quietly stops
+     * working. So the route here is the test's own.
+     */
+    public function testTheRoleFilterRefusesARoleTheRouteDoesNotName(): void
     {
-        $wrong = [
-            'doctor'      => ['coordinator/dashboard'],
-            'coordinator' => ['doctor/dashboard'],
-        ];
+        $this->withRoutes([
+            ['GET', 'doctors-only', 'Ui::dashboard', ['filter' => 'role:doctor']],
+        ]);
 
-        foreach ($wrong as $role => $screens) {
-            foreach ($screens as $screen) {
-                $response = $this->withSession([
-                    'auth_id' => 1, 'auth_role' => $role, 'auth_name' => 'Somebody',
-                ])->get($screen);
+        $response = $this->withSession([
+            'auth_id' => 1, 'auth_role' => 'coordinator', 'auth_name' => 'Somebody',
+        ])->get('doctors-only');
 
-                $response->assertStatus(403);
-                $this->assertStringContainsString('Not your screen', $response->getBody(), $role . ' on ' . $screen);
-                // The way out is their own, named on the page.
-                $this->assertStringContainsString(site_url($role . '/dashboard'), $response->getBody());
-            }
-        }
+        $response->assertStatus(403);
+        $this->assertStringContainsString('Not your screen', $response->getBody());
+        // The way out is named on the page, and it is the platform.
+        $this->assertStringContainsString(site_url('organ'), $response->getBody());
+
+        // And the role the route does name goes through.
+        $this->withSession([
+            'auth_id' => 1, 'auth_role' => 'doctor', 'auth_name' => 'Somebody', 'ui_organ' => 'kidney',
+        ])->get('doctors-only')->assertStatus(200);
     }
 
     // ---- Admin, which is a permission and not a role -----------------------
@@ -328,14 +374,14 @@ final class AuthTest extends CIUnitTestCase
     {
         $this->account('1', 'doctor', 'A', true, true);
 
-        $this->signIn('1', 'A')->assertRedirectTo(site_url('doctor/dashboard'));
+        $this->signIn('1', 'A')->assertRedirectTo(site_url('organ'));
 
         $this->assertSame('doctor', session('auth_role'));
         $this->assertTrue(session('auth_is_admin'));
 
         // And a coordinator holds it the same way, still a coordinator.
         $this->account('2', 'coordinator', 'A', true, true);
-        $this->withSession([])->signIn('2', 'A')->assertRedirectTo(site_url('coordinator/dashboard'));
+        $this->withSession([])->signIn('2', 'A')->assertRedirectTo(site_url('organ'));
         $this->assertSame('coordinator', session('auth_role'));
         $this->assertTrue(session('auth_is_admin'));
     }
@@ -453,7 +499,7 @@ final class AuthTest extends CIUnitTestCase
             ['password_hash' => password_hash('A', PASSWORD_DEFAULT)]
         );
 
-        $this->withSession([])->signIn('7702', 'A')->assertRedirectTo(site_url('doctor/dashboard'));
+        $this->withSession([])->signIn('7702', 'A')->assertRedirectTo(site_url('organ'));
 
         $this->withSession($this->session('doctor', true))
             ->post('admin/users/' . $mrp['id'] . '/active', ['active' => '0']);
@@ -465,28 +511,6 @@ final class AuthTest extends CIUnitTestCase
         $this->assertStringContainsString(
             'Your account is inactive',
             $this->withSession([])->signIn('7702', 'A')->getBody()
-        );
-    }
-
-    /** Resetting a password is the screen and nothing behind it, and says so. */
-    public function testResettingAPasswordChangesNothingYetAndSaysSo(): void
-    {
-        $this->withSession($this->session('doctor', true))
-            ->post('admin/users', ['id' => '7703', 'name' => 'Dr. Forgetful', 'kind' => 'doctor']);
-
-        $mrp    = $this->db->table('mrp')->where('code', '7703')->get()->getRowArray();
-        $before = $this->users->where('login_id', '7703')->first()['password_hash'];
-
-        $this->withSession($this->session('doctor', true))
-            ->post('admin/users/' . $mrp['id'] . '/password', ['password' => 'TemporaryOne1']);
-
-        $this->assertSame($before, $this->users->where('login_id', '7703')->first()['password_hash']);
-        $this->assertStringContainsString('not connected yet', (string) session('ui_mrp_saved'));
-
-        // The dialog on the screen warns before anybody presses it.
-        $this->assertStringContainsString(
-            'what is typed here is not stored',
-            $this->withSession($this->session('doctor', true))->get('admin')->getBody()
         );
     }
 
@@ -555,17 +579,14 @@ final class AuthTest extends CIUnitTestCase
         ];
     }
 
-    /** And their own is open. */
-    public function testEachRoleReachesItsOwnDashboard(): void
+    /** And the platform itself is open to both roles alike. */
+    public function testBothRolesReachThePlatform(): void
     {
         foreach (['doctor', 'coordinator'] as $role) {
-            $body = $this->withSession([
-                'auth_id' => 1, 'auth_role' => $role, 'auth_name' => 'Somebody',
-            ])->get($role . '/dashboard')->getBody();
+            $body = $this->withSession($this->session($role, false))->get('organ')->getBody();
 
-            $this->assertStringContainsString(ucfirst($role) . ' dashboard', $body);
-            $this->assertStringContainsString('Somebody', $body);
-            $this->assertStringContainsString(site_url('logout'), $body);
+            $this->assertStringContainsString('Select organ program', $body);
+            $this->assertStringContainsString(site_url('organ/kidney'), $body);
         }
     }
 }

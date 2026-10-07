@@ -64,6 +64,12 @@ if (! function_exists('ui_icon')) {
             // the card is shut and CSS turns it when it opens, so there is one
             // of them rather than two that could disagree.
             'chevron' => '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+            // The sidebar's own pair: each points the way it would move it.
+            // `currentColor`, unlike `menu`, which is drawn in the sidebar's
+            // own blue for the white bar it was made for and would be
+            // invisible on the rail.
+            'chevronLeft' => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
+            'chevronRight' => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
 
             'edit' => '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
 
@@ -144,5 +150,68 @@ if (! function_exists('ui_back')) {
         }
 
         return ['url' => (string) $to['url'], 'label' => (string) $to['label']];
+    }
+}
+
+if (! function_exists('ui_filter_values')) {
+    /**
+     * A filter chip row's set, read off the address.
+     *
+     * The chips were one-at-a-time: pressing B replaced A, so "A and B" was a
+     * question the lists could not be asked. They are a set now, written in
+     * the address as `?bt=A,B`, and the empty set means all — which is the
+     * same thing as no filter and so leaves the address alone.
+     *
+     * Only values the screen actually offers survive, so a hand-typed address
+     * narrows the list rather than breaking the query behind it.
+     *
+     * @param list<string> $allowed
+     *
+     * @return list<string>
+     */
+    function ui_filter_values(?string $param, array $allowed): array
+    {
+        $param = trim((string) $param);
+
+        // `all` is what the All chip puts in the address where a screen's own
+        // default is something narrower; everywhere else it is the absence of
+        // the parameter, and both mean the same thing here.
+        if ($param === '' || $param === 'all') {
+            return [];
+        }
+
+        return array_values(array_intersect($allowed, array_map('trim', explode(',', $param))));
+    }
+}
+
+if (! function_exists('ui_filter_toggle')) {
+    /**
+     * The set a chip row would hold with this chip pressed.
+     *
+     * In if it was out, out if it was in — which is what makes one press add a
+     * second blood group and a second press on the same chip take it off
+     * again. The order the screen lists them in is kept, so the address reads
+     * the same whichever order they were pressed.
+     *
+     * @param list<string> $chosen
+     * @param list<string> $allowed
+     *
+     * @return list<string>
+     */
+    function ui_filter_toggle(array $chosen, string $value, array $allowed): array
+    {
+        $chosen = in_array($value, $chosen, true)
+            ? array_values(array_diff($chosen, [$value]))
+            : [...$chosen, $value];
+
+        return array_values(array_intersect($allowed, $chosen));
+    }
+}
+
+if (! function_exists('ui_filter_param')) {
+    /** A chip row's set as the address writes it, '' for the empty one. */
+    function ui_filter_param(array $chosen): string
+    {
+        return implode(',', $chosen);
     }
 }

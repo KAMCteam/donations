@@ -18,8 +18,8 @@ use CodeIgniter\Router\RouteCollection;
  * recipient id.
  */
 
-// Entry point: sends visitors to the login screen, or to their own dashboard
-// if they are already signed in.
+// Entry point: sends visitors to the login screen, or straight into the
+// platform if they are already signed in.
 $routes->get('/', 'Ui::index');
 
 // The three addresses anybody may reach without a session. Everything else on
@@ -34,16 +34,9 @@ $routes->get('logout', 'Auth::logout');
  * The filter is on the group rather than written out forty-odd times: a route
  * added to this file later is protected by being in here, which is the way
  * round that fails safe. CodeIgniter merges a group's filter with a route's
- * own, so the dashboards below carry `auth` as well as their `role:…`.
+ * own, so a route that carries one of its own is guarded by both.
  */
 $routes->group('', ['filter' => 'auth'], static function ($routes): void {
-    // Where each role lands after signing in. Placeholders for now — the
-    // platform's own screens are below, and each dashboard links across.
-    // Two, because there are two roles: an administrator is a doctor or a
-    // coordinator who also looks after the register, and lands on their own.
-    $routes->get('doctor/dashboard', 'Doctor\Dashboard::index', ['filter' => 'role:doctor']);
-    $routes->get('coordinator/dashboard', 'Coordinator\Dashboard::index', ['filter' => 'role:coordinator']);
-
     /*
      * The register, and who may sign into it: one screen, behind the one
      * permission. `admin` asks whether this session carries it and nothing
@@ -61,7 +54,6 @@ $routes->group('', ['filter' => 'auth'], static function ($routes): void {
         $routes->post('users/(:num)', 'Admin\Users::update/$1');
         $routes->post('users/(:num)/active', 'Admin\Users::setActive/$1');
         $routes->post('users/(:num)/admin', 'Admin\Users::setAdmin/$1');
-        $routes->post('users/(:num)/password', 'Admin\Users::resetPassword/$1');
     });
 
     // Programme picker. Its own screen rather than a filter, since the UI asks

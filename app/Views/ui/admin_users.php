@@ -10,7 +10,8 @@
 use App\Models\MrpModel;
 
 /**
- * The register, and who may sign into it. One screen for one job.
+ * User Management: the register, and who may sign into it. One screen for one
+ * job.
  *
  * It was **Add MRP**, in the sidebar for everybody, and it made the physicians
  * and coordinators a record can be assigned to. It is still that, and now it
@@ -31,10 +32,14 @@ use App\Models\MrpModel;
  *      places, and the point of looking somebody up is that the directory is
  *      where their sign-in is checked. Registering somebody makes their
  *      account here with no password at all — it matches nothing until an
- *      administrator sets one.
+ *      administrator sets one. The permission is asked here too, because
+ *      whether somebody looks after the register is usually known the moment
+ *      they are being registered.
  *
  *   2. **Registered MRPs** — everybody registered, with the row to edit, to
- *      deactivate, to grant the permission on, and to reset the password of.
+ *      deactivate and to grant the permission on. Not to rename their ID:
+ *      the row shows it and the form leaves it alone, because a staff number
+ *      is the hospital's and not this screen's.
  *
  *   3. **Login Activity** — every attempt to sign in. Read-only, because a log
  *      somebody can tidy is not a log.
@@ -63,7 +68,7 @@ $when = static function (string $stamp): string {
 <div class="page">
     <div class="page-header page-header--plain">
         <div class="eyebrow">Admin</div>
-        <h1 class="page-title">Users</h1>
+        <h1 class="page-title">User Management</h1>
         <p class="page-subtitle">Register the people who use this platform, and see who has signed in.</p>
     </div>
 
@@ -139,6 +144,19 @@ $when = static function (string $stamp): string {
                        value="<?= esc((string) ($lookup['name'] ?? '')) ?>" placeholder="e.g. Dr. Amira Hassan">
             </div>
 
+            <div>
+                <?php // The same permission the row below grants, asked at the
+                      // moment it is usually known. Unticked is the answer for
+                      // almost everybody, so it is a box to tick rather than a
+                      // choice to make. ?>
+                <span class="mrp-label">Permission</span>
+                <label class="admin-toggle">
+                    <input type="checkbox" name="isAdmin" value="1">
+                    <span>Admin</span>
+                </label>
+                <p class="mrp-hint">Keeps their type. Adds the register, the delete buttons and this screen. It can be granted or taken back later from their row.</p>
+            </div>
+
             <button type="submit" class="mrp-submit">Add user</button>
         </form>
 
@@ -173,8 +191,16 @@ $when = static function (string $stamp): string {
                                                     <input type="text" id="edit-name-<?= esc($user['id']) ?>" name="name" class="input" value="<?= esc($user['name']) ?>">
                                                 </div>
                                                 <div>
-                                                    <label class="field-label" for="edit-code-<?= esc($user['id']) ?>">MRP ID</label>
-                                                    <input type="text" id="edit-code-<?= esc($user['id']) ?>" name="id" class="input input--mono" value="<?= esc($user['code']) ?>">
+                                                    <?php // Shown and not offered. A staff number is
+                                                          // the hospital's: the directory answers to
+                                                          // it, their sign-in is that number, and the
+                                                          // log is a column of them. Typing a
+                                                          // different one here would not correct a
+                                                          // person, it would make this row somebody
+                                                          // else's. ?>
+                                                    <span class="field-label">MRP ID</span>
+                                                    <p class="mrp-fixed mono"><?= esc($user['code']) ?></p>
+                                                    <p class="mrp-hint">The hospital&rsquo;s number, so not edited here.</p>
                                                 </div>
                                                 <div>
                                                     <label class="field-label" for="edit-kind-<?= esc($user['id']) ?>">Type</label>
@@ -221,13 +247,6 @@ $when = static function (string $stamp): string {
                                         <td class="cell-action">
                                             <a class="btn-edit" href="<?= site_url('admin') ?>?edit=<?= esc($user['id']) ?>"><?= ui_icon('edit') ?>Edit</a>
 
-                                            <?php // Setting a password without going round the
-                                                  // directory again. The dialog says what it does
-                                                  // not do yet, because a screen that looks like it
-                                                  // set a password and did not is worse than none. ?>
-                                            <?php $resetId = 'reset-' . $user['id']; ?>
-                                            <a class="btn-outline" href="#<?= esc($resetId) ?>" data-dialog="<?= esc($resetId) ?>">Reset password</a>
-
                                             <?php // Deactivate is this register's delete. Never a
                                                   // real one: the records they are on still name
                                                   // them, and a register that forgot somebody would
@@ -246,42 +265,6 @@ $when = static function (string $stamp): string {
                     </table>
                 </div>
 
-                <?php // The dialogs sit outside the table: a <dialog> inside a
-                      // row is inside the row's own form on some browsers, and
-                      // forms do not nest. ?>
-                <?php foreach ($users as $user): ?>
-                    <dialog id="reset-<?= esc($user['id']) ?>" class="dialog">
-                        <div class="confirm">
-                            <h2 class="confirm-title">Reset password</h2>
-                            <p class="confirm-detail">
-                                A new password for <?= esc($user['name']) ?> (<?= esc($user['code']) ?>),
-                                set here rather than by looking them up in the directory again.
-                            </p>
-                            <form method="post" action="<?= site_url('admin/users/' . rawurlencode($user['id']) . '/password') ?>" class="stack-4">
-                                <?= csrf_field() ?>
-                                <div>
-                                    <label class="field-label" for="pw-<?= esc($user['id']) ?>">New password</label>
-                                    <input type="text" id="pw-<?= esc($user['id']) ?>" name="password" class="input input--mono"
-                                           autocomplete="off" placeholder="Type one, or generate">
-                                </div>
-                                <?php // Generated in the browser and shown in
-                                      // the box, so whoever is setting it can
-                                      // read it out. Nothing is generated
-                                      // server-side yet, because nothing is
-                                      // stored yet. ?>
-                                <button type="button" class="btn-outline" data-generate-password="pw-<?= esc($user['id']) ?>">Generate a temporary password</button>
-                                <p class="reset-warning">
-                                    Not connected yet. This screen is the flow and nothing behind it:
-                                    what is typed here is not stored, and <?= esc($user['name']) ?>&rsquo;s password does not change.
-                                </p>
-                                <div class="confirm-actions">
-                                    <a class="btn-outline" href="<?= site_url('admin') ?>">Cancel</a>
-                                    <button type="submit" class="btn-save">Set password</button>
-                                </div>
-                            </form>
-                        </div>
-                    </dialog>
-                <?php endforeach; ?>
             </div>
         <?php endif; ?>
 
@@ -330,8 +313,4 @@ $when = static function (string $stamp): string {
         </div>
     </div>
 </div>
-<?= $this->endSection() ?>
-
-<?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/ui/js/admin.js') ?>"></script>
 <?= $this->endSection() ?>

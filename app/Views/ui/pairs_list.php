@@ -15,8 +15,8 @@ use App\Libraries\UiStore;
  * in the browser.
  *
  * @var list<array{pair: array<string, mixed>, recipient: array<string, mixed>|null, donor: array<string, mixed>|null}> $rows
- * @var string $btFilter
- * @var string $statusFilter
+ * @var list<string> $btFilter      The blood groups the chips are set to; empty is all
+ * @var list<string> $statusFilter  The statuses they are set to; empty is all
  * @var list<array{id: string, name: string}> $mrps
  * @var string $searchQuery  What the search above the list is narrowing to
  */
@@ -42,20 +42,31 @@ $mrpName = static function (string $id) use ($mrps): string {
     return '—';
 };
 
+// What each row may hold, in the order the row lists them, so the address
+// reads the same whichever order the chips were pressed.
+$allowed = ['bt' => UiStore::BLOOD_TYPES, 'status' => array_keys(UiStore::PAIR_STATUS_OPTIONS)];
+
 /**
- * Rebuilds the current query string with one filter swapped out.
+ * Rebuilds the current query string with one chip pressed.
  *
- * A filter sitting on its own default is left out of the URL — `all` for
- * blood type, Active for status, which is what the screen opens on. That is
- * why `status=all` has to be written out: leaving it off would mean Active.
+ * Pressed, not chosen: a chip is in the set or out of it, so this list can be
+ * asked for Active *and* Paired Exchange at once. `all` is not a value in the
+ * set — it empties the row.
+ *
+ * A filter sitting on its own default is left out of the URL — every blood
+ * group for one, Active alone for the other, which is what the screen opens
+ * on. That is why `status=all` has to be written out: leaving it off would
+ * mean Active.
  */
-$filterUrl = static function (string $key, string $value) use ($btFilter, $statusFilter, $searchQuery): string {
+$filterUrl = static function (string $key, string $value) use ($btFilter, $statusFilter, $searchQuery, $allowed): string {
     $query = ['bt' => $btFilter, 'status' => $statusFilter];
-    $query[$key] = $value;
+    $query[$key] = $value === 'all' ? [] : ui_filter_toggle($query[$key], $value, $allowed[$key]);
 
     $query = array_filter([
-        'bt'     => $query['bt'] === 'all' ? null : $query['bt'],
-        'status' => $query['status'] === UiStore::PAIRS_DEFAULT_STATUS ? null : $query['status'],
+        'bt'     => $query['bt'] === [] ? null : ui_filter_param($query['bt']),
+        'status' => $query['status'] === [UiStore::PAIRS_DEFAULT_STATUS]
+            ? null
+            : ($query['status'] === [] ? 'all' : ui_filter_param($query['status'])),
         // The search above the list is a filter like the chips are, so pressing
         // one keeps it rather than clearing it.
         'q'      => $searchQuery === '' ? null : $searchQuery,
@@ -72,7 +83,7 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
             <p class="page-subtitle"><?= esc(ui_plural(count($rows), 'pair')) ?></p>
         </div>
         <div class="header-actions">
-            <a class="btn-outline" href="<?= site_url('pairs/print') . '?' . http_build_query(array_filter(['bt' => $btFilter, 'status' => $statusFilter, 'q' => $searchQuery])) ?>" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
+            <a class="btn-outline" href="<?= site_url('pairs/print') . '?' . http_build_query(array_filter(['bt' => ui_filter_param($btFilter), 'status' => $statusFilter === [] ? 'all' : ui_filter_param($statusFilter), 'q' => $searchQuery])) ?>" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
             <a class="btn-primary" href="<?= site_url('pairs/new') ?>"><?= ui_icon('plus') ?>Add Pair</a>
         </div>
     </div>
@@ -80,20 +91,20 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
     <div class="filter-stack">
         <div class="filter-row">
             <span class="filter-label">Blood type:</span>
-            <a class="chip<?= $btFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', 'all') ?>">All</a>
+            <a class="chip<?= $btFilter === [] ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', 'all') ?>">All</a>
             <?php foreach (UiStore::BLOOD_TYPES as $bloodType): ?>
-                <a class="chip chip--mono<?= $btFilter === $bloodType ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', $bloodType) ?>"><?= esc($bloodType) ?></a>
+                <a class="chip chip--mono<?= in_array($bloodType, $btFilter, true) ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', $bloodType) ?>"><?= esc($bloodType) ?></a>
             <?php endforeach; ?>
         </div>
         <div class="filter-row">
             <span class="filter-label">Status:</span>
-            <a class="chip<?= $statusFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('status', 'all') ?>">All</a>
+            <a class="chip<?= $statusFilter === [] ? ' is-active' : '' ?>" href="<?= $filterUrl('status', 'all') ?>">All</a>
             <?php // All six the pair's own card offers, Closed among them: it
                   // is a word a pair can be on, not an ending, so a pair
                   // wearing it is still here to be narrowed down to. What is
                   // not on this list is a pair that has been *ended*. ?>
             <?php foreach (UiStore::PAIR_STATUS_OPTIONS as $status => $statusLabel): ?>
-                <a class="chip<?= $statusFilter === $status ? ' is-active' : '' ?>" href="<?= $filterUrl('status', $status) ?>"><?= esc($statusLabel) ?></a>
+                <a class="chip<?= in_array($status, $statusFilter, true) ? ' is-active' : '' ?>" href="<?= $filterUrl('status', $status) ?>"><?= esc($statusLabel) ?></a>
             <?php endforeach; ?>
         </div>
     </div>

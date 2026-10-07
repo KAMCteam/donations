@@ -79,10 +79,16 @@ foreach ($tests as $i => $test) {
 }
 
 // The group that takes the tests a record adds is the one group that has to
-// be there when it is empty — it is where the button to add the first one
-// lives, and nothing is under it until that button is pressed. Last, as the
-// check list had it.
-if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROUP])) {
+// be there when it is empty — it is where a test gets added, and nothing is
+// under it until one is. Last, as the check list had it.
+//
+// On every screen that can be written on, Add screens included. It used to
+// appear only where there was a record to add a test to, which meant the one
+// group somebody might actually need while entering a patient was the one
+// group they could not see: the sheet in front of them had no line for the
+// test their consultant had asked for, and nothing on the screen said there
+// would ever be one.
+if (($editing || $addLabUrl !== null) && ! isset($groups[DatabaseSeeder::CUSTOM_GROUP])) {
     $groups[DatabaseSeeder::CUSTOM_GROUP] = [];
 }
 
@@ -106,6 +112,19 @@ $groupWeight = [];
 
 foreach (array_keys($groups) as $groupName) {
     $groupWeight[$groupName] = LabProgress::weightFor($side, (string) $groupName);
+}
+
+// A screen with no record yet cannot post "add a test" anywhere — there is
+// nobody for it to belong to until Save. So the group arrives with one blank
+// card instead of a button: type a name into it and the test is created with
+// the record, leave it alone and nothing is. `ui.js` turns the line under it
+// into an Add lab button that lays out another, which is an addition — with
+// scripting off the one card is still there and still works.
+//
+// After the counts, and never in them: an unnamed card is not a test, and
+// "0 of 75" on an Add screen would be counting a box nobody has filled in.
+if ($editing && $addLabUrl === null) {
+    $groups[DatabaseSeeder::CUSTOM_GROUP][count($tests)] = UiStore::blankCustomLab($side);
 }
 
 // The groups are numbered, and a group's bar, its cards and its line in the
@@ -211,11 +230,34 @@ $groupBar = static function (array $p): void {
             <button type="submit" class="btn-add-lab"<?= $editing ? '' : ' form="lab-add"' ?> formaction="<?= esc($addLabUrl) ?>" formnovalidate><?= ui_icon('plus') ?>Add lab</button>
         </div>
         <fieldset class="card-fields"<?= $editing ? '' : ' disabled' ?>>
+    <?php elseif ($isCustomGroup && $editing): ?>
+        <?php // The same shape on a screen with no record yet: the heading, and
+              // Add lab under it on its own. The button is `ui.js` — there is
+              // nowhere to post an added test until Save, so what it does is
+              // lay out another blank card in the form — and it is rendered
+              // hidden, because a button that cannot work is worse than none.
+              //
+              // That file also takes the blank card below away, so the group
+              // arrives as it does on a record: a heading and a button, and a
+              // card only once one has been asked for. With the file blocked
+              // the card stays and the button never appears, which is the one
+              // shape that still works with no script at all.
+              //
+              // Inside the fieldset, unlike the record screens' button: nothing
+              // is disabled on an Add screen, so there is nothing to step out
+              // of. ?>
+        <div class="lab-group lab-group--add" data-lab-group-head="<?= (int) $groupNumber[$groupName] ?>" data-lab-add-blank="<?= esc($field) ?>">
+            <div class="lab-group-add-head">
+                <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
+                <?php $groupBar($groupProgress[$groupName]); ?>
+            </div>
+            <button type="button" class="btn-add-lab" data-lab-add-more hidden><?= ui_icon('plus') ?>Add lab</button>
+        </div>
     <?php endif; ?>
     <div class="lab-group">
         <?php // Its heading is above, with the button, except where there is
-              // no button — a screen with no record to add a test to. ?>
-        <?php if ($groupName !== '' && ! ($isCustomGroup && $addLabUrl !== null)): ?>
+              // no button — a group nobody can add to. ?>
+        <?php if ($groupName !== '' && ! ($isCustomGroup && ($addLabUrl !== null || $editing))): ?>
             <div class="lab-group-head" data-lab-group-head="<?= (int) $groupNumber[$groupName] ?>">
                 <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
                 <?php $groupBar($groupProgress[$groupName]); ?>
@@ -244,7 +286,10 @@ $groupBar = static function (array $p): void {
             // Every card is named, not only the ones a record added: a card
             // that cannot be linked to cannot be pointed at, and "Edit
             // results" has been linking to its own card from the start.
-            $cardId   = 'lab-' . $test['id'];
+            // A test that has not been saved has no id to be named after, so
+            // it is named for where it sits in the form — unique either way,
+            // and two blank cards with the same id would be one anchor.
+            $cardId   = $test['id'] === '' ? 'lab-new-' . $field . '-' . $i : 'lab-' . $test['id'];
             // What the card calls this answer and what colour it is — its own
             // word for it when somebody wrote one, ours otherwise.
             $label = static fn (string $key): string => $byKey[$key]['label'] ?? UiStore::RESULT_LABEL[$key] ?? $key;
@@ -353,7 +398,20 @@ $groupBar = static function (array $p): void {
                     </div>
                 <?php endif; ?>
 
-                <?php if ($custom && $removeLabUrl !== null): ?>
+                <?php if ($custom && $test['id'] === ''): ?>
+                    <?php // A card that has never been saved. There is nothing
+                          // to delete — no row behind it — so taking it away is
+                          // taking it off the form, which is `ui.js`, which is
+                          // also what put it there. Hidden until that file
+                          // unhides it, for the same reason Add lab is.
+                          //
+                          // No question asked first: a test added by mistake
+                          // has written nothing down, and the thing being
+                          // undone is a press from a moment ago. ?>
+                    <div class="lab-remove">
+                        <button type="button" class="lab-remove-link" data-lab-drop hidden><?= ui_icon('trash') ?>Remove this test</button>
+                    </div>
+                <?php elseif ($custom && $removeLabUrl !== null): ?>
                     <?php // Theirs to add, theirs to take away — at the foot of
                           // the card, after everything it holds. The question is
                           // asked over the card rather than on a screen of its

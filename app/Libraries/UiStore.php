@@ -541,7 +541,7 @@ final class UiStore
      *
      * @return list<array<string, mixed>>
      */
-    public function waitingList(?string $bloodGroup = null, ?string $status = null, ?string $query = null): array
+    public function waitingList(string|array|null $bloodGroup = null, string|array|null $status = null, ?string $query = null): array
     {
         $rows = $this->recipients->waitingList($this->organ(), $bloodGroup, $status, $query);
 
@@ -560,7 +560,7 @@ final class UiStore
      *
      * @return list<array<string, mixed>>
      */
-    public function availableDonors(?string $bloodGroup = null, ?string $status = null, ?string $query = null): array
+    public function availableDonors(string|array|null $bloodGroup = null, string|array|null $status = null, ?string $query = null): array
     {
         return array_map(
             fn (array $row): array => $this->donorToUi($row),
@@ -683,6 +683,7 @@ final class UiStore
         }
 
         $this->forgetEndedLinks('recipient_mrn', (int) $row['mrn']);
+        $this->forgetOwnTests((int) $row['mrn'], 'recipient');
         $this->recipients->delete($row['mrn']);
 
         return '';
@@ -704,6 +705,7 @@ final class UiStore
         }
 
         $this->forgetEndedLinks('donor_mrn', (int) $row['mrn']);
+        $this->forgetOwnTests((int) $row['mrn'], 'donor');
         $this->donors->delete($row['mrn']);
 
         return '';
@@ -808,6 +810,20 @@ final class UiStore
     private function forgetEndedLinks(string $column, int $mrn): void
     {
         $this->pairs->where($column, $mrn)->where('ended_at !=', null)->delete();
+    }
+
+    /**
+     * The tests this record added for itself, taken off with it.
+     *
+     * The results go by the trigger on the register, but the tests themselves
+     * are rows in `labs` keyed by the person's number, and nothing was taking
+     * them away. They were invisible once the record was gone — until the
+     * hospital issued that number again, and the next patient's workup opened
+     * carrying the last one's extra tests under Other.
+     */
+    private function forgetOwnTests(int $mrn, string $personType): void
+    {
+        $this->labs->where('person_mrn', $mrn)->where('person_type', $personType)->delete();
     }
 
     private function heldByAPair(string $name, array $pair): string
@@ -1060,7 +1076,16 @@ final class UiStore
         ];
     }
 
-    public function addMrp(string $code, string $name, string $kind = MrpModel::DOCTOR): string
+    /**
+     * Registers somebody, and gives them their way in.
+     *
+     * `$admin` is asked here as well as on the row, because whether somebody
+     * looks after the register is usually known at the moment they are being
+     * registered — and granting it afterwards meant adding the person, finding
+     * them in the list, opening their row and saving it again, four presses to
+     * say one thing that was already known.
+     */
+    public function addMrp(string $code, string $name, string $kind = MrpModel::DOCTOR, bool $admin = false): string
     {
         $code = trim($code);
         $name = trim($name);
@@ -1075,7 +1100,7 @@ final class UiStore
         }
 
         $this->mrp->insert(['code' => $code, 'name' => $name, 'kind' => $kind]);
-        $this->accountFor((int) $this->mrp->getInsertID(), $code, $name, $kind, true);
+        $this->accountFor((int) $this->mrp->getInsertID(), $code, $name, $kind, true, $admin);
 
         if ($kind === MrpModel::COORDINATOR) {
             $this->coordinatorId($name);
@@ -1096,9 +1121,11 @@ final class UiStore
      * than inventing them.
      *
      * An account already answering to that staff number is linked rather than
-     * duplicated: one person, one way in, whichever was made first.
+     * duplicated: one person, one way in, whichever was made first. The
+     * permission is written either way, because somebody ticking the box on
+     * Add MRP has said what they mean whichever of the two happens.
      */
-    private function accountFor(int $mrpId, string $code, string $name, string $kind, bool $active): void
+    private function accountFor(int $mrpId, string $code, string $name, string $kind, bool $active, bool $admin = false): void
     {
         if ($mrpId === 0 || $code === '') {
             return;
@@ -1108,7 +1135,7 @@ final class UiStore
         $existing = $users->where('login_id', $code)->first();
 
         if ($existing !== null) {
-            $users->update((int) $existing['id'], ['mrp_id' => $mrpId]);
+            $users->update((int) $existing['id'], ['mrp_id' => $mrpId] + ($admin ? ['is_admin' => 1] : []));
 
             return;
         }
@@ -1119,6 +1146,7 @@ final class UiStore
             'role'          => $kind === MrpModel::COORDINATOR ? 'coordinator' : 'doctor',
             'password_hash' => '',
             'is_active'     => $active ? 1 : 0,
+            'is_admin'      => $admin ? 1 : 0,
             'mrp_id'        => $mrpId,
         ]);
     }
@@ -1153,22 +1181,6 @@ final class UiStore
     }
 
     /**
-     * One registered person, as the Admin screen reads them.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function mrpPerson(string $id): ?array
-    {
-        foreach ($this->mrpRegister() as $person) {
-            if ($person['id'] === $id) {
-                return $person;
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * Grants somebody the register, or takes it back. '' on success.
      *
      * The permission lives on their sign-in account, because that is what has
@@ -1197,8 +1209,18 @@ final class UiStore
         return '';
     }
 
-    /** Changes a registered user's ID, name or kind. '' on success. */
-    public function updateMrp(string $id, string $code, string $name, string $kind): string
+    /**
+     * Changes a registered user's name or kind. '' on success.
+     *
+     * **Not their ID.** It is their staff number: the hospital issued it, the
+     * directory answers to it, their sign-in is that number, and the login log
+     * is a column of them. Editing it here would rename somebody in this one
+     * database and leave every other record of them saying the old number — and
+     * a typed-in ID was never corrected so much as swapped for another
+     * person's. A number entered wrongly is a row registered for the wrong
+     * person: deactivate it and register the right one.
+     */
+    public function updateMrp(string $id, string $name, string $kind): string
     {
         $row = $this->mrp->find((int) $id);
 
@@ -1206,35 +1228,28 @@ final class UiStore
             return 'That user could not be found.';
         }
 
-        $code = trim($code);
+        $code = (string) $row['code'];
         $name = trim($name);
         $kind = isset(MrpModel::KINDS[$kind]) ? $kind : (string) $row['kind'];
 
-        if ($code === '' || $name === '') {
-            return 'A user needs both an ID and a name.';
+        if ($name === '') {
+            return 'A user needs a name.';
         }
 
-        $clash = $this->mrp->byCode($code);
+        $this->mrp->update((int) $row['id'], ['name' => $name, 'kind' => $kind]);
 
-        if ($clash !== null && (int) $clash['id'] !== (int) $row['id']) {
-            return 'That ID is already registered.';
-        }
-
-        $this->mrp->update((int) $row['id'], ['code' => $code, 'name' => $name, 'kind' => $kind]);
-
-        // Their account says the same three things, and a register that
-        // disagreed with the login screen about somebody's name or staff
-        // number would be two answers to one question.
+        // Their account says the same things, and a register that disagreed
+        // with the login screen about somebody's name would be two answers to
+        // one question.
         $users   = model(UserModel::class);
         $account = $users->forMrp((int) $row['id']);
 
         if ($account === null) {
             $this->accountFor((int) $row['id'], $code, $name, $kind, (int) $row['is_active'] === 1);
-        } elseif ($users->where('login_id', $code)->where('id !=', (int) $account['id'])->first() === null) {
+        } else {
             $users->update((int) $account['id'], [
-                'login_id' => $code,
-                'name'     => $name,
-                'role'     => $kind === MrpModel::COORDINATOR ? 'coordinator' : 'doctor',
+                'name' => $name,
+                'role' => $kind === MrpModel::COORDINATOR ? 'coordinator' : 'doctor',
             ]);
         }
 
@@ -2041,6 +2056,34 @@ final class UiStore
     }
 
     /**
+     * A blank test, for the group an Add screen shows before there is a
+     * record.
+     *
+     * The same shape {@see self::defaultLabTests()} hands the card, with no
+     * id: nothing exists to carry one until Save. A card whose name is never
+     * typed is not a test and is dropped on the way in, so the blank one costs
+     * nothing — it is a line on the sheet with no writing on it.
+     *
+     * @return array<string, mixed>
+     */
+    public static function blankCustomLab(string $personType): array
+    {
+        return [
+            'id'         => '',
+            'name'       => '',
+            'group'      => DatabaseSeeder::CUSTOM_GROUP,
+            'resultType' => 'custom',
+            'side'       => $personType,
+            'custom'     => true,
+            'answers'    => self::answerSet('custom', null, $personType, DatabaseSeeder::CUSTOM_GROUP, ''),
+            'status'     => 'not_done',
+            'result'     => '',
+            'date'       => '',
+            'notes'      => '',
+        ];
+    }
+
+    /**
      * Adds a test to one record, under the group that heads such tests.
      *
      * Blank to begin with: the card it becomes carries the name field, so it
@@ -2064,6 +2107,21 @@ final class UiStore
             return 0;
         }
 
+        return $this->insertCustomLab((int) $mrn, $personType, '', $organ);
+    }
+
+    /**
+     * The row behind a test a record added. Returns its id, or 0.
+     *
+     * Two ways in. The record screens press **Add lab**, which lays out a
+     * blank card to type into, so the name comes later and the row starts as
+     * its own number — two blank names would collide under the unique key. The
+     * Add screens have no record to press that against, so the name is typed
+     * first and arrives with the save, which is this method's other caller.
+     */
+    private function insertCustomLab(int $mrn, string $personType, string $name = '', string $organ = ''): int
+    {
+        $organ    = $organ === '' ? $this->organ() : $organ;
         $parentId = $this->labs->customGroupId(DatabaseSeeder::CUSTOM_GROUP, $personType);
 
         if ($parentId === null) {
@@ -2071,16 +2129,16 @@ final class UiStore
         }
 
         // After everything the check list asks for, in the order they were
-        // added. Two blank names would collide under the unique key, so each
-        // starts as its own number until somebody types over it.
+        // added.
         $last = $this->labs->lastSortOrder($organ, $personType) + 1;
+        $name = trim($name);
 
         $this->labs->insert([
-            'name'          => 'New test ' . $last,
+            'name'          => $name === '' ? 'New test ' . $last : mb_substr($name, 0, 150),
             'lab_parent_id' => $parentId,
             'organ_code'    => $organ,
             'person_type'   => $personType,
-            'person_mrn'    => (int) $mrn,
+            'person_mrn'    => $mrn,
             'result_type'   => 'custom',
             'sort_order'    => $last,
             'is_active'     => 1,
@@ -2177,8 +2235,25 @@ final class UiStore
      */
     private function saveLabTests(int $mrn, string $personType, array $tests): void
     {
+        // How many tests one save may invent. The screens lay out one blank
+        // card and add more a press at a time, so nobody reaches this by
+        // using the platform — it is here because a posted form is not a
+        // screen, and a loop that creates a row per posted name is a loop
+        // somebody can hand ten thousand names to.
+        $mayCreate = 25;
+
         foreach ($tests as $test) {
             $labId = (int) ($test['id'] ?? 0);
+
+            if ($labId === 0) {
+                // A card the Add screens laid out blank: no row behind it yet,
+                // because there was no record to hang one on when it was
+                // drawn. A name makes it a test; without one it is an empty
+                // line on the sheet and nothing is written down.
+                $labId = trim((string) ($test['name'] ?? '')) === '' || $mayCreate-- <= 0
+                    ? 0
+                    : $this->insertCustomLab($mrn, $personType, (string) $test['name']);
+            }
 
             if ($labId === 0) {
                 continue;

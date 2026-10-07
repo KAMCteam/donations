@@ -121,7 +121,7 @@
   z-index: 20;
   background-color: #15508A;
   translate: -100% 0;
-  transition-property: transform, translate, scale, rotate;
+  transition-property: transform, translate, scale, rotate, width;
   transition-timing-function: var(--ease);
   transition-duration: 300ms;
 }
@@ -150,6 +150,18 @@
   transition-property: var(--transition-colors-props);
   transition-timing-function: var(--ease);
   transition-duration: var(--dur);
+}
+
+/* Three marks in the one button, and the screen's width says which. Narrow,
+   the sidebar goes away and comes back, so the mark is the X it always was;
+   wide, it narrows to the rail and widens again, so the mark is a chevron
+   pointing the way it would move. `ui.js` swaps the two chevrons by `hidden`,
+   which is why the rule below has to ask. */
+.sidebar-close-mark { display: none; }
+
+@media (min-width: 64rem) {
+  .sidebar-close-mark:not([hidden]) { display: inline-flex; }
+  .sidebar-close-x { display: none; }
 }
 
 .sidebar-nav {
@@ -216,9 +228,63 @@
 
 /* ---- Desktop (lg) ---- */
 @media (min-width: 64rem) {
-  .app-main.has-sidebar { margin-left: 15rem; }
+  .app-main.has-sidebar {
+    margin-left: 15rem;
+    transition-property: margin-left;
+    transition-timing-function: var(--ease);
+    transition-duration: 300ms;
+  }
   .backdrop,
   .topbar,
   .sidebar-close { display: none; }
   .sidebar { translate: 0 0; }
+
+  /* The sidebar narrows on a wide screen rather than leaving. Shut, it is its
+     icons and nothing else — a rail four and a bit rem wide — so the page gets
+     most of the width back and the way back to every screen is still on it,
+     one press away, where it was. Taking it off the screen altogether left
+     somebody reading a register with no navigation at all until they went
+     looking for the button that brings it back.
+
+     Only where `ui.js` ran: it is what narrows and widens it, so without that
+     file the sidebar stays as it was rather than offering a control that
+     cannot work. */
+  .has-js .sidebar-close { display: block; }
+
+  .has-js .app.is-collapsed .sidebar { width: 4.5rem; }
+  .has-js .app.is-collapsed .app-main.has-sidebar { margin-left: 4.5rem; }
+
+  /* What a rail is: the marks, centred, and nothing written. The name is on
+     each item's `title`, so hovering one still says what it is. */
+  .has-js .app.is-collapsed .nav-label,
+  .has-js .app.is-collapsed .sidebar-logo img { display: none; }
+
+  .has-js .app.is-collapsed .nav-item,
+  .has-js .app.is-collapsed .signout-btn {
+    justify-content: center;
+    gap: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .has-js .app.is-collapsed .sidebar-logo {
+    display: flex;
+    justify-content: center;
+    padding: 1rem 0.5rem;
+  }
+
+  .has-js .app.is-collapsed .sidebar-close {
+    position: static;
+    top: auto;
+    right: auto;
+  }
+
+  .has-js .app.is-collapsed .sidebar-nav { padding-left: 0.5rem; padding-right: 0.5rem; }
+  .has-js .app.is-collapsed .sidebar-footer { padding-left: 0.5rem; padding-right: 0.5rem; }
+}
+
+/* Nothing moves for somebody who has asked for that. */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .app-main.has-sidebar { transition-duration: 0ms; }
 }

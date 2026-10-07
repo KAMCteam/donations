@@ -1406,6 +1406,12 @@
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
+  /* A button on an unsaved card, a link on a saved one — the same line
+     either way, so the button is told to stop looking like one. */
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
   font-size: var(--text-xs);
   line-height: var(--lh-xs);
   font-weight: 500;

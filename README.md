@@ -123,12 +123,11 @@ Options -Indexes
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Entry point — the login screen, or the dashboard when already signed in |
+| `/` | Entry point — the login screen, or the platform when already signed in |
 | `/login` | Sign in — User ID and password, checked against `users` |
-| `/admin` | The register, and who may sign into it. Admin permission only |
+| `/admin` | User Management — the register, and who may sign into it. Admin permission only |
 | `/logout` | Empties the session and returns to the login screen |
-| `/doctor/dashboard`, `/coordinator/dashboard` | Where each role lands |
-| `/organ` | Programme picker (kidney / liver) |
+| `/organ` | Programme picker (kidney / liver) — where signing in lands |
 | `/dashboard` | Programme statistics and high-priority waitlist |
 | `/recipients` | Recipient waitlist, filterable by blood type and status |
 | `/recipients/print` | The filtered waitlist as a printable sheet |
@@ -142,7 +141,7 @@ Options -Indexes
 | `/exchange` | Paired exchange: the chains, and the builder; filterable by the recipient's blood type |
 | `/reports` | Both registers read across, under nine filters |
 | `/reports/export/{general\|internal}` | The filtered report as a printable sheet |
-| `/admin` | The register: Add MRP, Registered MRPs and Login Activity. Admin permission only |
+| `/admin` | User Management: Add MRP, Registered MRPs and Login Activity. Admin permission only |
 
 Auto-routing is off, so `app/Config/Routes.php` lists every reachable endpoint.
 The programme is chosen once per session on `/organ` and kept in the `ui_organ`
@@ -180,14 +179,39 @@ reacts to it:
 | Records | `app/Libraries/UiStore.php`, over `app/Models/*` |
 | Inline SVG icons, tone lookups | `app/Helpers/ui_helper.php` |
 | Stylesheets and images | `public/assets/ui/` — copied byte-for-byte |
-| Behaviour only | `public/assets/ui/js/ui.js` — one file, ~190 lines |
+| Behaviour only | `public/assets/ui/js/ui.js` — one file, ~1,050 lines |
 
 Navigation, filtering, sorting, opening a card for editing and saving are links
 and form posts, so every screen renders, navigates and submits **with
 JavaScript switched off**. `ui.js`
-is left with the mobile sidebar, the lab cards (status buttons, result editor,
+is left with the sidebar, the lab cards (status buttons, result editor,
 running totals), whole-row click targets, opening the pairing choice as a
 dialog, and the date fields (slashes as you type, and the calendar button).
+
+#### The sidebar narrows
+
+On a narrow screen it slides in over the page with a backdrop behind it, as it
+always did. On a wide one it **narrows to its icons** — a rail 4.5rem across —
+and the page takes the rest of the width back. A register is fifteen columns
+wide and the navigation beside it is in the way; taking it off the screen
+altogether, which is what the first version of this did, left whoever was
+reading one with no way to anywhere until they went looking for the control
+that brings it back.
+
+**Open is the default**, every time, on both. What is remembered is a viewer
+narrowing it, kept for the session and nowhere else, so a session that never
+narrows it opens wide.
+
+One button does it, in the sidebar, where it is in either state. It wears three
+marks and the screen's width says which: narrow, the **X** that has always
+meant the sidebar is leaving; wide, a **chevron pointing the way it would
+move** — left to narrow, right to widen. `ui.js` swaps the two chevrons, CSS
+chooses between them and the X. The icons stay, each with its name on `title`,
+so hovering one on the rail still says what it is.
+
+It all lives under `.has-js`, a class `initSidebar()` puts on `<html>`: that
+file is what narrows and widens the thing, so with it blocked the sidebar is
+the one it always was and nothing on the screen offers to move it.
 
 The result was checked against the design package screen by screen with
 full-page screenshot diffs at 1440px. Login, the programme picker, the pairs
@@ -487,8 +511,14 @@ back to the list it always named.
 
 Above the page header and centred in the content, on the five screens that
 have a list to narrow — Recipient Waitlist, Donors List, Pairs List, Paired
-Exchange, Reports. The dashboard, the Admin screen and the record screens have nothing
-for it to do, so they do not carry it.
+Exchange, Reports. The dashboard, User Management, the record screens and the
+exchange being built have nothing for it to do, so they do not carry it.
+
+Which five is read off the **address** rather than off the sidebar item, which
+was the rule until the exchange grew two screens under its own: Build the
+exchange and the review are `exchange` in the sidebar and have no list on them
+— a chain is worked out, not looked through — so the box there searched
+nothing and posted the chain's own address back at itself.
 
 It never leaves the screen. The form posts back to the same address with the
 filters already showing carried as hidden fields, so searching narrows what is
@@ -496,6 +526,28 @@ on the page rather than replacing it — and the chips carry `q` in their own
 links, so pressing one keeps the search. Both end up in the address together
 (`?bt=A&q=Dosari`), which the Export PDF button then takes with it, so the
 sheet is what the screen was showing.
+
+### A chip row is a set
+
+Each row — blood type, status — holds **as many chips as are pressed**, written
+in the address as `?bt=A,B`. A chip goes in when it is pressed and comes out
+when it is pressed again; **All** empties the row, and an empty row narrows
+nothing, so it drops out of the address and a plain list has a plain one.
+
+They were one at a time, which made "A and B" a question no list could be
+asked: somebody looking for a donor an AB recipient could take had to read
+three lists and hold the answer in their head. The rows still narrow together,
+so `?bt=A,B&status=active` is two questions at once and means both.
+
+`ui_filter_values()` reads a row off the address, keeping only the values that
+screen offers, so a hand-typed one narrows the list rather than breaking the
+query behind it; `ui_filter_toggle()` is the press. The two registers do it in
+SQL with `whereIn`, so the waiting list is still ordered by its computed score
+in the database rather than in PHP.
+
+The Pairs List is the one with a default that is not "all": it opens on
+**Active**, so `status=all` has to be written out there — leaving the parameter
+off means the default, and an address has to be able to say "every status".
 
 What each screen matches is its own: the two registers match an MRN or a name
 in SQL; the Pairs List and Paired Exchange match either of a pair's people by
@@ -574,6 +626,26 @@ they post as `pairDetails[<recipient MRN>][…]`. The review is one form around
 the whole summary now — which is why its Back and its close are buttons
 `ui.js` shuts the dialog with rather than little forms of their own: a form
 cannot sit inside another.
+
+#### The donor the chain leaves over
+
+A chain can end on a donor nobody is taking. They are allowed — that is what
+the end of a chain looks like — but not left hanging: it has to be said that
+they go **back to the available donors list**, and until it is, the exchange
+cannot be saved.
+
+There were two answers there, and the other was **Delete from the system**,
+which took the record, its whole workup and every pair row naming it, the one
+the exchange had just closed included. A screen for working out who gives to
+whom is no place for that. The donor is a person on the register who has not
+been matched this time, and the register's own answer for somebody who is not
+available is their **status** — so the review asks for it, per donor, beside
+the name it is about. Active is what it offers first, because a donor on the
+available list who is not Active is available to nobody, and On Hold is the
+true word for one going back who is not to be offered yet.
+
+Deleting a donor is the register's to do, deliberately, from the donor's own
+list, where the question is asked about a record rather than about a chain.
 
 #### Who the chain may offer
 
@@ -801,6 +873,51 @@ are in two, with the button between them — and it answers to a form of the
 page's own, so Enter in one of the card's boxes cannot press it. It used to:
 Add lab was the first submit button the form had, and a name typed and
 confirmed added a test nobody asked for.
+
+**On the Add screens there is no record yet**, so there is nothing for Add lab
+to post against — and for a while that meant the group was not on those screens
+at all. Which made the one group somebody might actually need while entering a
+patient the one group they could not see: the sheet in front of them had no
+line for the test the consultant had asked for, and nothing on the screen said
+there would ever be one. So Other is on every screen that can be written on,
+and it **looks the same on all of them**: the heading, **Add lab** under it on
+its own, and a card for each test that has been asked for — none to begin with.
+
+What is different is behind the button. The screen renders one blank card and
+a hidden button, and `ui.js` swaps which of the two is showing: the card
+becomes the template it adds copies of, the button becomes what adds them. A
+copy is that card exactly as it was found — before anybody typed in it, so
+there is nothing to clear — with its index bumped in the field names the form
+posts under and the ids its labels point at. With that file blocked the blank
+card is what is left and the button never appears, which is the half that
+works on its own.
+
+Name a card and the test is created with the record, by the same save; it is
+otherwise the card the record screens show, answer picker and all. Leave one
+alone and nothing is written down — an unnamed card is not a test, which is
+also why the blank one is left out of the count: *0 of 74* on the Add screen is
+the same 74 the record says a moment later.
+
+Each copy carries **Remove this test** at its foot from the moment it is laid
+out, as a saved card does. Nothing is deleted by it — there is no row behind an
+unsaved card — it comes off the form, which is the whole of what a press of Add
+lab did. And nothing is asked first, for the same reason: a test added by
+mistake has written nothing down, and what is being undone is a press from a
+moment ago. The saved card's own Remove still asks, because that one is a
+delete.
+
+A posted card with no id and a name becomes a row in `labs`, under the custom
+group, keyed to the record — the same row `addCustomLab()` writes, through the
+same `insertCustomLab()`. One save may invent at most 25 of them: the screens
+add one at a time and nobody reaches that by using them, but a posted form is
+not a screen, and a loop that creates a row per posted name is a loop somebody
+can hand ten thousand names to.
+
+Deleting a record takes its own tests with it. The results went by the trigger
+on the register, but the tests are rows keyed by the person's number and
+nothing was removing them — invisible once the record was gone, until the
+hospital issued that number again and the next patient's workup opened carrying
+the last one's extra tests under Other.
 
 The set lives in `labs.answer_set`, JSON, on the test's own row — one set per
 test, so two tests on one record are independent, and a test on one record is
@@ -1151,7 +1268,7 @@ workup, one per page — built from `App\Libraries\RecordBlocks`, the same
 blocks a single record's own printed sheet is made of, so the two sheets cannot
 drift apart.
 
-### The Admin screen is where users are made
+### User Management is where users are made
 
 **Add MRP**, its first section, creates somebody a record can be assigned to, and a
 transplant programme assigns two kinds. The form asks which — **Doctor** or
@@ -1191,17 +1308,39 @@ Registering somebody does make their **sign-in account**, with no password at
 all: an empty hash matches nothing, so the account exists and cannot be signed
 into until an administrator sets one. The two were separate tables describing
 the same staff, and the register's row is now the one place a person is edited,
-deactivated, granted the permission, and given a password.
+deactivated and granted the permission.
+
+The form asks for the **Admin** permission as well. It is the same permission
+the row below grants and not a second kind of thing — the hint under the two
+types says so — but whether somebody looks after the register is usually known
+at the moment they are being registered, and granting it afterwards meant
+adding the person, finding them in the list, opening their row and saving it
+again: four presses to say something that was already known.
 
 **Registered MRPs** under it is a table — Name, MRP ID, Type, Status, and the
 row's controls. **Edit** turns the row into a form where the row is, as a
-record's card does, and carries the **Admin** checkbox. **Deactivate** is never
-a delete: the records they are on still name them, and a physician who has left
-is part of what those records say. A deactivated user stays on the list, marked
-*Deactivated*, with **Reactivate** — and cannot sign in, because deactivating
-reaches their account as well as their row. **Reset password** sets one without
-sending them round the directory again; it is the screen and nothing behind it
-so far, and says so on the dialog.
+record's card does, and carries the **Admin** checkbox. It does **not** carry
+the MRP ID, which the row shows and does not offer: a staff number is the
+hospital's, the directory answers to it, somebody's sign-in *is* that number
+and the login log is a column of them. Editing it here would rename a person in
+this one database and leave every other record of them saying the old number —
+and a typed-in ID was never a correction so much as a swap for somebody else's.
+A row registered against the wrong number is deactivated and the right one
+registered. `updateMrp()` takes a name and a kind and reads the code off the
+row, so an ID posted to it by a hand-made form is ignored rather than trusted.
+
+**Deactivate** is never a delete: the records they are on still name them, and
+a physician who has left is part of what those records say. A deactivated user
+stays on the list, marked *Deactivated*, with **Reactivate** — and cannot sign
+in, because deactivating reaches their account as well as their row.
+
+There was a **Reset password** dialog here, with a generator beside the box. It
+is gone. It was the screen and nothing behind it — what was typed was read,
+checked for being there at all, and thrown away — and a control that looks like
+it set a password is worse than no control, because somebody reads the new
+password out and walks away. Setting one belongs with the directory this screen
+already defers to for sign-in; until that is wired, a row with no password
+carries *No password set* and says the true thing instead.
 
 **Login Activity**, the third section, is every attempt to sign in — name, User
 ID, when, and whether it worked, with why when it did not. Read-only: there is
@@ -1335,19 +1474,21 @@ the browser.
 
 #### Two roles, and a permission over both
 
-| Role | Lands on |
-| --- | --- |
-| `doctor` | `/doctor/dashboard` |
-| `coordinator` | `/coordinator/dashboard` |
-
-Both are placeholders and say so: a name, a role and the way out, with a link
-into the platform. The mapping is written once, in `Auth::HOME`.
+Both land in the same place: `/organ`, the programme picker, written once as
+`Auth::HOME`. There were two addresses there for a while, `/doctor/dashboard`
+and `/coordinator/dashboard`, each a screen saying who was signed in with a
+link into the platform underneath — and that is all either of them ever said.
+Somebody who has just typed their staff number and their password knows who
+they are; being told it again, with a button to press before they may start,
+is a step that holds them up and teaches them nothing. The screens are gone,
+the two controllers and the view with them, and signing in opens the platform
+at the one question it does have to ask.
 
 **Admin is not a third role.** Everybody who uses this system is a doctor or a
 coordinator; some of them also look after the register, and `users.is_admin`
-says which. An administrator keeps their own role, lands on their own
-dashboard, and keeps every screen their role already had — what the permission
-adds is on top:
+says which. An administrator keeps their own role, lands where everybody lands,
+and keeps every screen their role already had — what the permission adds is on
+top:
 
 - the **Admin** item in the sidebar, and the screen behind it;
 - the **delete** button on the three lists, which nobody else is shown.
@@ -1366,16 +1507,19 @@ that a guard is read next to the address it guards:
   way out is the screen they are being sent to.
 - **`role:doctor`, `role:doctor,coordinator`** — allowing rather than denying,
   so a role added later is kept out of every screen until somebody writes it
-  down.
+  down. No address carries it at the moment: the two that did were the landing
+  screens. It is kept because a register that grows a screen for one job will
+  want it again, and `AuthTest` puts a route of its own behind it so a guard
+  nothing uses cannot quietly stop working.
 - **`admin`** — the permission, asked of doctors and coordinators alike.
 
-Signed in and refused either way gets a 403 built on the login screen's own
-panel (`app/Views/errors/403.php`), naming their own dashboard as the way out
-and not naming the screen they asked for.
+Signed in and refused gets a 403 built on the login screen's own panel
+(`app/Views/errors/403.php`), naming the way back into the platform and not
+naming the screen they asked for.
 
 Every address in `Config\Routes` but `/login` and `/logout` is inside the
 `auth` group, so a route added to that file later is protected by being there;
-the Admin screen and the three deletes are inside `admin` as well. Hiding a
+User Management and the three deletes are inside `admin` as well. Hiding a
 button or a sidebar item is a courtesy — the address is still typeable, so the
 filter is what actually refuses.
 
@@ -1417,7 +1561,7 @@ writes.
 | Table | Exists because |
 | --- | --- |
 | `users` | Who may sign in, and as what: `login_id`, a password hash, a role, and whether they look after the register |
-| `login_activity` | Every attempt to sign in, successful or not. Written by the login screen, read by the Admin screen, edited by nothing |
+| `login_activity` | Every attempt to sign in, successful or not. Written by the login screen, read by User Management, edited by nothing |
 | `staff` | Superseded by `users`; kept, empty and unread, pending a decision to drop it |
 | `organ_programs` | The picker's cards are content — label, description, icon — not code |
 | `mrp` | Every record screen assigns a most responsible physician |
@@ -1590,7 +1734,7 @@ exactly as they are, password included.
 
 The first real account is the same row written by hand or from a console, with
 `is_active = 1`, a role, and `is_admin = 1` so that there is somebody who can
-register everybody else. After that, registering a person on the Admin screen
+register everybody else. After that, registering a person on the User Management screen
 makes their account for them.
 
 ## Migration notes (CodeIgniter 3 → 4)

@@ -765,7 +765,7 @@ class Ui extends BaseController
         $outcome = $tab['isActive'] ? (string) $this->request->getPost('outcome') : '';
 
         $error = $outcome === 'dissolve'
-            ? $this->store->dissolvePair($pair['recipientId'], 'The pair was dissolved from ' . $tab['name'] . "'s tab.")
+            ? $this->store->dissolvePair($pair['recipientId'])
             : $this->store->delinkPairDonor($pair['recipientId'], $linkId);
 
         if ($error !== '') {

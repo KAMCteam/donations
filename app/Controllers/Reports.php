@@ -166,11 +166,28 @@ class Reports extends BaseController
             static fn ($v): bool => is_string($v) && $v !== ''
         ));
 
+        // Was this address written by the form, or is it the screen opening?
+        // Several filters have a default that is not "all", and the only way
+        // to tell an untouched one from one somebody emptied is whether the
+        // form put its own marker in the address.
+        $applied = $this->request->getGet('applied') !== null;
+
+        $organs = $list('organ');
+
         return [
             'types'        => array_values(array_intersect($list('type'), ['recipient', 'donor'])),
-            'organs'       => $list('organ'),
+            // The programme the session is in, until somebody says otherwise.
+            // A report is read inside a programme — the sidebar, the lists and
+            // the dashboard are all that programme's — so opening Reports on
+            // every organ at once answered a question nobody had asked.
+            'organs'       => $organs !== [] || $applied ? $organs : [$this->store->organ()],
             'groups'       => array_values(array_intersect($list('group'), UiStore::BLOOD_TYPES)),
             'statuses'     => array_values(array_intersect($list('status'), array_keys(UiStore::STATUS_OPTIONS))),
+            // In a pair, not in a pair, or not asked. '' is the default and
+            // the third answer: a report about everybody.
+            'paired'       => in_array((string) ($this->request->getGet('paired') ?? ''), ['yes', 'no'], true)
+                ? (string) $this->request->getGet('paired')
+                : '',
             // A test is offered by name and carries every id that name has —
             // one per sheet, one per programme — so a choice arrives as a
             // comma-joined list and is flattened here.
@@ -178,13 +195,19 @@ class Reports extends BaseController
                 'intval',
                 array_merge(...array_map(static fn (string $v): array => explode(',', $v), $list('lab')) ?: [[]])
             ))),
+            // Which question the chosen tests are being asked: completed, or
+            // still outstanding. One or the other and never both — a record
+            // cannot have both completed and not completed the same test, so
+            // offering the two lists side by side would be offering an empty
+            // report.
+            'labMode'      => (string) ($this->request->getGet('labMode') ?? '') === 'missing' ? 'missing' : 'done',
             'from'         => $this->date((string) ($this->request->getGet('from') ?? '')),
             'to'           => $this->date((string) ($this->request->getGet('to') ?? '')),
             'mrps'         => array_map('intval', $list('mrp')),
             'coordinators' => array_map('intval', $list('coordinator')),
             'columns'      => array_values(array_intersect($list('column'), array_keys(self::OPTIONAL_COLUMNS))),
             // Nothing chosen is every column chosen, as everywhere else here.
-            'columnsTouched' => $this->request->getGet('applied') !== null,
+            'columnsTouched' => $applied,
             // The box above the report, which narrows what the filters chose
             // rather than being a tenth filter of its own.
             'search'         => trim((string) ($this->request->getGet('q') ?? '')),
@@ -237,12 +260,17 @@ class Reports extends BaseController
             'types'        => ['recipient' => 'Recipient', 'donor' => 'Donor'],
             'organs'       => $this->store->organs(),
             'groups'       => UiStore::BLOOD_TYPES,
-            // The three a record is ever set to. `STATUS_OPTIONS` holds more,
-            // but the rest are a pair's or retired, so offering them would be
-            // offering filters that can only come back empty. A URL naming one
-            // is still honoured — `filters()` validates against all of them.
-            'statuses'     => UiStore::PERSON_STATUS_OPTIONS,
+            // Every word the platform uses, a pair's as well as a person's.
+            // The four a record holds are a pair's first four as well, and the
+            // other two are only ever a pair's — so the filter asks the
+            // question of both: a record matches when its own word is asked
+            // for, or when an open pair holding it wears one that is. It
+            // offered the person's three alone before, which made a report
+            // about the cases in a paired exchange impossible to ask for.
+            'statuses'     => UiStore::PAIR_STATUS_OPTIONS,
+            'paired'       => ['yes' => 'In a pair', 'no' => 'Not in a pair'],
             'labs'         => model(LabModel::class)->named(),
+            'labModes'     => ['done' => 'Completed', 'missing' => 'Not completed'],
             'mrps'         => $this->store->mrps(),
             'coordinators' => $this->store->coordinators(),
             'columns'      => self::OPTIONAL_COLUMNS,
@@ -329,8 +357,13 @@ class Reports extends BaseController
             $applied[] = $named($filters['statuses'], $choices['statuses']);
         }
 
+        if ($filters['paired'] !== '') {
+            $applied[] = (string) $choices['paired'][$filters['paired']];
+        }
+
         if ($filters['labs'] !== []) {
-            $applied[] = ui_plural(count($filters['labs']), 'test') . ' recorded';
+            $applied[] = ui_plural(count($filters['labs']), 'test')
+                . ($filters['labMode'] === 'missing' ? ' not completed' : ' completed');
         }
 
         if ($filters['from'] !== '' || $filters['to'] !== '') {
@@ -380,10 +413,25 @@ class Reports extends BaseController
             }
         }
 
-        // `applied` is only worth carrying when it changes the reading: with
-        // every optional column chosen, touched and untouched mean the same
-        // thing, and leaving it off keeps a plain report's address empty.
-        if ($filters['columnsTouched'] && count($filters['columns']) < count(self::OPTIONAL_COLUMNS)) {
+        if ($filters['paired'] !== '') {
+            $query['paired'] = $filters['paired'];
+        }
+
+        // Only where it changes the reading: the mode is about the tests
+        // chosen, and with none chosen it is about nothing.
+        if ($filters['labs'] !== [] && $filters['labMode'] !== 'done') {
+            $query['labMode'] = $filters['labMode'];
+        }
+
+        // `applied` is only worth carrying where it changes the reading, and
+        // it changes it in two places. With every optional column chosen,
+        // touched and untouched mean the same thing. And an empty organ list
+        // means every programme only if somebody emptied it — untouched, it
+        // means the one the session is in — so the marker is what tells an
+        // address asking for all of them from one asking for nothing in
+        // particular.
+        if (($filters['columnsTouched'] && count($filters['columns']) < count(self::OPTIONAL_COLUMNS))
+            || $filters['organs'] === []) {
             $query['applied'] = '1';
         }
 

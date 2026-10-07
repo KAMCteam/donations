@@ -13,10 +13,21 @@ use App\Libraries\UiStore;
 /**
  * Reports: the register read across, under whatever the filters say.
  *
- * Nine filters, each a list of checkboxes inside a dropdown, each starting
- * empty — and empty means all, so an untouched filter narrows nothing. They
- * are one GET form: the report is in the address, which is what makes it
- * shareable, bookmarkable, and the same thing the two exports read.
+ * Eleven filters, most of them a list of checkboxes inside a dropdown, and
+ * most of them starting empty — empty means all, so an untouched filter
+ * narrows nothing. They are one GET form: the report is in the address, which
+ * is what makes it shareable, bookmarkable, and the same thing the two exports
+ * read.
+ *
+ * **Record type is not one of the dropdowns.** It decides which columns the
+ * table has — a donor has no entry date, a recipient has no donor type — so it
+ * is not a filter among filters but the thing the rest are read inside. It
+ * sits on its own line above them, as three words to choose between.
+ *
+ * Two others have a default that is not "all". **Organ** opens on the
+ * programme the session is in, because a report is read inside a programme
+ * like every other screen. **Labs** asks its tests as Completed, which is the
+ * question somebody opening it has.
  *
  * The dropdowns are `<details>`, so they open and close without scripting.
  *
@@ -58,13 +69,40 @@ $menu = static function (string $label, string $name, array $options, array $sel
     </details>
 <?php };
 
+/** The same dropdown for a question with one answer: radios, not checkboxes. */
+$pick = static function (string $label, string $name, array $options, string $chosenValue, string $allLabel): void { ?>
+    <details class="filter">
+        <summary class="filter-button">
+            <span class="filter-title"><?= esc($label) ?></span>
+            <span class="filter-count<?= $chosenValue === '' ? '' : ' is-set' ?>"><?= esc($chosenValue === '' ? 'All' : $options[$chosenValue]) ?></span>
+        </summary>
+        <div class="filter-menu">
+            <?php // The empty answer is an option like the other two, so it
+                  // can be chosen back: a radio row with no way to unset it
+                  // is a filter somebody is stuck inside. ?>
+            <label class="filter-option">
+                <input type="radio" name="<?= esc($name) ?>" value=""<?= $chosenValue === '' ? ' checked' : '' ?>>
+                <span><?= esc($allLabel) ?></span>
+            </label>
+            <?php foreach ($options as $value => $text): ?>
+                <label class="filter-option">
+                    <input type="radio" name="<?= esc($name) ?>" value="<?= esc((string) $value) ?>"<?= $chosenValue === (string) $value ? ' checked' : '' ?>>
+                    <span><?= esc($text) ?></span>
+                </label>
+            <?php endforeach; ?>
+        </div>
+    </details>
+<?php };
+
 // The lab filter's values are comma-joined id lists, so what is "selected" is
-// matched on the whole list rather than on one id.
-$labOptions  = [];
+// matched on the whole list rather than on one id — and the list is kept in
+// the headings the workup lists it under, because a hundred test names in one
+// alphabetical column is a list nobody finds anything in.
+$labGroups   = [];
 $labSelected = [];
 
 foreach ($choices['labs'] as $lab) {
-    $labOptions[$lab['ids']] = $lab['name'];
+    $labGroups[$lab['group']][$lab['ids']] = $lab['name'];
 
     if (array_intersect(array_map('intval', explode(',', $lab['ids'])), $filters['labs']) !== []) {
         $labSelected[] = $lab['ids'];
@@ -102,11 +140,71 @@ foreach ($choices['labs'] as $lab) {
               // reads as "none of them" rather than as untouched. ?>
         <input type="hidden" name="applied" value="1">
 
-        <?php $menu('Record type', 'type', $choices['types'], $filters['types']); ?>
+        <?php // Record type, on its own line above the rest and as words
+              // rather than a dropdown: it is what the table's columns are
+              // decided by, so the report is read differently depending on it
+              // and it should not have to be opened to be seen.
+              //
+              // One answer, where the others take several: both types at once
+              // is the mixed table, which is what All already means, so a
+              // third tick would have been a third way of saying it. ?>
+        <div class="report-type" role="group" aria-label="Record type">
+            <span class="report-type-label">Record type</span>
+            <?php $type = count($filters['types']) === 1 ? $filters['types'][0] : ''; ?>
+            <label class="report-type-option<?= $type === '' ? ' is-chosen' : '' ?>">
+                <input type="radio" name="type[]" value=""<?= $type === '' ? ' checked' : '' ?>>
+                <span>All records</span>
+            </label>
+            <?php foreach ($choices['types'] as $value => $text): ?>
+                <label class="report-type-option<?= $type === (string) $value ? ' is-chosen' : '' ?>">
+                    <input type="radio" name="type[]" value="<?= esc((string) $value) ?>"<?= $type === (string) $value ? ' checked' : '' ?>>
+                    <span><?= esc($text) ?>s</span>
+                </label>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="report-filter-row">
         <?php $menu('Organ', 'organ', array_column($choices['organs'], 'label', 'code'), $filters['organs']); ?>
         <?php $menu('Blood group', 'group', array_combine($choices['groups'], $choices['groups']), $filters['groups']); ?>
         <?php $menu('Status', 'status', $choices['statuses'], $filters['statuses']); ?>
-        <?php $menu('Labs', 'lab', $labOptions, $labSelected); ?>
+        <?php $pick('In a pair?', 'paired', $choices['paired'], $filters['paired'], 'All'); ?>
+
+        <?php // The tests, in the headings the workup lists them under, and
+              // asked as one of two questions. Which question is at the top,
+              // because it is what the ticks below it mean — and it is one or
+              // the other: a record cannot have both completed and not
+              // completed the same test. ?>
+        <details class="filter">
+            <summary class="filter-button">
+                <span class="filter-title">Labs</span>
+                <?php $labCount = $chosen($labSelected, count($choices['labs'])); ?>
+                <span class="filter-count<?= $labCount === 'All' ? '' : ' is-set' ?>"><?= esc($labCount) ?></span>
+            </summary>
+            <div class="filter-menu filter-menu--labs">
+                <div class="filter-modes">
+                    <?php foreach ($choices['labModes'] as $value => $text): ?>
+                        <label class="filter-mode<?= $filters['labMode'] === $value ? ' is-chosen' : '' ?>">
+                            <input type="radio" name="labMode" value="<?= esc($value) ?>"<?= $filters['labMode'] === $value ? ' checked' : '' ?>>
+                            <span><?= esc($text) ?></span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+                <p class="filter-modes-hint">Tick the tests to ask about. The report keeps the records that have <?= $filters['labMode'] === 'missing' ? 'not completed' : 'completed' ?> any of them.</p>
+
+                <?php foreach ($labGroups as $groupName => $groupLabs): ?>
+                    <?php if ((string) $groupName !== ''): ?>
+                        <h4 class="filter-group-name"><?= esc($groupName) ?></h4>
+                    <?php endif; ?>
+                    <?php foreach ($groupLabs as $value => $text): ?>
+                        <label class="filter-option">
+                            <input type="checkbox" name="lab[]" value="<?= esc((string) $value) ?>"
+                                   <?= in_array((string) $value, $labSelected, true) ? 'checked' : '' ?>>
+                            <span><?= esc($text) ?></span>
+                        </label>
+                    <?php endforeach; ?>
+                <?php endforeach; ?>
+            </div>
+        </details>
 
         <details class="filter">
             <summary class="filter-button">
@@ -133,6 +231,7 @@ foreach ($choices['labs'] as $lab) {
         <?php if ($query !== ''): ?>
             <a class="stat-link" href="<?= site_url('reports') ?>">Clear</a>
         <?php endif; ?>
+        </div>
     </form>
 
     <div class="card card--scroll">

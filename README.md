@@ -139,7 +139,7 @@ Options -Indexes
 | `/pairs/export` | The filtered pairs as CSV |
 | `/pairs/new`, `/pairs/{id}` | Add / open a pair |
 | `/exchange` | Paired exchange: the chains, and the builder; filterable by the recipient's blood type |
-| `/reports` | Both registers read across, under nine filters |
+| `/reports` | Both registers read across, under eleven filters |
 | `/reports/export/{general\|internal}` | The filtered report as a printable sheet |
 | `/admin` | User Management: Add MRP, Registered MRPs and Login Activity. Admin permission only |
 
@@ -552,7 +552,7 @@ off means the default, and an address has to be able to say "every status".
 What each screen matches is its own: the two registers match an MRN or a name
 in SQL; the Pairs List and Paired Exchange match either of a pair's people by
 number or name, and the Pairs List matches the pair number as well; Reports
-narrows the rows its nine filters chose.
+narrows the rows its eleven filters chose.
 
 Which screens have the box is decided in the layout from the `navPage` every
 screen already declares, not from a flag each would have to pass. CodeIgniter
@@ -1228,13 +1228,31 @@ written once when the record is made and never asked about again.
 
 Every other screen answers one question — who is waiting, who is free, which
 pairs there are. `/reports` answers whatever is asked of it: both registers in
-one table, under nine filters, with two ways of taking the answer away.
+one table, under eleven filters, with two ways of taking the answer away.
 
-One rule decides the filters. Each is a list of checkboxes, each starts empty,
-and **empty means all** — so an untouched filter narrows nothing and the query
-does not mention it at all. That is one rule for all nine rather than a default
-per filter, and it is why the button on a filter reads "All" both when nothing
-is chosen and when everything is: those select the same records.
+One rule decides most of the filters. Each is a list of checkboxes, each starts
+empty, and **empty means all** — so an untouched filter narrows nothing and the
+query does not mention it at all. That is one rule for most of them rather than
+a default per filter, and it is why the button on a filter reads "All" both
+when nothing is chosen and when everything is: those select the same records.
+
+Three are not like that, and each has a reason.
+
+**Record type** is not a dropdown and is not in the row with the others. It
+decides which columns the table has, so the rest of the filters are read inside
+it, and a control that changes the shape of the answer should not have to be
+opened to be seen. It is three words on their own line above them — All
+records, Recipients, Donors — and one answer, where the others take several:
+both types at once is the mixed table, which is what All already says.
+
+**Organ** opens on the programme the session is in rather than on every one. A
+report is read inside a programme like every other screen — the sidebar, the
+lists and the dashboard are all that programme's — so a report that opened on
+both answered a question nobody had asked. Untouched, the filter is the
+session's organ; emptied by hand, it is every one, and the form's `applied`
+marker is what tells those two apart in an address.
+
+**Labs** is two questions and asks one of them: see below.
 
 The columns are not the user's to choose. The **record type** decides them,
 because a donor has no entry date and a recipient has no donor type:
@@ -1258,6 +1276,46 @@ whether or not it is ticked: there is nothing to show.
 
 Related Donor/Recipient is a list, not a single name: a recipient may hold
 several donors, and the cell names each one with their MRN.
+
+#### In a pair, and the word the case is on
+
+**In a pair?** is All, In a pair or Not in a pair — an *open* pair, which is
+the only kind that holds anybody. It is the question a report asks about
+somebody still waiting, and the one it asks about a case already under way, and
+neither could be asked before.
+
+**Status** offers every word the platform uses, a pair's as well as a person's.
+Four of the pair's six are a person's own as well; the other two — Paired
+Exchange and Closed — are only ever a pair's. So the filter asks the question
+of both: a record matches when its own word is asked for, **or** when an open
+pair holding it wears one that is. It offered the person's three alone before,
+which made a report about the cases in a paired exchange impossible to ask for
+and two of the six words impossible to use.
+
+#### Labs: completed, or still outstanding
+
+The tests are listed under the headings the workup lists them under — a hundred
+names in one alphabetical column is a list nobody finds anything in — and above
+them is which of two questions the ticks are asking:
+
+| | What it keeps |
+| --- | --- |
+| **Completed** | Records that have completed any of the tests ticked |
+| **Not completed** | Records that have not completed any of them |
+
+One or the other, never both. A record cannot have both completed and not
+completed the same test, so two lists side by side would be a way of asking for
+an empty report. Completed is where it opens, because that is the question
+somebody opening it has.
+
+Completed means a result is recorded that *says* something — a row whose status
+is one of the words the workup counts, which is every word but the two that
+mean nobody has looked yet. Not completed has to be a `NOT EXISTS` rather than
+a status test, because the commonest way of not having completed a test is
+having no row for it at all. And the chosen name is every row the catalogue has
+under it — one per side, one per programme — so the outstanding query asks only
+about the row on the record's *own* sheet: without that, a kidney recipient
+would be missing the liver sheet's copy of a test they had completed.
 
 #### The table is laid out, not left to find its own width
 

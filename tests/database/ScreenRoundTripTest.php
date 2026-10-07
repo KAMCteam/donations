@@ -1493,29 +1493,32 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
-     * On a pair the recipient's workup arrives open and the donor's shut.
+     * On a pair both workups fold, and both arrive open.
      *
-     * Both fold — seventy-odd cards is a screenful and a half between whoever
-     * is reading and the pair's donors — but the recipient's workup is what
-     * somebody opens a pair to read, so arriving at one line that has to be
-     * pressed before it says anything made them press it every time. The
-     * donor's is still shut: their tabs are the thing below it.
+     * They fold because seventy-odd cards is a screenful and a half between
+     * whoever is reading and what is under them. They arrive open because a
+     * workup is what somebody opens a pair, or one of its donor tabs, to
+     * read: one line that has to be pressed before it says anything made them
+     * press it every time, and the donor's was no more a thing to hide than
+     * the recipient's.
      *
      * Shut, the line that says how the workup is going is still on the screen;
-     * the card being edited is open whichever it is. Anybody who shuts the
-     * recipient's keeps it shut — that is `ui.js`, not the markup.
+     * the card being edited is open whichever it is. Anybody who shuts one
+     * keeps it shut, each card on its own — that is `ui.js`, not the markup.
      */
-    public function testThePairsWorkupsFoldAndTheRecipientsArrivesOpen(): void
+    public function testThePairsWorkupsFoldAndBothArriveOpen(): void
     {
         [$pairId] = $this->pairWith('8950', '8951', 'The Donor');
+        [$link]   = $this->pairLinks(8950);
 
         $html = $this->get('pairs/' . $pairId)->getBody();
 
         // Two foldable workups: the recipient's and the open donor tab's.
         $this->assertSame(2, preg_match_all('/<details class="card card--pad card-fold"[^>]*data-lab-section/', $html));
-        // The recipient's open, the donor's shut.
+        // Both open, and neither left shut.
         $this->assertSame(1, preg_match_all('/id="card-rlabs" data-lab-section open>/', $html));
-        $this->assertSame(1, preg_match_all('/<details class="card card--pad card-fold"[^>]*data-lab-section>/', $html));
+        $this->assertSame(1, preg_match_all('/id="card-pd' . $link . '-labs" data-lab-section open>/', $html));
+        $this->assertSame(0, preg_match_all('/card-fold"[^>]*data-lab-section>/', $html));
         // And shut or open, it still says where the workup stands.
         $this->assertStringContainsString('of 74 completed', $html);
 

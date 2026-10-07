@@ -173,12 +173,17 @@ $closeUrl = fn (string $name): string => $viewUrl . '#card-' . $card($name);
     <?php if ($editable('labs')): ?>
         <input type="hidden" name="section" value="<?= esc($card('labs')) ?>">
     <?php endif; ?>
-    <?php // Folded shut, as the recipient's is: this donor's notes are under
-          // it, and the next donor's tab is a press away. ?>
+    <?php // Open when the tab arrives, as the recipient's workup above it is:
+          // the workup is what somebody opens a donor's tab to read, and
+          // making them press for it every time was asking them to say twice
+          // what they came for. It still folds — this donor's notes are under
+          // it and the next tab is a press away — and `ui.js` remembers it
+          // shut, per tab, for anybody who shuts it. ?>
     <?= view('ui/partials/lab_tests', [
         'tests'        => $labTests,
         'field'        => 'dLabs',
         'foldable'     => true,
+        'open'         => true,
         'animated'     => true,
         'editing'      => $editable('labs'),
         // Bare: the workup card adds the fragment itself.

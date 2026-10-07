@@ -62,19 +62,32 @@ if (Auth::isAdmin()) {
             <aside class="sidebar" id="sidebar">
                 <div class="sidebar-logo">
                     <img src="<?= base_url('assets/ui/img/kamc-white.png') ?>" alt="King Abdullah Medical City">
-                    <button type="button" class="sidebar-close" data-sidebar-close aria-label="Close menu"><?= ui_icon('close') ?></button>
+                    <?php // Narrow, this shuts the sidebar over the page. Wide,
+                          // it narrows it to its icons and widens it again, and
+                          // `ui.js` swaps which of the two marks is showing. ?>
+                    <button type="button" class="sidebar-close" data-sidebar-close aria-label="Close menu">
+                        <span class="sidebar-close-mark" data-when-wide><?= ui_icon('chevronLeft') ?></span>
+                        <span class="sidebar-close-mark" data-when-narrow hidden><?= ui_icon('chevronRight') ?></span>
+                        <?php // Narrow, the sidebar leaves rather than narrows,
+                              // so the mark is the one that has always meant
+                              // that. Which of the three shows is CSS. ?>
+                        <span class="sidebar-close-x"><?= ui_icon('close') ?></span>
+                    </button>
                 </div>
 
                 <nav class="sidebar-nav">
+                    <?php // The name rides in a span of its own so that it can
+                          // be taken off the rail, and on the `title` so that
+                          // hovering an icon still says what it is. ?>
                     <?php foreach ($navItems as $item): ?>
-                        <a class="nav-item<?= ($navPage ?? '') === $item['page'] ? ' is-active' : '' ?>" href="<?= $item['url'] ?>">
-                            <span class="nav-icon"><?= ui_icon($item['icon']) ?></span><?= esc($item['label']) ?>
+                        <a class="nav-item<?= ($navPage ?? '') === $item['page'] ? ' is-active' : '' ?>" href="<?= $item['url'] ?>" title="<?= esc($item['label']) ?>">
+                            <span class="nav-icon"><?= ui_icon($item['icon']) ?></span><span class="nav-label"><?= esc($item['label']) ?></span>
                         </a>
                     <?php endforeach; ?>
                 </nav>
 
                 <div class="sidebar-footer">
-                    <a class="signout-btn" href="<?= site_url('logout') ?>"><?= ui_icon('signOut') ?>Sign out</a>
+                    <a class="signout-btn" href="<?= site_url('logout') ?>" title="Sign out"><?= ui_icon('signOut') ?><span class="nav-label">Sign out</span></a>
                 </div>
             </aside>
 

@@ -2088,6 +2088,15 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('>The chain</h2>', $html);
         $this->assertStringNotContainsString('The pair being exchanged', $html);
         $this->assertSame(1, substr_count($html, 'class="card-title card-title--mb4"'));
+
+        // And no search box. There is no list on it to narrow — a chain is
+        // worked out, not looked through — and the one that was here searched
+        // nothing and posted the chain's own address back at itself. The
+        // review behind it is the same.
+        $this->assertStringNotContainsString('class="app-search"', $html);
+        $this->assertStringNotContainsString('class="app-search"', $this->get('exchange/review')->getBody());
+        // The list it was started from keeps its own.
+        $this->assertStringContainsString('class="app-search"', $this->get('exchange')->getBody());
     }
 
     /**
@@ -2988,10 +2997,11 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     /**
      * The search narrows the list you are looking at, and never leaves it.
      *
-     * A screen with a list carries the box; one without — the dashboard, Add
-     * MRP, a record — has nothing for it to do and does not. It posts back to
-     * the same address, with the filters already on the screen riding along,
-     * so searching narrows what is showing rather than replacing it.
+     * A screen with a list carries the box; one without — the dashboard, User
+     * Management, a record, the exchange being built — has nothing for it to
+     * do and does not. It posts back to the same address, with the filters
+     * already on the screen riding along, so searching narrows what is showing
+     * rather than replacing it.
      */
     public function testTheSearchNarrowsTheListYouAreOn(): void
     {
@@ -3008,7 +3018,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             $this->assertStringContainsString('class="app-search"', $this->get($screen)->getBody(), $screen . ' carries the search');
         }
 
-        foreach (['dashboard', 'admin'] as $screen) {
+        foreach (['dashboard', 'admin', 'recipients/9503', 'donors/9504'] as $screen) {
             $this->assertStringNotContainsString('class="app-search"', $this->get($screen)->getBody(), $screen . ' does not');
         }
 

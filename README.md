@@ -503,8 +503,14 @@ back to the list it always named.
 
 Above the page header and centred in the content, on the five screens that
 have a list to narrow — Recipient Waitlist, Donors List, Pairs List, Paired
-Exchange, Reports. The dashboard, User Management and the record screens have nothing
-for it to do, so they do not carry it.
+Exchange, Reports. The dashboard, User Management, the record screens and the
+exchange being built have nothing for it to do, so they do not carry it.
+
+Which five is read off the **address** rather than off the sidebar item, which
+was the rule until the exchange grew two screens under its own: Build the
+exchange and the review are `exchange` in the sidebar and have no list on them
+— a chain is worked out, not looked through — so the box there searched
+nothing and posted the chain's own address back at itself.
 
 It never leaves the screen. The form posts back to the same address with the
 filters already showing carried as hidden fields, so searching narrows what is

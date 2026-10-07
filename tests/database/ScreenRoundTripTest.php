@@ -2716,18 +2716,34 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertSame('transplanted', $this->db->table('recipients')->where('mrn', 9507)->get()->getRowArray()['status']);
     }
 
-    /** The Status field says what it will do beyond itself, before it does it. */
+    /**
+     * The Status field says what it will do beyond itself — when it is asked.
+     *
+     * Four of the pair's six words are the two people's own, and saving the
+     * card writes them there too, so it has to be said before the save. It
+     * used to be said at all times, which made it four lines of small print
+     * under a control nobody had touched, still there after the save and
+     * saying nothing about what had happened. It answers the choice now: the
+     * line is in the markup, hidden, and `ui.js` shows it when one of the four
+     * shared words is picked.
+     */
     public function testThePairsStatusSaysItSetsThePeoplesToo(): void
     {
         [$pairId] = $this->pairWith('2010', '2011', 'The Donor');
 
         $html = $this->get('pairs/' . $pairId . '?edit=pair')->getBody();
 
-        $this->assertStringContainsString('class="field-hint"', $html);
-        $this->assertStringContainsString('On Hold, Active, Declined', $html);
-        $this->assertStringContainsString('and Transplanted', $html);
-        $this->assertStringContainsString('saving this card sets theirs to the same word', $html);
-        $this->assertStringContainsString('Paired Exchange and Closed', $html);
+        // On the card, and not on the screen: a page arriving is not a choice.
+        $this->assertStringContainsString('class="field-hint" data-note-for="f-status"', $html);
+        $this->assertStringContainsString('Note: This status will update both the recipient', $html);
+        $this->assertMatchesRegularExpression('~data-note-for="f-status"[^>]*hidden~s', $html);
+
+        // The four it answers to are the four a person can be on, named from
+        // the one list rather than written out again here.
+        $this->assertStringContainsString('data-note-when="on_hold,active,declined,transplanted"', $html);
+
+        // And the sentence it replaced is gone.
+        $this->assertStringNotContainsString('saving this card sets theirs to the same word', $html);
     }
 
     /** A transplant happens to a person, so a person's record says so. */

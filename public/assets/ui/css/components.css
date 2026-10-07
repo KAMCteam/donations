@@ -1331,23 +1331,6 @@
   border-bottom: 1px solid var(--slate-100);
 }
 
-/* The line under the blank card on an Add screen: what the card does, and —
-   where scripting is on — the button that lays out another. */
-.lab-add-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.75rem;
-  margin-top: 0.75rem;
-}
-
-.lab-add-note p {
-  margin: 0;
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
-  color: var(--slate-500);
-}
-
 /* ---- The colour picker ---------------------------------------------------
    A swatch that opens the colours the check list's own answers use. A
    `<details>`, so it opens and chooses with no scripting at all. */

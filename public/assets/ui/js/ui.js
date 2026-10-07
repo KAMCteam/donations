@@ -873,6 +873,31 @@
     });
   }
 
+  /* ---- A note that answers a choice ---------------------------------------
+
+     A line that is only true of what somebody has just picked, and is only
+     shown once they have picked it. Unlike the reveals above it does **not**
+     sync on load: a page arriving is not a choice being made, and a note
+     standing under a field at all times is small print rather than an answer.
+
+     It is written hidden, so with this file blocked it is not on the screen
+     at all — which is the honest state for a line that reports a press. */
+
+  function initChoiceNotes() {
+    document.querySelectorAll("[data-note-for]").forEach(function (note) {
+      var select = document.getElementById(note.getAttribute("data-note-for"));
+      if (!select) return;
+
+      var when = (note.getAttribute("data-note-when") || "").split(",").map(function (v) {
+        return v.trim();
+      });
+
+      select.addEventListener("change", function () {
+        note.hidden = when.indexOf(select.value) === -1;
+      });
+    });
+  }
+
   /* ---- Dialogs ----------------------------------------------------------
      A link carrying data-dialog opens that dialog instead of navigating. The
      href is a real page showing the same thing, so nothing here is required:
@@ -1162,5 +1187,6 @@
     initAnswerPickers();
     initConfirmButtons();
     initReveals();
+    initChoiceNotes();
   });
 })();

@@ -58,7 +58,9 @@ $closeUrl = static fn (string $section): string => $viewUrl . '#card-' . $sectio
               // there is nothing to press: taking it back means saying
               // something else on the card below. ?>
         <div class="header-actions">
-            <a class="btn-outline" href="<?= site_url('pairs/' . rawurlencode($pair['id'])) ?>/print" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
+            <?php // Two sheets, so the button asks which. See the dialog at
+                  // the foot of this screen. ?>
+            <a class="btn-outline" href="#export-choice" data-dialog="export-choice"><?= ui_icon('printer') ?>Export PDF</a>
             <?php if ($pair['status'] === PairModel::EXCHANGE): ?>
                 <span class="badge tone-teal-soft">On the exchange list</span>
             <?php elseif ($pair['forExchange']): ?>
@@ -110,16 +112,27 @@ $closeUrl = static fn (string $section): string => $viewUrl . '#card-' . $sectio
                             <option value="<?= esc($value) ?>"<?= $v['pairStatus'] === $value ? ' selected' : '' ?>><?= esc($label) ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <?php // Said before the save, not after it: four of these
-                          // six words are the recipient's and the donor's own
-                          // as well, and saving the card writes them there
-                          // too. Somebody setting a pair Transplanted should
-                          // know the two registers change with it. ?>
-                    <p class="field-hint">
-                        <?= esc(implode(', ', array_slice(UiStore::PERSON_STATUS_OPTIONS, 0, -1))) ?>
-                        and <?= esc(array_values(UiStore::PERSON_STATUS_OPTIONS)[count(UiStore::PERSON_STATUS_OPTIONS) - 1]) ?>
-                        are the recipient's and the donor's status too: saving this card sets theirs to the same word.
-                        Paired Exchange and Closed are the pair's alone and leave both as they are.
+                    <?php // Four of these six words are the recipient's and
+                          // the donor's own as well, and saving the card
+                          // writes them there too — so it is said before the
+                          // save, while it can still change what somebody
+                          // does.
+                          //
+                          // And only then. It stood under the field at all
+                          // times, which made it part of the furniture: four
+                          // lines of small print that were there before
+                          // anybody touched the control and still there after
+                          // the save, saying nothing about what had just
+                          // happened. Now it answers the choice — it appears
+                          // when one of the four shared words is picked, goes
+                          // when one of the pair's own two is, and is not on
+                          // the screen the card comes back as. `ui.js`, which
+                          // is also why it is written hidden: a page that is
+                          // not being changed is a page nothing has been
+                          // chosen on. ?>
+                    <p class="field-hint" data-note-for="f-status"
+                       data-note-when="<?= esc(implode(',', array_keys(UiStore::PERSON_STATUS_OPTIONS))) ?>" hidden>
+                        Note: This status will update both the recipient&rsquo;s and donor&rsquo;s status.
                     </p>
                 </div>
             </div>
@@ -367,5 +380,21 @@ $closeUrl = static fn (string $section): string => $viewUrl . '#card-' . $sectio
         'mrps'      => $mrps,
         'coordinators' => $coordinators,
     ], ['saveData' => false]) ?>
+
+    <?php // What the Export button at the top of this screen opens. Outside
+          // every card's form, because a form cannot sit inside another. ?>
+    <?php $printUrl = site_url('pairs/' . rawurlencode($pair['id'])) . '/print'; ?>
+    <dialog id="export-choice" class="dialog">
+        <div class="dialog-body">
+            <form method="dialog" class="dialog-close-form">
+                <button class="dialog-close" aria-label="Close">&times;</button>
+            </form>
+            <?= view('ui/partials/export_choice', [
+                'exportSubject'    => 'pair #' . $pair['id'],
+                'exportFullUrl'    => $printUrl,
+                'exportSummaryUrl' => $printUrl . '?summary=1',
+            ], ['saveData' => false]) ?>
+        </div>
+    </dialog>
 </div>
 <?= $this->endSection() ?>

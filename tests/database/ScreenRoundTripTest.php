@@ -2716,18 +2716,34 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertSame('transplanted', $this->db->table('recipients')->where('mrn', 9507)->get()->getRowArray()['status']);
     }
 
-    /** The Status field says what it will do beyond itself, before it does it. */
+    /**
+     * The Status field says what it will do beyond itself — when it is asked.
+     *
+     * Four of the pair's six words are the two people's own, and saving the
+     * card writes them there too, so it has to be said before the save. It
+     * used to be said at all times, which made it four lines of small print
+     * under a control nobody had touched, still there after the save and
+     * saying nothing about what had happened. It answers the choice now: the
+     * line is in the markup, hidden, and `ui.js` shows it when one of the four
+     * shared words is picked.
+     */
     public function testThePairsStatusSaysItSetsThePeoplesToo(): void
     {
         [$pairId] = $this->pairWith('2010', '2011', 'The Donor');
 
         $html = $this->get('pairs/' . $pairId . '?edit=pair')->getBody();
 
-        $this->assertStringContainsString('class="field-hint"', $html);
-        $this->assertStringContainsString('On Hold, Active, Declined', $html);
-        $this->assertStringContainsString('and Transplanted', $html);
-        $this->assertStringContainsString('saving this card sets theirs to the same word', $html);
-        $this->assertStringContainsString('Paired Exchange and Closed', $html);
+        // On the card, and not on the screen: a page arriving is not a choice.
+        $this->assertStringContainsString('class="field-hint" data-note-for="f-status"', $html);
+        $this->assertStringContainsString('Note: This status will update both the recipient', $html);
+        $this->assertMatchesRegularExpression('~data-note-for="f-status"[^>]*hidden~s', $html);
+
+        // The four it answers to are the four a person can be on, named from
+        // the one list rather than written out again here.
+        $this->assertStringContainsString('data-note-when="on_hold,active,declined,transplanted"', $html);
+
+        // And the sentence it replaced is gone.
+        $this->assertStringNotContainsString('saving this card sets theirs to the same word', $html);
     }
 
     /** A transplant happens to a person, so a person's record says so. */
@@ -3769,9 +3785,11 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             'notes' => 'Seen in clinic on Tuesday.',
         ]);
 
-        // The screen carries the link, and it opens the sheet.
+        // The screen's Export asks which sheet, and the dialog carries both.
         $screen = $this->get('recipients/9401')->getBody();
-        $this->assertStringContainsString(site_url('recipients/9401') . '/print', $screen);
+        $this->assertStringContainsString('data-dialog="export-choice"', $screen);
+        $this->assertStringContainsString('href="' . site_url('recipients/9401') . '/print"', $screen);
+        $this->assertStringContainsString('href="' . site_url('recipients/9401') . '/print?summary=1"', $screen);
 
         $sheet = $this->get('recipients/9401/print')->getBody();
 
@@ -3791,6 +3809,97 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('assets/ui/css/sheet.css', $sheet);
         $this->assertStringContainsString('assets/ui/css/record-print.css', $sheet);
         $this->assertStringNotContainsString('class="sidebar', $sheet);
+    }
+
+    /**
+     * Export asks which of the two sheets, on all three record screens.
+     *
+     * One button and one answer printed the whole workup every time —
+     * seventy-odd rows for a recipient, twice that for a pair — which is the
+     * right sheet for a transplant meeting and the wrong one for anything
+     * somebody is handing on.
+     */
+    public function testEveryRecordScreenOffersBothSheets(): void
+    {
+        [$pairId] = $this->pairWith('9410', '9411', 'Printed Donor');
+
+        foreach ([
+            'recipients/9410' => 'recipients/9410/print',
+            'donors/9411'     => 'donors/9411/print',
+            'pairs/' . $pairId => 'pairs/' . $pairId . '/print',
+        ] as $screen => $sheet) {
+            $html = $this->get($screen)->getBody();
+
+            $this->assertStringContainsString('data-dialog="export-choice"', $html, $screen);
+            $this->assertStringContainsString('>Full record</span>', $html, $screen);
+            $this->assertStringContainsString('>Summary</span>', $html, $screen);
+            $this->assertStringContainsString('href="' . site_url($sheet) . '"', $html, $screen);
+            $this->assertStringContainsString('href="' . site_url($sheet) . '?summary=1"', $html, $screen);
+        }
+    }
+
+    /**
+     * The summary sheet is the record with the workup as its headings.
+     *
+     * One line per group — how far that group has got — and no result on the
+     * page at all. What a group has got through is a fact about the workup;
+     * what any one test said is a fact about the patient, and the two are not
+     * needed by the same reader.
+     */
+    public function testTheSummarySheetKeepsTheGroupsAndDropsTheResults(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9412', 'name' => 'Summary Printed', 'age' => '39', 'bloodType' => 'B']);
+
+        $lab = $this->db->table('labs')
+            ->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'HIV'])
+            ->get()->getRowArray();
+        $this->post('recipients/9412', [
+            'section' => 'labs',
+            'labs'    => [['id' => $lab['id'], 'name' => 'HIV', 'status' => 'negative', 'notes' => 'Checked twice']],
+        ]);
+
+        $summary = $this->get('recipients/9412/print?summary=1')->getBody();
+
+        // The record itself is all still there.
+        $this->assertStringContainsString('Recipient Record &mdash; Summary Printed', $summary);
+        $this->assertStringContainsString('MRN 9412', $summary);
+        // And says on the sheet that it is the short one, so a workup that
+        // looks empty is not read as a workup that is.
+        $this->assertStringContainsString('Summary', $summary);
+
+        // The groups, each with its own count, and the whole workup's figure.
+        $this->assertStringContainsString('Infectious workup', $summary);
+        $this->assertStringContainsString('>Section</th>', $summary);
+        $this->assertStringContainsString('1 of 74 completed', $summary);
+
+        // And no test, no answer and no comment anywhere on it.
+        $this->assertStringNotContainsString('HIV', $summary);
+        $this->assertStringNotContainsString('Checked twice', $summary);
+        $this->assertStringNotContainsString('Negative', $summary);
+        $this->assertStringNotContainsString('Cross match', $summary);
+
+        // The full sheet is what it always was.
+        $full = $this->get('recipients/9412/print')->getBody();
+        $this->assertStringContainsString('HIV', $full);
+        $this->assertStringContainsString('Checked twice', $full);
+        $this->assertStringContainsString('Cross match', $full);
+        $this->assertStringNotContainsString('>Section</th>', $full);
+    }
+
+    /** A pair's summary carries both workups, both as headings. */
+    public function testTheSummarySheetOfAPairShortensBothWorkups(): void
+    {
+        [$pairId] = $this->pairWith('9413', '9414', 'Short Donor');
+
+        $summary = $this->get('pairs/' . $pairId . '/print?summary=1')->getBody();
+
+        $this->assertStringContainsString('Recipient &mdash; Required Lab Tests', $summary);
+        $this->assertStringContainsString('Donor &mdash; Required Lab Tests', $summary);
+        $this->assertSame(2, substr_count($summary, 'rec-labs--summary'));
+        // Each side's own groups, and no test from either.
+        $this->assertStringContainsString('Cancer screening', $summary);
+        $this->assertStringContainsString('Clearances', $summary);
+        $this->assertStringNotContainsString('Cross match', $summary);
     }
 
     /** A donor's sheet is the donor's, down to the fields only they have. */
@@ -4424,7 +4533,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('data-lab-status="seen"', $view);
         $this->assertStringContainsString('data-lab-tone="tone-emerald"', $view);
         $this->assertStringContainsString('data-lab-status="not_seen" data-lab-tone="tone-emerald"', $view);
-        $this->assertStringNotContainsString('What this test answers', $view);
+        $this->assertStringNotContainsString('What this test result offers', $view);
         // Every answer carries the colour it was given, ready for when it is
         // pressed — the stylesheet keeps an unchosen chip white, and the class
         // is what it wears once it is the answer.
@@ -4435,7 +4544,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         // Editing brings the picker back with the choices still on it.
         $edit = $this->get('recipients/4081?edit=labs')->getBody();
-        $this->assertStringContainsString('What this test answers', $edit);
+        $this->assertStringContainsString('What this test result offers', $edit);
         // The index is wherever the custom test falls in the workup, which is
         // after everything the check list asks for.
         $this->assertStringContainsString('[answers][seen][on]" value="1" checked', $edit);
@@ -4567,7 +4676,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $html = $this->get('recipients/4091?edit=labs')->getBody();
 
         $this->assertStringContainsString('Blood group', $html);
-        $this->assertStringNotContainsString('What this test answers', $html);
+        $this->assertStringNotContainsString('What this test result offers', $html);
     }
 
     /** One record's test is not on anybody else's sheet. */

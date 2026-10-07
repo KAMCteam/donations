@@ -1132,6 +1132,18 @@ the recipient's and the donor's own status to the same word, and the card says
 so under the field before it is saved — a save that writes two other records
 should not do it quietly, and the notice afterwards names who it was set on.
 
+It says it **when it is asked**, not at all times:
+
+> Note: This status will update both the recipient's and donor's status.
+
+The line is written hidden and `ui.js` shows it when one of the four shared
+words is picked, hides it again for either of the pair's own two, and never
+shows it on a page that has just arrived — the card comes back from a save with
+nothing under the field. It stood there permanently before, four lines of small
+print under a control nobody had touched, which is how a warning becomes
+furniture: still there after the save, saying nothing about what had just
+happened. A line that reports a press belongs to the press.
+
 Paired Exchange and Closed carry nothing: a person is not "in a paired
 exchange" and is not "closed", their case is. Nor does calling a pair Closed
 move anybody: both of them stay in it, on whatever word their own record
@@ -1267,6 +1279,35 @@ followed by each of its rows opened out — the whole record and the whole
 workup, one per page — built from `App\Libraries\RecordBlocks`, the same
 blocks a single record's own printed sheet is made of, so the two sheets cannot
 drift apart.
+
+### Exporting one record: the whole of it, or the shape of it
+
+**Export PDF** on a recipient, a donor or a pair asks which of two sheets
+before it opens one:
+
+| | What is on it |
+| --- | --- |
+| **Full record** | Everything on the record, with every lab test, its result and its comment — what the button has always printed |
+| **Summary** | The same record with the workup reduced to its headings: one line per group saying how far that group has got, and no result anywhere on the page |
+
+One answer was the wrong number. The full sheet is seventy-odd rows for a
+recipient and twice that for a pair — right for a transplant meeting, wrong for
+anything being handed on, so printing a record to send meant printing ten pages
+of *Not done*. And the part that makes those pages awkward to hand on is the
+part the summary leaves out: what a group has got through is a fact about the
+workup, what any one test said is a fact about the patient, and the two are not
+needed by the same reader.
+
+The choice is two addresses and nothing else — `…/print` and
+`…/print?summary=1` — so either can be linked to, and the full one is what an
+address with nothing on it still means. `ui/partials/export_choice` is the
+dialog's body, opened like every other on the platform: a `<dialog>` with
+`:target` behind it, so the choice works with scripting off. The summary sheet
+says **Summary** in its own meta line, because a workup printed without results
+would otherwise read as a workup nobody has started.
+
+The counts are `LabProgress::counted()`, the same ones the group bars on the
+screen show, so the summary and the record it came from cannot disagree.
 
 ### User Management is where users are made
 

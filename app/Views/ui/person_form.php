@@ -102,7 +102,10 @@ $closeUrl = static fn (string $section): string => $viewUrl . '#card-' . $sectio
         <div class="header-actions">
             <?php // A record has nothing to print until it has been saved. ?>
             <?php if ($mode === 'view'): ?>
-                <a class="btn-outline" href="<?= site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id'])) ?>/print" target="_blank" rel="noopener"><?= ui_icon('printer') ?>Export PDF</a>
+                <?php // Two sheets, so the button asks which. The dialog is
+                      // below; with scripting off `:target` shows the same
+                      // panel, and both answers are ordinary links either way. ?>
+                <a class="btn-outline" href="#export-choice" data-dialog="export-choice"><?= ui_icon('printer') ?>Export PDF</a>
             <?php endif; ?>
             <?php // One link to a side, and the button goes once it is made.
                   // Making the pair is one step again: choose a new donor or a
@@ -488,6 +491,22 @@ $closeUrl = static fn (string $section): string => $viewUrl . '#card-' . $sectio
             'mrps'          => $mrps,
             'coordinators'  => $coordinators,
         ], ['saveData' => false]) ?>
+    <?php endif; ?>
+
+    <?php if ($mode === 'view'): ?>
+        <?php $printUrl = site_url(($isRecipient ? 'recipients/' : 'donors/') . rawurlencode($person['id'])) . '/print'; ?>
+        <dialog id="export-choice" class="dialog">
+            <div class="dialog-body">
+                <form method="dialog" class="dialog-close-form">
+                    <button class="dialog-close" aria-label="Close">&times;</button>
+                </form>
+                <?= view('ui/partials/export_choice', [
+                    'exportSubject'    => (string) $person['name'],
+                    'exportFullUrl'    => $printUrl,
+                    'exportSummaryUrl' => $printUrl . '?summary=1',
+                ], ['saveData' => false]) ?>
+            </div>
+        </dialog>
     <?php endif; ?>
 
     <?php if ($mode === 'view' && $linked === null): ?>

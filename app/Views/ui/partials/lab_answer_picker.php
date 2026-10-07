@@ -78,8 +78,9 @@ $palette = static function (string $name, string $current) {
 };
 ?>
 <div class="lab-answers" data-answer-picker data-base="<?= esc($base) ?>">
-    <div class="lab-answers-head">What this test answers</div>
-    <p class="lab-answers-hint">Tick the answers it offers and give each a colour. Only the ticked ones stay on the card after it is saved.</p>
+    <div class="lab-answers-head">What this test result offers</div>
+    <p class="lab-answers-hint">Select the results it offers and assign a colour to each. Only the selected results will appear on the card after it is saved.
+</p>
 
     <div class="lab-answer-list" data-answer-list>
         <?php foreach ($offered as $option): ?>
@@ -102,7 +103,7 @@ $palette = static function (string $name, string $current) {
                     <?php if ($option['own']): ?>
                         <input type="text" class="lab-answer-name" name="<?= $field ?>[label]"
                                value="<?= esc($option['label']) ?>" maxlength="<?= UiStore::CUSTOM_ANSWER_MAX ?>"
-                               aria-label="Name of this answer" autocomplete="off">
+                               aria-label="Name of this result" autocomplete="off">
                     <?php else: ?>
                         <span class="lab-answer-label badge <?= $tone === '' ? 'tone-none' : esc($tone) ?>"><?= esc($option['label']) ?></span>
                         <input type="hidden" name="<?= $field ?>[label]" value="<?= esc($option['label']) ?>">

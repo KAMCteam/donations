@@ -438,7 +438,7 @@ $groupBar = static function (array $p): void {
             'id'     => $removeId,
             'title'  => 'Remove ' . ($removeThis['name'] === '' ? 'this test' : $removeThis['name']) . '?',
             'detail' => 'This test was added to this record, so only this record has it. It will be '
-                . 'removed along with the answer and the comment on it. This cannot be undone.',
+                . 'removed along with the result and the comment on it. This cannot be undone.',
             'action' => $removeThis['action'],
             'confirmVerb' => 'Remove test',
         ], ['saveData' => false]) ?>

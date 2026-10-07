@@ -71,7 +71,7 @@ $chooser = static function (string $action, string $ownField, string $ownMrn, st
             <?php $back = ui_back(site_url('exchange'), 'Paired Exchange'); ?>
             <a class="back-link" href="<?= esc($back['url']) ?>"><?= ui_icon('back') ?>Back to <?= esc($back['label']) ?></a>
             <div class="eyebrow">Exchange</div>
-            <h1 class="page-title">Build the exchange</h1>
+            <h1 class="page-title">Build the Exchange Chain</h1>
         </div>
         <div class="header-actions">
             <?php if ($state['canUndo']): ?>

@@ -219,9 +219,6 @@ $when = static function (string $stamp): string {
                                                         <input type="checkbox" name="isAdmin" value="1"<?= $user['isAdmin'] ? ' checked' : '' ?><?= $user['hasLogin'] ? '' : ' disabled' ?>>
                                                         <span>Admin</span>
                                                     </label>
-                                                    <p class="mrp-hint"><?= $user['hasLogin']
-                                                        ? 'Keeps their type. Adds the register, the delete buttons and this screen.'
-                                                        : 'No sign-in account, so there is nothing to grant.' ?></p>
                                                 </div>
                                                 <div class="mrp-edit-actions">
                                                     <a class="btn-outline" href="<?= site_url('admin') ?>">Cancel</a>

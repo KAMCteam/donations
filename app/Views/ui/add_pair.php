@@ -123,7 +123,7 @@ foreach ($v as $field => $value) {
                         <?php if ($fixedIs('recipient')): ?>
                             <input type="text" id="f-r-mrn" class="input-ro input-ro--mono" value="<?= esc($v['rMrn']) ?>" readonly>
                         <?php else: ?>
-                            <input type="text" id="f-r-mrn" name="rMrn" class="input input--mono" value="<?= esc($v['rMrn']) ?>" inputmode="numeric" placeholder="From the hospital record" data-mrn="recipient" required>
+                            <input type="text" id="f-r-mrn" name="rMrn" class="input input--mono" value="<?= esc($v['rMrn']) ?>" inputmode="numeric" placeholder="From hospital records" data-mrn="recipient" required>
                         <?php endif; ?>
                     </div>
                     <div class="span-lg-2">
@@ -267,7 +267,7 @@ foreach ($v as $field => $value) {
                         <?php if ($fixedIs('donor')): ?>
                             <input type="text" id="f-d-mrn" class="input-ro input-ro--mono" value="<?= esc($v['dMrn']) ?>" readonly>
                         <?php else: ?>
-                            <input type="text" id="f-d-mrn" name="dMrn" class="input input--mono" value="<?= esc($v['dMrn']) ?>" inputmode="numeric" placeholder="From the hospital record" data-mrn="donor" required>
+                            <input type="text" id="f-d-mrn" name="dMrn" class="input input--mono" value="<?= esc($v['dMrn']) ?>" inputmode="numeric" placeholder="From hospital records" data-mrn="donor" required>
                         <?php endif; ?>
                     </div>
                     <div>

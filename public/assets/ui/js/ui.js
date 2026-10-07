@@ -28,10 +28,35 @@
 
   /* ---- Sidebar (app.js setSidebarOpen) ---------------------------------- */
 
+  /* The sidebar, which closes on a wide screen now as well as on a narrow one.
+
+     Narrow, it slides in over the page with a backdrop behind it, as it always
+     has. Wide, it sits beside the page and shutting it gives the page the
+     width back — a register is fifteen columns wide and the fifteen inches of
+     navigation beside it are not what somebody reading one needs.
+
+     **Open is the default**, every time, on both. What is remembered is a
+     viewer shutting it, kept for the session and nowhere else; a session that
+     never shuts it opens with it open.
+
+     Both are this file's doing, and the markup says so: the toggles live
+     under `.has-js`, which is set here, so with this file blocked the wide
+     screen keeps the sidebar it always had and nothing on the screen offers
+     to close it. */
+
+  var SIDEBAR_KEY = "ui-sidebar";
+
+  function wideScreen() {
+    return window.matchMedia("(min-width: 64rem)").matches;
+  }
+
   function initSidebar() {
     var sidebar = document.getElementById("sidebar");
     var shell = document.querySelector(".app");
     if (!sidebar || !shell) return;
+
+    // What makes the toggles visible at all: see the comment above.
+    document.documentElement.classList.add("has-js");
 
     function setOpen(open) {
       sidebar.classList.toggle("is-open", open);
@@ -47,9 +72,31 @@
       }
     }
 
+    function setCollapsed(collapsed) {
+      shell.classList.toggle("is-collapsed", collapsed);
+
+      // Private browsing, blocked site data: the sidebar still opens and
+      // closes, it is only the remembering that goes.
+      try {
+        window.sessionStorage.setItem(SIDEBAR_KEY, collapsed ? "closed" : "open");
+      } catch (e) {}
+    }
+
+    try {
+      if (window.sessionStorage.getItem(SIDEBAR_KEY) === "closed") {
+        shell.classList.add("is-collapsed");
+      }
+    } catch (e) {}
+
     document.addEventListener("click", function (e) {
-      if (e.target.closest("[data-sidebar-open]")) { setOpen(true); return; }
-      if (e.target.closest("[data-sidebar-close]")) setOpen(false);
+      if (e.target.closest("[data-sidebar-open]")) {
+        if (wideScreen()) { setCollapsed(false); } else { setOpen(true); }
+        return;
+      }
+
+      if (e.target.closest("[data-sidebar-close]")) {
+        if (wideScreen()) { setCollapsed(true); } else { setOpen(false); }
+      }
     });
   }
 

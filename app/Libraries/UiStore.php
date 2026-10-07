@@ -541,7 +541,7 @@ final class UiStore
      *
      * @return list<array<string, mixed>>
      */
-    public function waitingList(?string $bloodGroup = null, ?string $status = null, ?string $query = null): array
+    public function waitingList(string|array|null $bloodGroup = null, string|array|null $status = null, ?string $query = null): array
     {
         $rows = $this->recipients->waitingList($this->organ(), $bloodGroup, $status, $query);
 
@@ -560,7 +560,7 @@ final class UiStore
      *
      * @return list<array<string, mixed>>
      */
-    public function availableDonors(?string $bloodGroup = null, ?string $status = null, ?string $query = null): array
+    public function availableDonors(string|array|null $bloodGroup = null, string|array|null $status = null, ?string $query = null): array
     {
         return array_map(
             fn (array $row): array => $this->donorToUi($row),

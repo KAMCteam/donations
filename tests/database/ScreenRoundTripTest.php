@@ -978,8 +978,10 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->seeInDatabase('pairs', ['id' => $pairId, 'ended_at' => null]);
 
         // And the pair is still on the register, under the chip for the word.
+        // The chips are a set, so from the screen's own Active the Closed one
+        // adds itself rather than replacing it.
         $this->assertStringContainsString('R', $this->get('pairs?status=closed')->getBody());
-        $this->assertStringContainsString('status=closed', $this->get('pairs')->getBody());
+        $this->assertStringContainsString('status=active%2Cclosed', $this->get('pairs')->getBody());
 
         // Moving it off the word drops the reason: it is about a decision
         // that has been changed.
@@ -2046,7 +2048,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
-     * The two fates only appear once the spare donor is the one left.
+     * The fate only appears once the spare donor is the one left.
      *
      * While a recipient is still without a donor the chain has somewhere to
      * go, so ending it here is not yet a choice anybody has to make — and
@@ -2070,7 +2072,9 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('btn-fate', $html);
         $this->assertStringContainsString('Everyone else is matched', $html);
         $this->assertStringContainsString('Move to the available donors list', $html);
-        $this->assertStringContainsString('Delete from the system', $html);
+        // And it is the only one: deleting a donor is not something a screen
+        // for working out who gives to whom does.
+        $this->assertStringNotContainsString('Delete from the system', $html);
     }
 
     /** The screen is the chain: the duplicate card above it is gone. */
@@ -2086,26 +2090,60 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertSame(1, substr_count($html, 'class="card-title card-title--mb4"'));
     }
 
-    /** The other fate: the spare donor is removed from the system. */
-    public function testASpareDonorCanBeDeletedInstead(): void
+    /**
+     * The review asks what word the donor left over goes back on.
+     *
+     * Closing their pair is what puts them back on the register; what it
+     * cannot say is whether they are to be offered to anybody again straight
+     * away. Active is what the select offers first, because a donor on the
+     * available list who is not Active is available to nobody.
+     */
+    public function testTheReviewSetsTheSpareDonorsStatus(): void
     {
         [$pairA] = $this->twoPairsToExchange();
         $this->post('donors/new', ['mrn' => '8802', 'name' => 'Spare Donor', 'age' => '44', 'bloodType' => 'O', 'donorStatus' => 'Active']);
 
         $this->post('exchange/start/' . $pairA);
         $this->post('exchange/build', ['action' => 'chooseDonor', 'recipientMrn' => '8101', 'donorMrn' => '8802']);
-        $this->post('exchange/build', ['action' => 'fate', 'donorMrn' => '8102', 'fate' => 'delete']);
+        $this->post('exchange/build', ['action' => 'fate', 'donorMrn' => '8102', 'fate' => 'available']);
 
-        // The review says so before it happens.
+        // The review carries the select, defaulted to Active.
         $review = $this->get('exchange/review')->getBody();
-        $this->assertStringContainsString('Deleted from the system', $review);
-        $this->assertStringContainsString('cannot be undone', $review);
+        $this->assertStringContainsString('name="donorStatus[8102]"', $review);
+        $this->assertStringContainsString('value="active" selected', $review);
+        // And says nothing about deleting anybody, because nothing does.
+        $this->assertStringNotContainsString('Deleted from the system', $review);
 
-        $this->post('exchange/build', ['action' => 'confirm'])->assertRedirectTo(site_url('pairs'));
-        $this->dontSeeInDatabase('donors', ['mrn' => 8102]);
-        // The pair naming them goes too — a foreign key would hold it there
-        // otherwise, and half a deletion is not one.
-        $this->dontSeeInDatabase('pairs', ['id' => $pairA]);
+        $this->post('exchange/build', [
+            'action'      => 'confirm',
+            'donorStatus' => [8102 => 'on_hold'],
+        ])->assertRedirectTo(site_url('pairs'));
+
+        // The record stays, back on the register, on the word the review chose.
+        $this->seeInDatabase('donors', ['mrn' => 8102, 'status' => 'on_hold']);
+        $this->assertContains('8102', array_column((new UiStore())->availableDonors(), 'id'));
+        // And On Hold is what the list says about them, so the next chain's
+        // donor lists — which offer Active and nothing else — pass them over.
+        $this->assertStringContainsString('On Hold', $this->get('donors/8102')->getBody());
+    }
+
+    /** A donor cannot be deleted from the exchange screen at all. */
+    public function testTheExchangeScreenCannotDeleteADonor(): void
+    {
+        [$pairA] = $this->twoPairsToExchange();
+        $this->post('donors/new', ['mrn' => '8804', 'name' => 'Spare Donor', 'age' => '44', 'bloodType' => 'O', 'donorStatus' => 'Active']);
+
+        $this->post('exchange/start/' . $pairA);
+        $this->post('exchange/build', ['action' => 'chooseDonor', 'recipientMrn' => '8101', 'donorMrn' => '8804']);
+
+        // Posted by hand, the way the screen no longer can.
+        $this->post('exchange/build', ['action' => 'fate', 'donorMrn' => '8102', 'fate' => 'delete']);
+        $this->assertStringContainsString('what becomes of this donor', (string) session()->getFlashdata('ui_error'));
+
+        // So it is still undecided, and the record is still there.
+        $this->post('exchange/build', ['action' => 'confirm']);
+        $this->assertStringContainsString('what becomes of each donor', (string) session()->getFlashdata('ui_error'));
+        $this->seeInDatabase('donors', ['mrn' => 8102]);
     }
 
     /** Undo steps back, and cancelling puts everything back as it was. */
@@ -2797,6 +2835,83 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     }
 
     /**
+     * A chip row is a set: more than one chip at a time, on every list.
+     *
+     * They were one-at-a-time, so pressing B replaced A and "A and B" was a
+     * question no list could be asked — somebody looking for a donor an AB
+     * recipient could take had to read three lists and hold the answer in
+     * their head. A chip goes into the set when it is pressed and comes out
+     * when it is pressed again; All empties the row.
+     */
+    public function testAChipRowHoldsMoreThanOneChoice(): void
+    {
+        $this->post('recipients/new', ['mrn' => '9321', 'name' => 'Group A R', 'age' => '40', 'bloodType' => 'A']);
+        $this->post('recipients/new', ['mrn' => '9322', 'name' => 'Group B R', 'age' => '41', 'bloodType' => 'B']);
+        $this->post('recipients/new', ['mrn' => '9323', 'name' => 'Group O R', 'age' => '42', 'bloodType' => 'O']);
+
+        // Two groups at once, and only those two.
+        $both = $this->get('recipients?bt=A,B')->getBody();
+        $this->assertStringContainsString('Group A R', $both);
+        $this->assertStringContainsString('Group B R', $both);
+        $this->assertStringNotContainsString('Group O R', $both);
+
+        // Pressing a third adds it; pressing one already in takes it out.
+        $this->assertStringContainsString(site_url('recipients') . '?bt=A%2CB%2CO', $both);
+        $this->assertStringContainsString('href="' . site_url('recipients') . '?bt=B"', $both);
+
+        // An order nobody pressed, and a group that is not one, are both
+        // read the way the screen lists them rather than refused.
+        $odd = $this->get('recipients?bt=B,A,ZZ')->getBody();
+        $this->assertStringContainsString('Group A R', $odd);
+        $this->assertStringContainsString('Group B R', $odd);
+        $this->assertStringNotContainsString('Group O R', $odd);
+
+        // And the two rows narrow together: a status chip keeps the groups.
+        $this->assertStringContainsString('bt=A%2CB&amp;status=active', $both);
+    }
+
+    /** The same on the donors list, and on the two statuses at once. */
+    public function testTheDonorsListTakesTwoStatusesAtOnce(): void
+    {
+        $this->post('donors/new', ['mrn' => '9331', 'name' => 'Active D', 'age' => '30', 'bloodType' => 'A', 'donorStatus' => 'Active']);
+        $this->post('donors/new', ['mrn' => '9332', 'name' => 'Held D', 'age' => '31', 'bloodType' => 'B', 'donorStatus' => 'On Hold']);
+        $this->post('donors/new', ['mrn' => '9333', 'name' => 'Declined D', 'age' => '32', 'bloodType' => 'O', 'donorStatus' => 'Declined']);
+
+        $html = $this->get('donors?status=active,on_hold')->getBody();
+
+        $this->assertStringContainsString('Active D', $html);
+        $this->assertStringContainsString('Held D', $html);
+        $this->assertStringNotContainsString('Declined D', $html);
+    }
+
+    /** And the pairs list, which opens narrowed to Active rather than to all. */
+    public function testThePairsListTakesTwoStatusesAtOnce(): void
+    {
+        $first  = $this->pairWith('9341', '9342', 'Donor One')[0];
+        $second = $this->pairWith('9343', '9344', 'Donor Two')[0];
+
+        $this->post('pairs/' . $second, ['section' => 'pair', 'pairStatus' => 'on_hold']);
+        $this->seeInDatabase('pairs', ['id' => $second, 'status' => 'on_hold']);
+
+        // Each pair by its own row, not by a name: the save's notice names the
+        // donor it changed, and it is still on the next page.
+        $row = static fn (int $id): string => 'data-href="' . site_url('pairs/' . $id) . '"';
+
+        // Active alone is what the screen opens on, so the On Hold pair is not
+        // on it; asking for both brings it back without losing the first.
+        $opened = $this->get('pairs')->getBody();
+        $this->assertStringContainsString($row($first), $opened);
+        $this->assertStringNotContainsString($row($second), $opened);
+
+        $both = $this->get('pairs?status=active,on_hold')->getBody();
+        $this->assertStringContainsString($row($first), $both);
+        $this->assertStringContainsString($row($second), $both);
+        // Three chips read as chosen: the two statuses asked for, and the
+        // blood row's All, which is what an empty row looks like.
+        $this->assertSame(3, substr_count($both, 'chip is-active'));
+    }
+
+    /**
      * Both registers narrow by status as well, and the two chip rows narrow
      * together rather than each clearing the other.
      */
@@ -3063,8 +3178,12 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringNotContainsString('Offered Recipient', $this->get('exchange?bt=B')->getBody());
         $this->assertStringNotContainsString('Offered Recipient', $this->get('exchange?bt=AB')->getBody());
 
-        // The two filters narrow together rather than clearing each other.
-        $this->assertStringContainsString('bt=A&amp;q=9603', $this->get('exchange?bt=A&q=9603')->getBody());
+        // The two filters narrow together rather than clearing each other: a
+        // chip press keeps the search, and Clear drops the search and keeps
+        // the chips.
+        $withBoth = $this->get('exchange?bt=A&q=9603')->getBody();
+        $this->assertStringContainsString('bt=A%2CB&amp;q=9603', $withBoth);
+        $this->assertStringContainsString('href="' . site_url('exchange') . '?bt=A"', $withBoth);
         $this->assertStringContainsString('Offered Recipient', $this->get('exchange?bt=A&q=9603')->getBody());
         $this->assertStringNotContainsString('Offered Recipient', $this->get('exchange?bt=A&q=1234')->getBody());
 
@@ -3802,7 +3921,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         // The Closed chip is there — it is a word a pair can wear — and an
         // ended pair is not under it either. Being ended is not a status.
-        $this->assertStringContainsString('status=closed', $this->get('pairs')->getBody());
+        $this->assertStringContainsString('status=active%2Cclosed', $this->get('pairs')->getBody());
 
         $closed = $this->get('pairs?status=closed')->getBody();
         $this->assertStringContainsString('No pairs found.', $closed);

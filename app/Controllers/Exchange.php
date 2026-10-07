@@ -49,15 +49,17 @@ class Exchange extends BaseController
         $organ = $this->store->organ();
         $query = trim((string) $this->request->getGet('q'));
 
-        // The recipients' groups, not the pairs': see `exchangeablePairs`.
-        $bloodType = (string) ($this->request->getGet('bt') ?? 'all');
-        $bloodType = in_array($bloodType, UiStore::BLOOD_TYPES, true) ? $bloodType : 'all';
+        // The recipients' groups, not the pairs': see `exchangeablePairs`. A
+        // set, as every other chip row on the platform is — somebody with an O
+        // donor to place is looking for everybody, and with an A donor for two
+        // groups at once.
+        $bloodType = ui_filter_values($this->request->getGet('bt'), UiStore::BLOOD_TYPES);
 
         return view('ui/exchange_list', [
             'title'    => 'Paired Exchange',
             'navPage'  => 'exchange',
             'organ'    => $organ,
-            'rows'     => $this->draft->exchangeablePairs($organ, $query, $bloodType === 'all' ? '' : $bloodType),
+            'rows'     => $this->draft->exchangeablePairs($organ, $query, $bloodType),
             'query'    => $query,
             'btFilter' => $bloodType,
             'hasDraft' => $this->draft->isOpen($organ),
@@ -157,8 +159,15 @@ class Exchange extends BaseController
             // Each new pair's own details, as the review asked for them:
             // keyed by the recipient's MRN, which is what the draft keys the
             // assignments by.
-            $details = $this->request->getPost('pairDetails');
-            $error   = $this->draft->confirm($organ, is_array($details) ? $details : []);
+            $details  = $this->request->getPost('pairDetails');
+            // The word each donor left over goes back on, asked for in the
+            // same review and saved by the same press.
+            $statuses = $this->request->getPost('donorStatus');
+            $error    = $this->draft->confirm(
+                $organ,
+                is_array($details) ? $details : [],
+                is_array($statuses) ? $statuses : []
+            );
 
             if ($error === '') {
                 $this->session->setFlashdata('ui_notice', 'The exchange is saved. Its new pairs are below.');

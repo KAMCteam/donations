@@ -26,7 +26,7 @@ class DonorModel extends Model
      *
      * @return list<array<string, mixed>>
      */
-    public function register(?string $organCode = null, bool $unmatchedOnly = false, ?string $bloodGroup = null, ?string $status = null, ?string $query = null): array
+    public function register(?string $organCode = null, bool $unmatchedOnly = false, string|array|null $bloodGroup = null, string|array|null $status = null, ?string $query = null): array
     {
         $builder = $this->db->table('donors d')
             // Kept from when a donor could be entered for one recipient and
@@ -50,12 +50,12 @@ class DonorModel extends Model
             $builder->where('NOT EXISTS (SELECT 1 FROM pairs p WHERE p.donor_mrn = d.mrn AND ' . PairModel::openSql() . ')', null, false);
         }
 
-        if ($bloodGroup !== null && $bloodGroup !== '') {
-            $builder->where('d.blood_group', $bloodGroup);
+        if (self::narrowTo($bloodGroup) !== []) {
+            $builder->whereIn('d.blood_group', self::narrowTo($bloodGroup));
         }
 
-        if ($status !== null && $status !== '') {
-            $builder->where('d.status', $status);
+        if (self::narrowTo($status) !== []) {
+            $builder->whereIn('d.status', self::narrowTo($status));
         }
 
         // The search box above the list: an MRN or a name.
@@ -67,6 +67,23 @@ class DonorModel extends Model
         }
 
         return $builder->orderBy('d.mrn')->get()->getResultArray();
+    }
+
+    /**
+     * One value or several, as a chip row asks it.
+     *
+     * The chips are a set now — `?bt=A,O` — so a filter is a list, and `null`
+     * or an empty one narrows nothing. A single string still works, because
+     * the screens that ask for one compatible blood group are asking a
+     * different question from the chips.
+     */
+    private static function narrowTo($value): array
+    {
+        if ($value === null || $value === '' || $value === []) {
+            return [];
+        }
+
+        return is_array($value) ? array_values($value) : [$value];
     }
 
     /** True when an open pair already holds this donor. */

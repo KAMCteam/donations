@@ -22,9 +22,9 @@ use CodeIgniter\Session\Session;
  *   - **No recipient without a donor.** Every recipient the exchange pulls in
  *     must leave it with one. Until they all do there is nothing to save.
  *   - **A donor without a recipient is allowed, but not left hanging.** They
- *     can only be at the end of the chain, and their fate has to be said:
- *     back to the available register, or removed. Saying nothing is not one
- *     of the options.
+ *     can only be at the end of the chain, and it has to be said that they go
+ *     back to the available register. Saying nothing is not one of the
+ *     options; the status they go back on is asked for in the review.
  *
  * Compatibility is by blood group, donor to recipient — O gives to all, A to A
  * and AB, B to B and AB, AB to AB — so the lists only ever offer a match. A
@@ -79,10 +79,20 @@ final class ExchangeDraft
         'AB' => ['AB'],
     ];
 
-    /** What may become of a donor the chain leaves without a recipient. */
+    /**
+     * What becomes of a donor the chain leaves without a recipient.
+     *
+     * One answer. There were two, and the other was **Delete from the
+     * system** — which took the record, its whole workup and every pair row
+     * naming it, the one this exchange had just closed included. A screen for
+     * working out who gives to whom is no place for that: the donor is a
+     * person on the register who has not been matched this time, and the
+     * register's own answer for somebody who is not available is their
+     * status, which the review asks for. Deleting a record is the register's
+     * to do, deliberately, from the donor's own list.
+     */
     public const FATES = [
         'available' => 'Move to the available donors list',
-        'delete'    => 'Delete from the system',
     ];
 
     private Session $session;
@@ -507,7 +517,7 @@ final class ExchangeDraft
      *
      * @return string An empty string when it is done, else why it was not
      */
-    public function confirm(string $organ, array $details = []): string
+    public function confirm(string $organ, array $details = [], array $donorStatuses = []): string
     {
         $state = $this->state($organ);
 
@@ -568,20 +578,19 @@ final class ExchangeDraft
             }
         }
 
-        // A donor sent back to the register needs nothing doing: closing their
-        // pair is what put them there. A deleted one is deleted — and so are
-        // the pair rows that name them, since `pairs.donor_mrn` is ON DELETE
-        // RESTRICT and the closed pair this exchange just made would otherwise
-        // hold the record in place. The summary says as much before anyone
-        // presses save; it is the difference between removing a donor and
-        // removing every trace of who they were matched with.
-        foreach ($draft['fate'] as $donorMrn => $fate) {
-            if ($fate !== 'delete' || $this->pairs->openPairForDonor((int) $donorMrn) !== null) {
-                continue;
-            }
+        // A donor sent back to the register is already there — closing their
+        // pair is what put them back — so the only thing left to write is the
+        // word the review was asked for. Active is what it offers first,
+        // because a donor on the available list who is not Active is not
+        // available to anybody; On Hold is the true word for one who is going
+        // back but is not to be matched yet, and that is exactly the case this
+        // asks about.
+        foreach (array_keys($draft['fate']) as $donorMrn) {
+            $status = (string) ($donorStatuses[$donorMrn] ?? '');
 
-            $this->pairs->where('donor_mrn', (int) $donorMrn)->delete();
-            $this->donors->delete((int) $donorMrn);
+            if (isset(UiStore::PERSON_STATUS_OPTIONS[$status])) {
+                $this->donors->update((int) $donorMrn, ['status' => $status]);
+            }
         }
 
         $this->discard();
@@ -611,7 +620,7 @@ final class ExchangeDraft
      *
      * @return list<array<string, mixed>>
      */
-    public function exchangeablePairs(string $organ, string $query = '', string $bloodGroup = ''): array
+    public function exchangeablePairs(string $organ, string $query = '', array $bloodGroups = []): array
     {
         // No status filter: being on this list is already a status, and the
         // few a pair can hold here are all true of every row on it.
@@ -623,10 +632,10 @@ final class ExchangeDraft
         // either side would hide the very pairs that make one work — what
         // somebody narrowing this list is asking is "who needs a group I can
         // place", which is a question about the recipients.
-        if ($bloodGroup !== '') {
+        if ($bloodGroups !== []) {
             $rows = array_filter(
                 $rows,
-                static fn (array $r): bool => (string) $r['r_blood_group'] === $bloodGroup
+                static fn (array $r): bool => in_array((string) $r['r_blood_group'], $bloodGroups, true)
             );
         }
 
@@ -790,7 +799,7 @@ final class ExchangeDraft
     /**
      * What saving would actually do, for the review before it happens.
      *
-     * @return array{links: list<array<string, mixed>>, released: list<array<string, mixed>>, deleted: list<array<string, mixed>>, closed: list<int>}
+     * @return array{links: list<array<string, mixed>>, released: list<array<string, mixed>>, closed: list<int>}
      */
     private function summary(array $draft, array $inPlay): array
     {
@@ -806,18 +815,11 @@ final class ExchangeDraft
         }
 
         $released = [];
-        $deleted  = [];
 
-        foreach ($draft['fate'] as $donorMrn => $fate) {
+        foreach (array_keys($draft['fate']) as $donorMrn) {
             $donor = $this->donors->find((int) $donorMrn);
 
-            if ($donor === null) {
-                continue;
-            }
-
-            if ($fate === 'delete') {
-                $deleted[] = $donor;
-            } else {
+            if ($donor !== null) {
                 $released[] = $donor;
             }
         }
@@ -825,7 +827,6 @@ final class ExchangeDraft
         return [
             'links'    => $links,
             'released' => $released,
-            'deleted'  => $deleted,
             'closed'   => $draft['broken'],
         ];
     }

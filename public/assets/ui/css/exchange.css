@@ -258,8 +258,6 @@
   transition-duration: var(--dur);
 }
 
-.btn-fate--danger { background-color: #b91c1c; }
-
 /* The one that was pressed keeps a ring, so the decision stays visible
    after the page comes back. */
 .btn-fate.is-chosen {
@@ -296,13 +294,6 @@
 }
 
 .summary-block + .summary-block { margin-top: 1.25rem; }
-
-.summary-block--danger {
-  padding: 0.875rem 1rem;
-  border: 1px solid #fecaca;
-  border-radius: var(--radius-lg);
-  background-color: #fef2f2;
-}
 
 .summary-heading {
   display: flex;
@@ -368,13 +359,34 @@
   color: var(--slate-500);
 }
 
-.summary-warning {
-  margin-top: 0.625rem;
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  font-weight: 600;
-  color: #991b1b;
+/* A donor going back to the register: who they are on one line, and the word
+   they go back on under it. The same shape the new pairs above it wear, so
+   the review reads as one list of things to answer. */
+.summary-list li.summary-released {
+  display: flex;
+  flex-direction: column;
+  /* The list above centres its rows, which are one line each; this one is two
+     and reads down the left like the pair blocks it sits under. */
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-lg);
+  background-color: #fff;
 }
+
+.summary-list li.summary-released .field { width: 100%; max-width: 16rem; }
+
+.summary-list li.summary-released + li.summary-released { margin-top: 0.625rem; }
+
+.summary-list li.summary-released .summary-released-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.summary-list--released { display: block; }
 
 /* Review and save before the chain allows it: visibly not yet available,
    and not clickable either. */

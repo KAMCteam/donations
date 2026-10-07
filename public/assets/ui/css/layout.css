@@ -216,9 +216,34 @@
 
 /* ---- Desktop (lg) ---- */
 @media (min-width: 64rem) {
-  .app-main.has-sidebar { margin-left: 15rem; }
+  .app-main.has-sidebar {
+    margin-left: 15rem;
+    transition-property: margin-left;
+    transition-timing-function: var(--ease);
+    transition-duration: 300ms;
+  }
   .backdrop,
   .topbar,
   .sidebar-close { display: none; }
   .sidebar { translate: 0 0; }
+
+  /* The sidebar closes on a wide screen too, and the page takes the width
+     back. Only where `ui.js` ran: it is what shuts and reopens it, so without
+     that file the bar below stays hidden and the sidebar stays where it is
+     rather than offering a control that cannot work.
+
+     The X sits where it does on a narrow screen — in the sidebar, over the
+     logo — and the bar along the top is how it comes back, which is the same
+     pair of controls the narrow screen has always had. */
+  .has-js .topbar { display: flex; }
+  .has-js .sidebar-close { display: block; }
+
+  .has-js .app.is-collapsed .sidebar { translate: -100% 0; }
+  .has-js .app.is-collapsed .app-main.has-sidebar { margin-left: 0; }
+}
+
+/* Nothing moves for somebody who has asked for that. */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .app-main.has-sidebar { transition-duration: 0ms; }
 }

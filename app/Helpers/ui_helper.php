@@ -146,3 +146,66 @@ if (! function_exists('ui_back')) {
         return ['url' => (string) $to['url'], 'label' => (string) $to['label']];
     }
 }
+
+if (! function_exists('ui_filter_values')) {
+    /**
+     * A filter chip row's set, read off the address.
+     *
+     * The chips were one-at-a-time: pressing B replaced A, so "A and B" was a
+     * question the lists could not be asked. They are a set now, written in
+     * the address as `?bt=A,B`, and the empty set means all — which is the
+     * same thing as no filter and so leaves the address alone.
+     *
+     * Only values the screen actually offers survive, so a hand-typed address
+     * narrows the list rather than breaking the query behind it.
+     *
+     * @param list<string> $allowed
+     *
+     * @return list<string>
+     */
+    function ui_filter_values(?string $param, array $allowed): array
+    {
+        $param = trim((string) $param);
+
+        // `all` is what the All chip puts in the address where a screen's own
+        // default is something narrower; everywhere else it is the absence of
+        // the parameter, and both mean the same thing here.
+        if ($param === '' || $param === 'all') {
+            return [];
+        }
+
+        return array_values(array_intersect($allowed, array_map('trim', explode(',', $param))));
+    }
+}
+
+if (! function_exists('ui_filter_toggle')) {
+    /**
+     * The set a chip row would hold with this chip pressed.
+     *
+     * In if it was out, out if it was in — which is what makes one press add a
+     * second blood group and a second press on the same chip take it off
+     * again. The order the screen lists them in is kept, so the address reads
+     * the same whichever order they were pressed.
+     *
+     * @param list<string> $chosen
+     * @param list<string> $allowed
+     *
+     * @return list<string>
+     */
+    function ui_filter_toggle(array $chosen, string $value, array $allowed): array
+    {
+        $chosen = in_array($value, $chosen, true)
+            ? array_values(array_diff($chosen, [$value]))
+            : [...$chosen, $value];
+
+        return array_values(array_intersect($allowed, $chosen));
+    }
+}
+
+if (! function_exists('ui_filter_param')) {
+    /** A chip row's set as the address writes it, '' for the empty one. */
+    function ui_filter_param(array $chosen): string
+    {
+        return implode(',', $chosen);
+    }
+}

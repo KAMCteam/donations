@@ -3900,6 +3900,126 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     // ---- Tests a record adds for itself ----------------------------------
 
     /**
+     * Other is on the Add screens too, as a blank card to type into.
+     *
+     * It used to appear only where there was a record to add a test to, which
+     * made the one group somebody might need while entering a patient the one
+     * group they could not see: the sheet in front of them had no line for the
+     * test the consultant had asked for, and nothing said there would ever be
+     * one. There is no record to post Add lab against yet, so the group
+     * arrives carrying the blank card instead of the button.
+     */
+    public function testTheAddScreensShowTheOtherGroupWithABlankCard(): void
+    {
+        foreach ([
+            'recipients/new' => 'labs',
+            'donors/new'     => 'labs',
+        ] as $screen => $field) {
+            $html = $this->get($screen)->getBody();
+
+            $this->assertStringContainsString('>Other</h3>', $html, $screen);
+            // One card, with a name to type and nothing behind it yet.
+            $this->assertSame(1, substr_count($html, 'data-lab-add-blank="' . $field . '"'), $screen);
+            $this->assertSame(1, substr_count($html, 'class="lab-name-field"'), $screen);
+            // The button that lays out another is hidden until `ui.js` shows
+            // it: it cannot work without that file, and a button that does
+            // nothing is worse than no button.
+            $this->assertStringContainsString('data-lab-add-more hidden', $html, $screen);
+            // Nothing to post an added test to, so nothing pretends there is.
+            $this->assertStringNotContainsString('class="lab-group lab-group--add"', $html, $screen);
+        }
+
+        // The pair carries both sheets, so it carries both blank cards.
+        $html = $this->get('pairs/new')->getBody();
+        $this->assertSame(1, substr_count($html, 'data-lab-add-blank="rLabs"'));
+        $this->assertSame(1, substr_count($html, 'data-lab-add-blank="dLabs"'));
+        $this->assertSame(2, substr_count($html, '>Other</h3>'));
+    }
+
+    /** The blank card does not count as a test until it is one. */
+    public function testTheBlankCardIsNotCountedOnTheAddScreen(): void
+    {
+        $this->post('recipients/new', ['mrn' => '4039', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O']);
+
+        // The Add screen counts the check list and not the empty line under
+        // Other — "0 of 75" would be counting a box nobody has filled in — so
+        // it says the same number the record it becomes says.
+        $this->assertStringContainsString('0 of 74 completed', $this->get('recipients/new')->getBody());
+        $this->assertStringContainsString('0 of 74 completed', $this->get('recipients/4039')->getBody());
+    }
+
+    /** Named on the Add screen, the test is created with the record. */
+    public function testATestNamedWhileAddingIsCreatedWithTheRecord(): void
+    {
+        $this->post('recipients/new', [
+            'mrn' => '4040', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O',
+            'labs' => [
+                74 => ['id' => '', 'name' => 'Serum magnesium', 'status' => 'done', 'notes' => 'Asked for by the consultant'],
+                // Laid out and never typed into: not a test, and nothing is
+                // written down for it.
+                75 => ['id' => '', 'name' => '', 'status' => 'not_done', 'notes' => ''],
+            ],
+        ]);
+
+        $this->seeInDatabase('recipients', ['mrn' => 4040]);
+        $this->seeInDatabase('labs', [
+            'person_mrn'  => 4040,
+            'person_type' => 'recipient',
+            'name'        => 'Serum magnesium',
+            'result_type' => 'custom',
+        ]);
+        $this->assertSame(1, $this->db->table('labs')->where('person_mrn', 4040)->countAllResults());
+
+        // With its answer and its comment, read back on the record.
+        $html = $this->get('recipients/4040')->getBody();
+        $this->assertStringContainsString('Serum magnesium', $html);
+        $this->assertStringContainsString('Asked for by the consultant', $html);
+        $this->assertStringContainsString('1 of 75 completed', $html);
+    }
+
+    /** The donor's half of the same, through Add Pair. */
+    public function testATestNamedWhileAddingAPairIsCreatedForThatSide(): void
+    {
+        $this->post('pairs/new', [
+            'rMrn' => '4041', 'dMrn' => '4042',
+            'rName' => 'R', 'rAge' => '40', 'rBloodType' => 'A',
+            'dName' => 'D', 'dAge' => '30', 'dBloodType' => 'A',
+            'dLabs' => [54 => ['id' => '', 'name' => 'Renal angiogram', 'status' => 'pending', 'notes' => '']],
+        ]);
+
+        $this->seeInDatabase('labs', ['person_mrn' => 4042, 'person_type' => 'donor', 'name' => 'Renal angiogram']);
+        // And only on that side: the recipient's sheet is untouched.
+        $this->assertSame(0, $this->db->table('labs')->where('person_mrn', 4041)->countAllResults());
+    }
+
+    /**
+     * A record's own tests go with the record.
+     *
+     * The results went by the trigger on the register; the tests themselves
+     * are rows in `labs` keyed by the person's number, and nothing took them
+     * away. They were invisible once the record was gone — until the hospital
+     * issued that number again, and the next patient's workup opened carrying
+     * the last one's extra tests under Other.
+     */
+    public function testARecordsOwnTestsAreDeletedWithIt(): void
+    {
+        $this->post('recipients/new', [
+            'mrn' => '4043', 'name' => 'Ahmed Test', 'age' => '41', 'bloodType' => 'O',
+            'labs' => [74 => ['id' => '', 'name' => 'Only theirs', 'status' => 'done', 'notes' => '']],
+        ]);
+        $this->seeInDatabase('labs', ['person_mrn' => 4043, 'name' => 'Only theirs']);
+
+        $this->post('recipients/4043/delete');
+
+        $this->dontSeeInDatabase('recipients', ['mrn' => 4043]);
+        $this->dontSeeInDatabase('labs', ['person_mrn' => 4043]);
+
+        // So the number coming round again opens a clean sheet.
+        $this->post('recipients/new', ['mrn' => '4043', 'name' => 'Somebody Else', 'age' => '50', 'bloodType' => 'A']);
+        $this->assertStringContainsString('0 of 74 completed', $this->get('recipients/4043')->getBody());
+    }
+
+    /**
      * Other is a heading with a button under it, not a test.
      *
      * The check list seeds nothing there, so the group is empty until

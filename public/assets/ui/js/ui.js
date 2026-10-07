@@ -406,6 +406,66 @@
     });
   }
 
+  /* ---- More than one test on an Add screen --------------------------------
+     The Add screens lay out one blank card under "Other", because there is no
+     record yet for an Add lab button to post against. One is enough to enter a
+     test with the record, and it is all that works without this file.
+
+     Here, the sentence under it becomes a button that lays out another. The
+     blank card is copied as it was found — before anybody typed in it, so
+     there is nothing to clear afterwards — and the copy's index is bumped, in
+     the field names the form posts under and in the ids its labels point at.
+     The index is ours and is a number, so the replacing is exact. */
+
+  function initBlankLabCards() {
+    document.querySelectorAll("[data-lab-add-blank]").forEach(function (note) {
+      var grid = note.parentNode.querySelector(".lab-grid");
+      if (!grid) return;
+
+      var blank = grid.querySelector(".lab-card:last-child");
+      if (!blank) return;
+
+      var field = note.getAttribute("data-lab-add-blank");
+      var template = blank.outerHTML;
+      // The index the template carries, and the one the next copy gets. Both
+      // are needed: every copy is made from the same untouched template, so
+      // what is replaced is always the template's own number.
+      var from = Number(blank.getAttribute("data-idx"));
+      var next = from;
+
+      if (!template || isNaN(from)) return;
+
+      // Rendered by the screen and hidden there, because only this file can
+      // make it do anything.
+      var button = note.querySelector("[data-lab-add-more]");
+      if (!button) return;
+
+      button.hidden = false;
+
+      button.addEventListener("click", function () {
+        next += 1;
+
+        var holder = document.createElement("div");
+        // `labs[7]` -> `labs[8]` in every name, and `labs-7-` -> `labs-8-` in
+        // every id and the labels that point at them.
+        holder.innerHTML = template
+          .split(field + "[" + from + "]").join(field + "[" + next + "]")
+          .split(field + "-" + from + "-").join(field + "-" + next + "-")
+          .split("lab-new-" + field + "-" + from).join("lab-new-" + field + "-" + next)
+          .split('data-idx="' + from + '"').join('data-idx="' + next + '"');
+
+        var card = holder.firstElementChild;
+        if (!card) return;
+
+        grid.appendChild(card);
+        // Typing is what somebody came to do, so the new card's name box is
+        // where the cursor goes.
+        var name = card.querySelector(".lab-name-field");
+        if (name) name.focus();
+      });
+    });
+  }
+
   /* ---- Dates -------------------------------------------------------------
      The screens write dates as DD/MM/YYYY. Typing eight digits is enough: the
      slashes go in as you reach them and anything that is not a digit is
@@ -988,6 +1048,7 @@
     initRowLinks();
     initMenus();
     initLabSections();
+    initBlankLabCards();
     initDateFields();
     initDialogs();
     initAutoSubmit();

@@ -79,10 +79,16 @@ foreach ($tests as $i => $test) {
 }
 
 // The group that takes the tests a record adds is the one group that has to
-// be there when it is empty — it is where the button to add the first one
-// lives, and nothing is under it until that button is pressed. Last, as the
-// check list had it.
-if (($addLabUrl ?? null) !== null && ! isset($groups[DatabaseSeeder::CUSTOM_GROUP])) {
+// be there when it is empty — it is where a test gets added, and nothing is
+// under it until one is. Last, as the check list had it.
+//
+// On every screen that can be written on, Add screens included. It used to
+// appear only where there was a record to add a test to, which meant the one
+// group somebody might actually need while entering a patient was the one
+// group they could not see: the sheet in front of them had no line for the
+// test their consultant had asked for, and nothing on the screen said there
+// would ever be one.
+if (($editing || $addLabUrl !== null) && ! isset($groups[DatabaseSeeder::CUSTOM_GROUP])) {
     $groups[DatabaseSeeder::CUSTOM_GROUP] = [];
 }
 
@@ -106,6 +112,19 @@ $groupWeight = [];
 
 foreach (array_keys($groups) as $groupName) {
     $groupWeight[$groupName] = LabProgress::weightFor($side, (string) $groupName);
+}
+
+// A screen with no record yet cannot post "add a test" anywhere — there is
+// nobody for it to belong to until Save. So the group arrives with one blank
+// card instead of a button: type a name into it and the test is created with
+// the record, leave it alone and nothing is. `ui.js` turns the line under it
+// into an Add lab button that lays out another, which is an addition — with
+// scripting off the one card is still there and still works.
+//
+// After the counts, and never in them: an unnamed card is not a test, and
+// "0 of 75" on an Add screen would be counting a box nobody has filled in.
+if ($editing && $addLabUrl === null) {
+    $groups[DatabaseSeeder::CUSTOM_GROUP][count($tests)] = UiStore::blankCustomLab($side);
 }
 
 // The groups are numbered, and a group's bar, its cards and its line in the
@@ -244,7 +263,10 @@ $groupBar = static function (array $p): void {
             // Every card is named, not only the ones a record added: a card
             // that cannot be linked to cannot be pointed at, and "Edit
             // results" has been linking to its own card from the start.
-            $cardId   = 'lab-' . $test['id'];
+            // A test that has not been saved has no id to be named after, so
+            // it is named for where it sits in the form — unique either way,
+            // and two blank cards with the same id would be one anchor.
+            $cardId   = $test['id'] === '' ? 'lab-new-' . $field . '-' . $i : 'lab-' . $test['id'];
             // What the card calls this answer and what colour it is — its own
             // word for it when somebody wrote one, ours otherwise.
             $label = static fn (string $key): string => $byKey[$key]['label'] ?? UiStore::RESULT_LABEL[$key] ?? $key;
@@ -371,6 +393,22 @@ $groupBar = static function (array $p): void {
             </div>
         <?php endforeach; ?>
         </div>
+        <?php if ($isCustomGroup && $editing && $addLabUrl === null): ?>
+            <?php // The line under the blank card on a screen with no record.
+                  // `ui.js` turns it into an Add lab button that lays out
+                  // another blank card; with scripting off it is a sentence
+                  // saying what the one card does and where more come from,
+                  // which is true either way and is why it is written here
+                  // rather than drawn by the script. ?>
+            <div class="lab-add-note" data-lab-add-blank="<?= esc($field) ?>">
+                <p>Name this test and it is added when the record is saved. More can be added from the record afterwards.</p>
+                <?php // Hidden, and shown by `ui.js`: a button that lays out
+                      // another blank card can only do that with scripting on,
+                      // and a button that does nothing is worse than no button.
+                      // The sentence above is true with or without it. ?>
+                <button type="button" class="btn-add-lab" data-lab-add-more hidden><?= ui_icon('plus') ?>Add lab</button>
+            </div>
+        <?php endif; ?>
     </div>
     <?php endforeach; ?>
     </fieldset>

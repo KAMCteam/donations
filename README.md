@@ -179,7 +179,7 @@ reacts to it:
 | Records | `app/Libraries/UiStore.php`, over `app/Models/*` |
 | Inline SVG icons, tone lookups | `app/Helpers/ui_helper.php` |
 | Stylesheets and images | `public/assets/ui/` — copied byte-for-byte |
-| Behaviour only | `public/assets/ui/js/ui.js` — one file, ~190 lines |
+| Behaviour only | `public/assets/ui/js/ui.js` — one file, ~1,050 lines |
 
 Navigation, filtering, sorting, opening a card for editing and saving are links
 and form posts, so every screen renders, navigates and submits **with
@@ -800,6 +800,41 @@ are in two, with the button between them — and it answers to a form of the
 page's own, so Enter in one of the card's boxes cannot press it. It used to:
 Add lab was the first submit button the form had, and a name typed and
 confirmed added a test nobody asked for.
+
+**On the Add screens there is no record yet**, so there is nothing for Add lab
+to post against — and for a while that meant the group was not on those screens
+at all. Which made the one group somebody might actually need while entering a
+patient the one group they could not see: the sheet in front of them had no
+line for the test the consultant had asked for, and nothing on the screen said
+there would ever be one. So Other is on every screen that can be written on,
+and on an Add screen it arrives carrying **one blank card** instead of a
+button. Name it and the test is created with the record, by the same save; the
+card the Add screens lay out is otherwise the card the record screens show,
+answer picker and all. Leave it alone and nothing is written down — an unnamed
+card is not a test, which is also why it is left out of the count: *0 of 74* on
+the Add screen is the same 74 the record says a moment later.
+
+The line under it says so, and where scripting is on it also carries an **Add
+lab** button that lays out another blank card. That one is `ui.js`: it copies
+the blank card as it was found — before anybody typed in it, so there is
+nothing to clear — and bumps its index in the field names the form posts under
+and the ids its labels point at. The button is rendered hidden and shown by
+that file, because it cannot do anything without it and a button that does
+nothing is worse than no button. With scripting off the one card is still
+there, still works, and the sentence beside it is still true.
+
+A posted card with no id and a name becomes a row in `labs`, under the custom
+group, keyed to the record — the same row `addCustomLab()` writes, through the
+same `insertCustomLab()`. One save may invent at most 25 of them: the screens
+add one at a time and nobody reaches that by using them, but a posted form is
+not a screen, and a loop that creates a row per posted name is a loop somebody
+can hand ten thousand names to.
+
+Deleting a record takes its own tests with it. The results went by the trigger
+on the register, but the tests are rows keyed by the person's number and
+nothing was removing them — invisible once the record was gone, until the
+hospital issued that number again and the next patient's workup opened carrying
+the last one's extra tests under Other.
 
 The set lives in `labs.answer_set`, JSON, on the test's own row — one set per
 test, so two tests on one record are independent, and a test on one record is

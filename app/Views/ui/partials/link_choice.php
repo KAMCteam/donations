@@ -35,7 +35,7 @@
         <span class="link-choice-icon"><?= ui_icon('plus') ?></span>
         <span>
             <span class="link-choice-label">Link with a new <?= esc($counterpart) ?></span>
-            <span class="link-choice-hint">Opens Add Pair with this record already filled in — you enter the <?= esc($counterpart) ?>.</span>
+            <span class="link-choice-hint">Opens Add Pair page to link this record with a new <?= esc($counterpart) ?> not yet registered in the system.</span>
         </span>
     </a>
 

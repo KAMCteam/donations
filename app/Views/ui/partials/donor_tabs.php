@@ -170,14 +170,14 @@ foreach ($tabs as $t) {
                         $delinkChoices[] = [
                             'value' => 'new',
                             'label' => 'Link with a new donor',
-                            'hint'  => 'Opens Add Donor for this pair. They join it as the donor it is going ahead with.',
+                            'hint'  => 'Opens Add Donor for this pair. He joins as the donor it is going ahead with.',
                         ];
 
                         if ($offerable !== []) {
                             $delinkChoices[] = [
                                 'value'  => 'existing',
                                 'label'  => 'Link with an existing donor',
-                                'hint'   => 'Choose from the donors on the register who are not in a pair. They are set to "Active" on this pair.',
+                                'hint'   => 'Choose from the donors on the register who are not in a pair.',
                                 'select' => [
                                     'name'    => 'donorMrn',
                                     'label'   => 'Donor to link',
@@ -202,8 +202,7 @@ foreach ($tabs as $t) {
                         'title'   => 'Delink ' . $donor['name'] . '?',
                         'detail'  => $tab['isActive']
                             ? $donor['name'] . ' is this pair\'s active donor, so taking them off it takes the pair '
-                                . 'apart — unless another donor is linked in their place. Their tab is archived '
-                                . 'either way: it stays here, read-only, with the status they have now.'
+                                . 'apart — unless another donor is linked in their place.'
                             : 'This pair has finished with ' . $donor['name'] . '. Their tab stays here, read-only, '
                                 . 'with the status they have now — and their own record is untouched, so they go '
                                 . 'back to the register and can be linked again from their own screen.',

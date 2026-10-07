@@ -45,7 +45,7 @@
             <div class="login-heading-block">
                 <div class="login-mobile-logo"><img src="<?= base_url('assets/ui/img/kamc.svg') ?>" alt="King Abdullah Medical City"></div>
                 <h2 class="login-title">User login</h2>
-                <p class="login-sub">Enter your credentials to access the platform.</p>
+                <p class="login-sub">Enter your ID and password to continue.</p>
             </div>
 
             <form class="stack-5" method="post" action="<?= site_url('login') ?>" novalidate data-login-form>

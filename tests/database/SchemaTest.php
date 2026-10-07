@@ -453,7 +453,7 @@ final class SchemaTest extends CIUnitTestCase
 
         // The clinic's two appointments are answered Seen or Not seen.
         $this->assertSame('seen_not_seen', $types['Transplant Nephrology Clinic']);
-        $this->assertSame('seen_not_seen', $types['Transplant Surgeon Clinic']);
+        $this->assertSame('seen_not_seen', $types['Transplant Surgery Clinic']);
 
         // Other is a heading now, not a test: the check list seeds nothing
         // under it, and what a record adds there offers every answer.

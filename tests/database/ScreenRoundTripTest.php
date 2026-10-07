@@ -3185,7 +3185,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $html = $this->get('exchange')->getBody();
 
         $this->assertStringContainsString('Offered Recipient', $html);
-        $this->assertStringContainsString('Recipient blood type:', $html);
+        $this->assertStringContainsString('Recipient blood group:', $html);
         $this->assertStringNotContainsString('Status:', $html);
         // Its own file-number box went to the bar at the top of every screen —
         // the only `q` on this page now is that one. `?q=` still narrows the

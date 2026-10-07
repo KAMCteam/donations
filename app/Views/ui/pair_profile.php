@@ -74,7 +74,7 @@ $closeUrl = static fn (string $section): string => $viewUrl . '#card-' . $sectio
                     <?= csrf_field() ?>
                     <input type="hidden" name="section" value="exchange">
                     <input type="hidden" name="forExchange" value="1">
-                    <button type="submit" class="btn-outline"><?= ui_icon('shuffle14') ?>Pair Exchange</button>
+                    <button type="submit" class="btn-outline"><?= ui_icon('shuffle14') ?>Paired Exchange</button>
                 </form>
             <?php endif; ?>
         </div>

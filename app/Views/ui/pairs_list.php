@@ -90,7 +90,7 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
 
     <div class="filter-stack">
         <div class="filter-row">
-            <span class="filter-label">Blood type:</span>
+            <span class="filter-label">Blood Group:</span>
             <a class="chip<?= $btFilter === [] ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', 'all') ?>">All</a>
             <?php foreach (UiStore::BLOOD_TYPES as $bloodType): ?>
                 <a class="chip chip--mono<?= in_array($bloodType, $btFilter, true) ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', $bloodType) ?>"><?= esc($bloodType) ?></a>

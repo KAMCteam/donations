@@ -1132,6 +1132,18 @@ the recipient's and the donor's own status to the same word, and the card says
 so under the field before it is saved — a save that writes two other records
 should not do it quietly, and the notice afterwards names who it was set on.
 
+It says it **when it is asked**, not at all times:
+
+> Note: This status will update both the recipient's and donor's status.
+
+The line is written hidden and `ui.js` shows it when one of the four shared
+words is picked, hides it again for either of the pair's own two, and never
+shows it on a page that has just arrived — the card comes back from a save with
+nothing under the field. It stood there permanently before, four lines of small
+print under a control nobody had touched, which is how a warning becomes
+furniture: still there after the save, saying nothing about what had just
+happened. A line that reports a press belongs to the press.
+
 Paired Exchange and Closed carry nothing: a person is not "in a paired
 exchange" and is not "closed", their case is. Nor does calling a pair Closed
 move anybody: both of them stay in it, on whatever word their own record

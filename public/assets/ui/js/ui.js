@@ -530,6 +530,16 @@
       blank.remove();
       button.hidden = false;
 
+      // Dropping one is the same for every copy, so it is listened for on
+      // the grid rather than bound to each card as it arrives.
+      grid.addEventListener("click", function (e) {
+        var drop = e.target.closest("[data-lab-drop]");
+        if (!drop) return;
+
+        var card = drop.closest(".lab-card");
+        if (card) card.remove();
+      });
+
       button.addEventListener("click", function () {
         next += 1;
 
@@ -544,6 +554,12 @@
 
         var card = holder.firstElementChild;
         if (!card) return;
+
+        // The way back out of a press. Hidden in the markup because only this
+        // file can take a card off the form, and shown on each copy as it is
+        // made — the template itself never goes on the screen.
+        var drop = card.querySelector("[data-lab-drop]");
+        if (drop) drop.hidden = false;
 
         grid.appendChild(card);
         // Typing is what somebody came to do, so the new card's name box is

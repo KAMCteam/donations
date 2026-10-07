@@ -898,6 +898,14 @@ alone and nothing is written down — an unnamed card is not a test, which is
 also why the blank one is left out of the count: *0 of 74* on the Add screen is
 the same 74 the record says a moment later.
 
+Each copy carries **Remove this test** at its foot from the moment it is laid
+out, as a saved card does. Nothing is deleted by it — there is no row behind an
+unsaved card — it comes off the form, which is the whole of what a press of Add
+lab did. And nothing is asked first, for the same reason: a test added by
+mistake has written nothing down, and what is being undone is a press from a
+moment ago. The saved card's own Remove still asks, because that one is a
+delete.
+
 A posted card with no id and a name becomes a row in `labs`, under the custom
 group, keyed to the record — the same row `addCustomLab()` writes, through the
 same `insertCustomLab()`. One save may invent at most 25 of them: the screens

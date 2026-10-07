@@ -453,48 +453,59 @@
     });
   }
 
-  /* ---- More than one test on an Add screen --------------------------------
-     The Add screens lay out one blank card under "Other", because there is no
-     record yet for an Add lab button to post against. One is enough to enter a
-     test with the record, and it is all that works without this file.
+  /* ---- "Other" on an Add screen -------------------------------------------
+     On a record, Other is a heading with an Add lab button under it and a card
+     for each test that has been added. The Add screens show the same thing,
+     but nothing there can post an added test: there is no record for it to
+     belong to until Save. So the screen renders one blank card and a hidden
+     button, and this file swaps which of the two is showing — the card becomes
+     the template it adds copies of, and the button becomes what adds them.
 
-     Here, the sentence under it becomes a button that lays out another. The
-     blank card is copied as it was found — before anybody typed in it, so
-     there is nothing to clear afterwards — and the copy's index is bumped, in
-     the field names the form posts under and in the ids its labels point at.
-     The index is ours and is a number, so the replacing is exact. */
+     Which leaves the no-script case holding the half that works on its own:
+     the blank card, there to be typed into, with no button beside it offering
+     something it cannot do.
+
+     A copy is the blank card exactly as it was found — before anybody typed in
+     it, so there is nothing to clear afterwards — with its index bumped in the
+     field names the form posts under and in the ids its labels point at. The
+     index is ours and is a number, so the replacing is exact. */
 
   function initBlankLabCards() {
-    document.querySelectorAll("[data-lab-add-blank]").forEach(function (note) {
-      var grid = note.parentNode.querySelector(".lab-grid");
-      if (!grid) return;
+    document.querySelectorAll("[data-lab-add-blank]").forEach(function (head) {
+      var section = head.closest("[data-lab-section]");
+      var number = head.getAttribute("data-lab-group-head");
+      if (!section || !number) return;
+
+      // The group's own grid, found by its number and inside this workup: a
+      // screen showing two of them numbers each from one.
+      var grid = section.querySelector('.lab-grid[data-lab-group="' + number + '"]');
+      var button = head.querySelector("[data-lab-add-more]");
+      if (!grid || !button) return;
 
       var blank = grid.querySelector(".lab-card:last-child");
       if (!blank) return;
 
-      var field = note.getAttribute("data-lab-add-blank");
+      var field = head.getAttribute("data-lab-add-blank");
       var template = blank.outerHTML;
       // The index the template carries, and the one the next copy gets. Both
       // are needed: every copy is made from the same untouched template, so
       // what is replaced is always the template's own number.
       var from = Number(blank.getAttribute("data-idx"));
-      var next = from;
+      var next = from - 1;
 
       if (!template || isNaN(from)) return;
 
-      // Rendered by the screen and hidden there, because only this file can
-      // make it do anything.
-      var button = note.querySelector("[data-lab-add-more]");
-      if (!button) return;
-
+      // The swap: the card goes, the button arrives, and Other reads as it
+      // does on a record.
+      blank.remove();
       button.hidden = false;
 
       button.addEventListener("click", function () {
         next += 1;
 
         var holder = document.createElement("div");
-        // `labs[7]` -> `labs[8]` in every name, and `labs-7-` -> `labs-8-` in
-        // every id and the labels that point at them.
+        // `labs[74]` -> `labs[75]` in every name, and `labs-74-` -> `labs-75-`
+        // in every id and the labels that point at them.
         holder.innerHTML = template
           .split(field + "[" + from + "]").join(field + "[" + next + "]")
           .split(field + "-" + from + "-").join(field + "-" + next + "-")

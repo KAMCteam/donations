@@ -230,11 +230,34 @@ $groupBar = static function (array $p): void {
             <button type="submit" class="btn-add-lab"<?= $editing ? '' : ' form="lab-add"' ?> formaction="<?= esc($addLabUrl) ?>" formnovalidate><?= ui_icon('plus') ?>Add lab</button>
         </div>
         <fieldset class="card-fields"<?= $editing ? '' : ' disabled' ?>>
+    <?php elseif ($isCustomGroup && $editing): ?>
+        <?php // The same shape on a screen with no record yet: the heading, and
+              // Add lab under it on its own. The button is `ui.js` — there is
+              // nowhere to post an added test until Save, so what it does is
+              // lay out another blank card in the form — and it is rendered
+              // hidden, because a button that cannot work is worse than none.
+              //
+              // That file also takes the blank card below away, so the group
+              // arrives as it does on a record: a heading and a button, and a
+              // card only once one has been asked for. With the file blocked
+              // the card stays and the button never appears, which is the one
+              // shape that still works with no script at all.
+              //
+              // Inside the fieldset, unlike the record screens' button: nothing
+              // is disabled on an Add screen, so there is nothing to step out
+              // of. ?>
+        <div class="lab-group lab-group--add" data-lab-group-head="<?= (int) $groupNumber[$groupName] ?>" data-lab-add-blank="<?= esc($field) ?>">
+            <div class="lab-group-add-head">
+                <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
+                <?php $groupBar($groupProgress[$groupName]); ?>
+            </div>
+            <button type="button" class="btn-add-lab" data-lab-add-more hidden><?= ui_icon('plus') ?>Add lab</button>
+        </div>
     <?php endif; ?>
     <div class="lab-group">
         <?php // Its heading is above, with the button, except where there is
-              // no button — a screen with no record to add a test to. ?>
-        <?php if ($groupName !== '' && ! ($isCustomGroup && $addLabUrl !== null)): ?>
+              // no button — a group nobody can add to. ?>
+        <?php if ($groupName !== '' && ! ($isCustomGroup && ($addLabUrl !== null || $editing))): ?>
             <div class="lab-group-head" data-lab-group-head="<?= (int) $groupNumber[$groupName] ?>">
                 <h3 class="lab-group-name"><?= esc($groupName) ?></h3>
                 <?php $groupBar($groupProgress[$groupName]); ?>
@@ -393,22 +416,6 @@ $groupBar = static function (array $p): void {
             </div>
         <?php endforeach; ?>
         </div>
-        <?php if ($isCustomGroup && $editing && $addLabUrl === null): ?>
-            <?php // The line under the blank card on a screen with no record.
-                  // `ui.js` turns it into an Add lab button that lays out
-                  // another blank card; with scripting off it is a sentence
-                  // saying what the one card does and where more come from,
-                  // which is true either way and is why it is written here
-                  // rather than drawn by the script. ?>
-            <div class="lab-add-note" data-lab-add-blank="<?= esc($field) ?>">
-                <p>Name this test and it is added when the record is saved. More can be added from the record afterwards.</p>
-                <?php // Hidden, and shown by `ui.js`: a button that lays out
-                      // another blank card can only do that with scripting on,
-                      // and a button that does nothing is worse than no button.
-                      // The sentence above is true with or without it. ?>
-                <button type="button" class="btn-add-lab" data-lab-add-more hidden><?= ui_icon('plus') ?>Add lab</button>
-            </div>
-        <?php endif; ?>
     </div>
     <?php endforeach; ?>
     </fieldset>

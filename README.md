@@ -866,21 +866,23 @@ at all. Which made the one group somebody might actually need while entering a
 patient the one group they could not see: the sheet in front of them had no
 line for the test the consultant had asked for, and nothing on the screen said
 there would ever be one. So Other is on every screen that can be written on,
-and on an Add screen it arrives carrying **one blank card** instead of a
-button. Name it and the test is created with the record, by the same save; the
-card the Add screens lay out is otherwise the card the record screens show,
-answer picker and all. Leave it alone and nothing is written down — an unnamed
-card is not a test, which is also why it is left out of the count: *0 of 74* on
-the Add screen is the same 74 the record says a moment later.
+and it **looks the same on all of them**: the heading, **Add lab** under it on
+its own, and a card for each test that has been asked for — none to begin with.
 
-The line under it says so, and where scripting is on it also carries an **Add
-lab** button that lays out another blank card. That one is `ui.js`: it copies
-the blank card as it was found — before anybody typed in it, so there is
-nothing to clear — and bumps its index in the field names the form posts under
-and the ids its labels point at. The button is rendered hidden and shown by
-that file, because it cannot do anything without it and a button that does
-nothing is worse than no button. With scripting off the one card is still
-there, still works, and the sentence beside it is still true.
+What is different is behind the button. The screen renders one blank card and
+a hidden button, and `ui.js` swaps which of the two is showing: the card
+becomes the template it adds copies of, the button becomes what adds them. A
+copy is that card exactly as it was found — before anybody typed in it, so
+there is nothing to clear — with its index bumped in the field names the form
+posts under and the ids its labels point at. With that file blocked the blank
+card is what is left and the button never appears, which is the half that
+works on its own.
+
+Name a card and the test is created with the record, by the same save; it is
+otherwise the card the record screens show, answer picker and all. Leave one
+alone and nothing is written down — an unnamed card is not a test, which is
+also why the blank one is left out of the count: *0 of 74* on the Add screen is
+the same 74 the record says a moment later.
 
 A posted card with no id and a name becomes a row in `labs`, under the custom
 group, keyed to the record — the same row `addCustomLab()` writes, through the

@@ -4019,40 +4019,46 @@ final class ScreenRoundTripTest extends CIUnitTestCase
     // ---- Tests a record adds for itself ----------------------------------
 
     /**
-     * Other is on the Add screens too, as a blank card to type into.
+     * Other is on the Add screens too, in the shape a record's wears.
      *
      * It used to appear only where there was a record to add a test to, which
      * made the one group somebody might need while entering a patient the one
      * group they could not see: the sheet in front of them had no line for the
      * test the consultant had asked for, and nothing said there would ever be
-     * one. There is no record to post Add lab against yet, so the group
-     * arrives carrying the blank card instead of the button.
+     * one.
+     *
+     * The heading and an **Add lab** button under it, then a card for each
+     * test asked for — the same as on a record. What is different is behind
+     * it: there is nothing to post an added test to until Save, so the screen
+     * renders one blank card and a hidden button and `ui.js` swaps which of
+     * the two is showing. With that file blocked the card is what is left,
+     * which is the half that works on its own.
      */
-    public function testTheAddScreensShowTheOtherGroupWithABlankCard(): void
+    public function testTheAddScreensShowTheOtherGroupWithItsOwnButton(): void
     {
-        foreach ([
-            'recipients/new' => 'labs',
-            'donors/new'     => 'labs',
-        ] as $screen => $field) {
+        foreach (['recipients/new', 'donors/new'] as $screen) {
             $html = $this->get($screen)->getBody();
 
+            // The heading, with the button under it rather than beside it.
+            $this->assertStringContainsString('class="lab-group lab-group--add"', $html, $screen);
             $this->assertStringContainsString('>Other</h3>', $html, $screen);
-            // One card, with a name to type and nothing behind it yet.
-            $this->assertSame(1, substr_count($html, 'data-lab-add-blank="' . $field . '"'), $screen);
-            $this->assertSame(1, substr_count($html, 'class="lab-name-field"'), $screen);
-            // The button that lays out another is hidden until `ui.js` shows
-            // it: it cannot work without that file, and a button that does
-            // nothing is worse than no button.
+            $this->assertSame(1, substr_count($html, 'data-lab-add-blank="labs"'), $screen);
+            // Hidden, because only `ui.js` can make it do anything here.
             $this->assertStringContainsString('data-lab-add-more hidden', $html, $screen);
-            // Nothing to post an added test to, so nothing pretends there is.
-            $this->assertStringNotContainsString('class="lab-group lab-group--add"', $html, $screen);
+            // And nothing posts: the record it would belong to does not exist.
+            $this->assertStringNotContainsString('formaction="' . site_url($screen) . '/labs"', $html, $screen);
+
+            // The blank card the script turns into its template, there in the
+            // markup so the screen still works without it.
+            $this->assertSame(1, substr_count($html, 'class="lab-name-field"'), $screen);
         }
 
-        // The pair carries both sheets, so it carries both blank cards.
+        // The pair carries both sheets, so it carries both of them.
         $html = $this->get('pairs/new')->getBody();
         $this->assertSame(1, substr_count($html, 'data-lab-add-blank="rLabs"'));
         $this->assertSame(1, substr_count($html, 'data-lab-add-blank="dLabs"'));
         $this->assertSame(2, substr_count($html, '>Other</h3>'));
+        $this->assertSame(2, substr_count($html, 'data-lab-add-more hidden'));
     }
 
     /** The blank card does not count as a test until it is one. */

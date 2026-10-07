@@ -125,7 +125,7 @@ Options -Indexes
 | --- | --- |
 | `/` | Entry point — the login screen, or the platform when already signed in |
 | `/login` | Sign in — User ID and password, checked against `users` |
-| `/admin` | The register, and who may sign into it. Admin permission only |
+| `/admin` | User Management — the register, and who may sign into it. Admin permission only |
 | `/logout` | Empties the session and returns to the login screen |
 | `/organ` | Programme picker (kidney / liver) — where signing in lands |
 | `/dashboard` | Programme statistics and high-priority waitlist |
@@ -141,7 +141,7 @@ Options -Indexes
 | `/exchange` | Paired exchange: the chains, and the builder; filterable by the recipient's blood type |
 | `/reports` | Both registers read across, under nine filters |
 | `/reports/export/{general\|internal}` | The filtered report as a printable sheet |
-| `/admin` | The register: Add MRP, Registered MRPs and Login Activity. Admin permission only |
+| `/admin` | User Management: Add MRP, Registered MRPs and Login Activity. Admin permission only |
 
 Auto-routing is off, so `app/Config/Routes.php` lists every reachable endpoint.
 The programme is chosen once per session on `/organ` and kept in the `ui_organ`
@@ -486,7 +486,7 @@ back to the list it always named.
 
 Above the page header and centred in the content, on the five screens that
 have a list to narrow — Recipient Waitlist, Donors List, Pairs List, Paired
-Exchange, Reports. The dashboard, the Admin screen and the record screens have nothing
+Exchange, Reports. The dashboard, User Management and the record screens have nothing
 for it to do, so they do not carry it.
 
 It never leaves the screen. The form posts back to the same address with the
@@ -1150,7 +1150,7 @@ workup, one per page — built from `App\Libraries\RecordBlocks`, the same
 blocks a single record's own printed sheet is made of, so the two sheets cannot
 drift apart.
 
-### The Admin screen is where users are made
+### User Management is where users are made
 
 **Add MRP**, its first section, creates somebody a record can be assigned to, and a
 transplant programme assigns two kinds. The form asks which — **Doctor** or
@@ -1190,17 +1190,39 @@ Registering somebody does make their **sign-in account**, with no password at
 all: an empty hash matches nothing, so the account exists and cannot be signed
 into until an administrator sets one. The two were separate tables describing
 the same staff, and the register's row is now the one place a person is edited,
-deactivated, granted the permission, and given a password.
+deactivated and granted the permission.
+
+The form asks for the **Admin** permission as well. It is the same permission
+the row below grants and not a second kind of thing — the hint under the two
+types says so — but whether somebody looks after the register is usually known
+at the moment they are being registered, and granting it afterwards meant
+adding the person, finding them in the list, opening their row and saving it
+again: four presses to say something that was already known.
 
 **Registered MRPs** under it is a table — Name, MRP ID, Type, Status, and the
 row's controls. **Edit** turns the row into a form where the row is, as a
-record's card does, and carries the **Admin** checkbox. **Deactivate** is never
-a delete: the records they are on still name them, and a physician who has left
-is part of what those records say. A deactivated user stays on the list, marked
-*Deactivated*, with **Reactivate** — and cannot sign in, because deactivating
-reaches their account as well as their row. **Reset password** sets one without
-sending them round the directory again; it is the screen and nothing behind it
-so far, and says so on the dialog.
+record's card does, and carries the **Admin** checkbox. It does **not** carry
+the MRP ID, which the row shows and does not offer: a staff number is the
+hospital's, the directory answers to it, somebody's sign-in *is* that number
+and the login log is a column of them. Editing it here would rename a person in
+this one database and leave every other record of them saying the old number —
+and a typed-in ID was never a correction so much as a swap for somebody else's.
+A row registered against the wrong number is deactivated and the right one
+registered. `updateMrp()` takes a name and a kind and reads the code off the
+row, so an ID posted to it by a hand-made form is ignored rather than trusted.
+
+**Deactivate** is never a delete: the records they are on still name them, and
+a physician who has left is part of what those records say. A deactivated user
+stays on the list, marked *Deactivated*, with **Reactivate** — and cannot sign
+in, because deactivating reaches their account as well as their row.
+
+There was a **Reset password** dialog here, with a generator beside the box. It
+is gone. It was the screen and nothing behind it — what was typed was read,
+checked for being there at all, and thrown away — and a control that looks like
+it set a password is worse than no control, because somebody reads the new
+password out and walks away. Setting one belongs with the directory this screen
+already defers to for sign-in; until that is wired, a row with no password
+carries *No password set* and says the true thing instead.
 
 **Login Activity**, the third section, is every attempt to sign in — name, User
 ID, when, and whether it worked, with why when it did not. Read-only: there is
@@ -1379,7 +1401,7 @@ naming the screen they asked for.
 
 Every address in `Config\Routes` but `/login` and `/logout` is inside the
 `auth` group, so a route added to that file later is protected by being there;
-the Admin screen and the three deletes are inside `admin` as well. Hiding a
+User Management and the three deletes are inside `admin` as well. Hiding a
 button or a sidebar item is a courtesy — the address is still typeable, so the
 filter is what actually refuses.
 
@@ -1421,7 +1443,7 @@ writes.
 | Table | Exists because |
 | --- | --- |
 | `users` | Who may sign in, and as what: `login_id`, a password hash, a role, and whether they look after the register |
-| `login_activity` | Every attempt to sign in, successful or not. Written by the login screen, read by the Admin screen, edited by nothing |
+| `login_activity` | Every attempt to sign in, successful or not. Written by the login screen, read by User Management, edited by nothing |
 | `staff` | Superseded by `users`; kept, empty and unread, pending a decision to drop it |
 | `organ_programs` | The picker's cards are content — label, description, icon — not code |
 | `mrp` | Every record screen assigns a most responsible physician |
@@ -1594,7 +1616,7 @@ exactly as they are, password included.
 
 The first real account is the same row written by hand or from a console, with
 `is_active = 1`, a role, and `is_admin = 1` so that there is somebody who can
-register everybody else. After that, registering a person on the Admin screen
+register everybody else. After that, registering a person on the User Management screen
 makes their account for them.
 
 ## Migration notes (CodeIgniter 3 → 4)

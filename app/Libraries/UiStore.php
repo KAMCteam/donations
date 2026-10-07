@@ -1060,7 +1060,16 @@ final class UiStore
         ];
     }
 
-    public function addMrp(string $code, string $name, string $kind = MrpModel::DOCTOR): string
+    /**
+     * Registers somebody, and gives them their way in.
+     *
+     * `$admin` is asked here as well as on the row, because whether somebody
+     * looks after the register is usually known at the moment they are being
+     * registered — and granting it afterwards meant adding the person, finding
+     * them in the list, opening their row and saving it again, four presses to
+     * say one thing that was already known.
+     */
+    public function addMrp(string $code, string $name, string $kind = MrpModel::DOCTOR, bool $admin = false): string
     {
         $code = trim($code);
         $name = trim($name);
@@ -1075,7 +1084,7 @@ final class UiStore
         }
 
         $this->mrp->insert(['code' => $code, 'name' => $name, 'kind' => $kind]);
-        $this->accountFor((int) $this->mrp->getInsertID(), $code, $name, $kind, true);
+        $this->accountFor((int) $this->mrp->getInsertID(), $code, $name, $kind, true, $admin);
 
         if ($kind === MrpModel::COORDINATOR) {
             $this->coordinatorId($name);
@@ -1096,9 +1105,11 @@ final class UiStore
      * than inventing them.
      *
      * An account already answering to that staff number is linked rather than
-     * duplicated: one person, one way in, whichever was made first.
+     * duplicated: one person, one way in, whichever was made first. The
+     * permission is written either way, because somebody ticking the box on
+     * Add MRP has said what they mean whichever of the two happens.
      */
-    private function accountFor(int $mrpId, string $code, string $name, string $kind, bool $active): void
+    private function accountFor(int $mrpId, string $code, string $name, string $kind, bool $active, bool $admin = false): void
     {
         if ($mrpId === 0 || $code === '') {
             return;
@@ -1108,7 +1119,7 @@ final class UiStore
         $existing = $users->where('login_id', $code)->first();
 
         if ($existing !== null) {
-            $users->update((int) $existing['id'], ['mrp_id' => $mrpId]);
+            $users->update((int) $existing['id'], ['mrp_id' => $mrpId] + ($admin ? ['is_admin' => 1] : []));
 
             return;
         }
@@ -1119,6 +1130,7 @@ final class UiStore
             'role'          => $kind === MrpModel::COORDINATOR ? 'coordinator' : 'doctor',
             'password_hash' => '',
             'is_active'     => $active ? 1 : 0,
+            'is_admin'      => $admin ? 1 : 0,
             'mrp_id'        => $mrpId,
         ]);
     }
@@ -1153,22 +1165,6 @@ final class UiStore
     }
 
     /**
-     * One registered person, as the Admin screen reads them.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function mrpPerson(string $id): ?array
-    {
-        foreach ($this->mrpRegister() as $person) {
-            if ($person['id'] === $id) {
-                return $person;
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * Grants somebody the register, or takes it back. '' on success.
      *
      * The permission lives on their sign-in account, because that is what has
@@ -1197,8 +1193,18 @@ final class UiStore
         return '';
     }
 
-    /** Changes a registered user's ID, name or kind. '' on success. */
-    public function updateMrp(string $id, string $code, string $name, string $kind): string
+    /**
+     * Changes a registered user's name or kind. '' on success.
+     *
+     * **Not their ID.** It is their staff number: the hospital issued it, the
+     * directory answers to it, their sign-in is that number, and the login log
+     * is a column of them. Editing it here would rename somebody in this one
+     * database and leave every other record of them saying the old number — and
+     * a typed-in ID was never corrected so much as swapped for another
+     * person's. A number entered wrongly is a row registered for the wrong
+     * person: deactivate it and register the right one.
+     */
+    public function updateMrp(string $id, string $name, string $kind): string
     {
         $row = $this->mrp->find((int) $id);
 
@@ -1206,35 +1212,28 @@ final class UiStore
             return 'That user could not be found.';
         }
 
-        $code = trim($code);
+        $code = (string) $row['code'];
         $name = trim($name);
         $kind = isset(MrpModel::KINDS[$kind]) ? $kind : (string) $row['kind'];
 
-        if ($code === '' || $name === '') {
-            return 'A user needs both an ID and a name.';
+        if ($name === '') {
+            return 'A user needs a name.';
         }
 
-        $clash = $this->mrp->byCode($code);
+        $this->mrp->update((int) $row['id'], ['name' => $name, 'kind' => $kind]);
 
-        if ($clash !== null && (int) $clash['id'] !== (int) $row['id']) {
-            return 'That ID is already registered.';
-        }
-
-        $this->mrp->update((int) $row['id'], ['code' => $code, 'name' => $name, 'kind' => $kind]);
-
-        // Their account says the same three things, and a register that
-        // disagreed with the login screen about somebody's name or staff
-        // number would be two answers to one question.
+        // Their account says the same things, and a register that disagreed
+        // with the login screen about somebody's name would be two answers to
+        // one question.
         $users   = model(UserModel::class);
         $account = $users->forMrp((int) $row['id']);
 
         if ($account === null) {
             $this->accountFor((int) $row['id'], $code, $name, $kind, (int) $row['is_active'] === 1);
-        } elseif ($users->where('login_id', $code)->where('id !=', (int) $account['id'])->first() === null) {
+        } else {
             $users->update((int) $account['id'], [
-                'login_id' => $code,
-                'name'     => $name,
-                'role'     => $kind === MrpModel::COORDINATOR ? 'coordinator' : 'doctor',
+                'name' => $name,
+                'role' => $kind === MrpModel::COORDINATOR ? 'coordinator' : 'doctor',
             ]);
         }
 

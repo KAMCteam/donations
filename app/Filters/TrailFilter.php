@@ -49,7 +49,7 @@ class TrailFilter implements FilterInterface
         'pairs'       => 'Pairs List',
         'exchange'    => 'Paired Exchange',
         'reports'     => 'Reports',
-        'admin'       => 'Admin',
+        'admin'       => 'User Management',
         'organ'       => 'the programme picker',
     ];
 

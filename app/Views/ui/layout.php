@@ -32,7 +32,7 @@ $navItems = [
 // Leaving it out is a courtesy and not the lock: `admin` on the route is what
 // keeps anybody else out, and the address is typeable either way.
 if (Auth::isAdmin()) {
-    $navItems[] = ['page' => 'admin', 'label' => 'Admin', 'icon' => 'userPlus', 'url' => site_url('admin')];
+    $navItems[] = ['page' => 'admin', 'label' => 'User Management', 'icon' => 'userPlus', 'url' => site_url('admin')];
 }
 ?>
 <!doctype html>

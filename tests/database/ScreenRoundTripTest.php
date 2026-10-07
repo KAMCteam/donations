@@ -2203,7 +2203,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->post('exchange/start/' . $pairId)->assertRedirectTo(site_url('exchange'));
 
         // The pair's own screen offers the button, and pressing it is a post.
-        $this->assertStringContainsString('Pair Exchange', $this->get('pairs/' . $pairId)->getBody());
+        $this->assertStringContainsString('Paired Exchange', $this->get('pairs/' . $pairId)->getBody());
         $this->post('pairs/' . $pairId, ['section' => 'exchange', 'forExchange' => '1']);
         $this->seeInDatabase('pairs', ['id' => $pairId, 'for_exchange' => 1]);
 

@@ -74,7 +74,7 @@ $headers = ['Pair #', 'Recipient', 'MRN', 'Blood', 'Donor', 'MRN', 'Blood', 'Sta
         <div class="filter-row">
             <?php // Said in the label, because this row means something else
                   // here than it does on the Pairs List. ?>
-            <span class="filter-label filter-label--mr">Recipient blood type:</span>
+            <span class="filter-label filter-label--mr">Recipient blood group:</span>
             <a class="chip<?= $btFilter === [] ? ' is-active' : '' ?>" href="<?= $filterUrl('all') ?>">All</a>
             <?php foreach (UiStore::BLOOD_TYPES as $bloodType): ?>
                 <a class="chip chip--mono<?= in_array($bloodType, $btFilter, true) ? ' is-active' : '' ?>" href="<?= $filterUrl($bloodType) ?>"><?= esc($bloodType) ?></a>
@@ -102,7 +102,7 @@ $headers = ['Pair #', 'Recipient', 'MRN', 'Blood', 'Donor', 'MRN', 'Blood', 'Sta
                 <?php else: ?>
                     <?php // Empty is the normal starting state, so say what fills it. ?>
                     No pairs have been put forward for exchange.<br>
-                    Open a pair from the <a class="stat-link" href="<?= site_url('pairs') ?>">Pairs List</a> and press <strong>Pair Exchange</strong> to offer it here.
+                    Open a pair from the <a class="stat-link" href="<?= site_url('pairs') ?>">Pairs List</a> and press <strong>Paired Exchange</strong> to offer it here.
                 <?php endif; ?>
             </div>
         <?php else: ?>

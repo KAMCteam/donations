@@ -40,7 +40,8 @@ $offered = $hasActive
         <span class="link-choice-icon"><?= ui_icon('plus') ?></span>
         <span>
             <span class="link-choice-label">A new donor</span>
-            <span class="link-choice-hint">Enter somebody who is not on the system yet, with a workup of their own. The status on their form is the one they join the pair on.</span>
+            <span class="link-choice-hint">Link with a new donor
+Opens Add Donor page to link this record with a new donor not yet registered in the system.</span>
         </span>
     </a>
 

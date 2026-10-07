@@ -173,7 +173,7 @@ $chooser = static function (string $action, string $ownField, string $ownMrn, st
                             <?php endif; ?>
 
                             <?php if ($onlyDonorsLeft): ?>
-                                <p class="node-open-hint">Everyone else is matched. This donor ends the chain &mdash; send them back to the available donors list, and set the word they go back on in the review.</p>
+                                <p class="node-open-hint">Everyone else is matched. This donor ends the chain &mdash; send him back to the donors list.</p>
 
                                 <?php // One answer, and it is still pressed rather
                                       // than assumed: a donor leaving the chain

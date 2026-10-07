@@ -243,7 +243,7 @@ class DatabaseSeeder extends Seeder
             ['Advocate', 'cleared_not_cleared'],
             ['Social worker', 'cleared_not_cleared'],
             ['Cardio', 'cleared_not_cleared'],
-            ['Transplant Surgery', 'cleared_not_cleared'],
+            ['Transplant Surgeon', 'cleared_not_cleared'],
             ['Anaesthesia', 'cleared_not_cleared'],
         ],
         'Transplant Clinic' => [

@@ -87,10 +87,10 @@ if (Auth::isAdmin()) {
                 <div id="page" class="page-host">
                     <?php // The search narrows the list you are looking at,
                           // so it posts back to the screen you are on and
-                          // never leaves it. A screen with a list to narrow
-                          // asks for it by setting `searchOn`; one without —
-                          // the dashboard, Add MRP, a record — has nothing for
-                          // it to do and does not carry it.
+                          // never leaves it. Only a screen with a list to
+                          // narrow has one; everything else — the dashboard,
+                          // User Management, a record, the exchange being
+                          // built — has nothing for it to do.
                           //
                           // A GET form, so the question is in the address,
                           // comes back on a refresh and can be sent to
@@ -98,12 +98,24 @@ if (Auth::isAdmin()) {
                           // along as hidden fields, so searching narrows what
                           // is showing rather than replacing it. ?>
                     <?php
-                    // Which screens have one is decided here, from the nav item
-                    // every screen already declares, rather than from a flag
-                    // each would have to remember to pass: CodeIgniter keeps
-                    // view data between `view()` calls, so a missing flag is
-                    // not a false one — it is the last screen's.
-                    $searchable = in_array($navPage ?? '', ['recipients', 'donors', 'pairs', 'exchange', 'reports'], true);
+                    // Which screens have one is decided here, from the address
+                    // being answered, rather than from a flag each would have
+                    // to remember to pass: CodeIgniter keeps view data between
+                    // `view()` calls, so a missing flag is not a false one —
+                    // it is the last screen's.
+                    //
+                    // The address and not the nav item, which was the rule
+                    // until the exchange grew two more screens under its own:
+                    // Build the exchange and the review are `exchange` in the
+                    // sidebar and have no list on them to narrow, so a search
+                    // box there searched nothing and posted the chain's own
+                    // address back at itself. These five are the lists, by
+                    // name, and nothing else is one.
+                    $searchable = in_array(
+                        trim(service('request')->getPath(), '/'),
+                        ['recipients', 'donors', 'pairs', 'exchange', 'reports'],
+                        true
+                    );
                     ?>
                     <?php if ($searchable): ?>
                         <div class="app-search-bar">

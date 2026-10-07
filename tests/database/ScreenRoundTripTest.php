@@ -4061,6 +4061,13 @@ final class ScreenRoundTripTest extends CIUnitTestCase
             // The blank card the script turns into its template, there in the
             // markup so the screen still works without it.
             $this->assertSame(1, substr_count($html, 'class="lab-name-field"'), $screen);
+            // And the way back out of a press, on the card from the moment it
+            // is laid out: a test added by mistake has written nothing down,
+            // so taking it off the form is all there is to undo. Hidden with
+            // the button, and for the same reason.
+            $this->assertStringContainsString('data-lab-drop hidden', $html, $screen);
+            // Nothing posts for it — there is no row behind it to delete.
+            $this->assertStringNotContainsString('/labs/' . "'" . '/delete', $html, $screen);
         }
 
         // The pair carries both sheets, so it carries both of them.

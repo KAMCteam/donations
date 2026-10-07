@@ -398,7 +398,20 @@ $groupBar = static function (array $p): void {
                     </div>
                 <?php endif; ?>
 
-                <?php if ($custom && $removeLabUrl !== null): ?>
+                <?php if ($custom && $test['id'] === ''): ?>
+                    <?php // A card that has never been saved. There is nothing
+                          // to delete — no row behind it — so taking it away is
+                          // taking it off the form, which is `ui.js`, which is
+                          // also what put it there. Hidden until that file
+                          // unhides it, for the same reason Add lab is.
+                          //
+                          // No question asked first: a test added by mistake
+                          // has written nothing down, and the thing being
+                          // undone is a press from a moment ago. ?>
+                    <div class="lab-remove">
+                        <button type="button" class="lab-remove-link" data-lab-drop hidden><?= ui_icon('trash') ?>Remove this test</button>
+                    </div>
+                <?php elseif ($custom && $removeLabUrl !== null): ?>
                     <?php // Theirs to add, theirs to take away — at the foot of
                           // the card, after everything it holds. The question is
                           // asked over the card rather than on a screen of its

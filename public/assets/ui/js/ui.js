@@ -28,21 +28,26 @@
 
   /* ---- Sidebar (app.js setSidebarOpen) ---------------------------------- */
 
-  /* The sidebar, which closes on a wide screen now as well as on a narrow one.
+  /* The sidebar, which narrows on a wide screen and slides away on a narrow
+     one.
 
-     Narrow, it slides in over the page with a backdrop behind it, as it always
-     has. Wide, it sits beside the page and shutting it gives the page the
-     width back — a register is fifteen columns wide and the fifteen inches of
-     navigation beside it are not what somebody reading one needs.
+     Narrow, it comes in over the page with a backdrop behind it, as it always
+     has. Wide, shutting it leaves **the rail**: its icons, four and a bit rem
+     of them, with the page taking the rest of the width back. Not nothing —
+     a register is fifteen columns wide and the navigation beside it is in the
+     way, but taking it off the screen altogether left whoever was reading one
+     with no way to anywhere until they went looking for the button that
+     brings it back.
 
      **Open is the default**, every time, on both. What is remembered is a
-     viewer shutting it, kept for the session and nowhere else; a session that
-     never shuts it opens with it open.
+     viewer narrowing it, kept for the session and nowhere else; a session
+     that never narrows it opens wide.
 
-     Both are this file's doing, and the markup says so: the toggles live
-     under `.has-js`, which is set here, so with this file blocked the wide
-     screen keeps the sidebar it always had and nothing on the screen offers
-     to close it. */
+     One button does both, in the sidebar, where it is whichever state it is
+     in: a chevron while there is something to narrow, the menu mark while
+     there is something to widen. It is this file's doing, and the markup says
+     so — the control lives under `.has-js`, which is set here, so with this
+     file blocked the sidebar is the one it always was. */
 
   var SIDEBAR_KEY = "ui-sidebar";
 
@@ -72,30 +77,55 @@
       }
     }
 
-    function setCollapsed(collapsed) {
+    var toggle = sidebar.querySelector("[data-sidebar-close]");
+
+    function setCollapsed(collapsed, remember) {
       shell.classList.toggle("is-collapsed", collapsed);
 
-      // Private browsing, blocked site data: the sidebar still opens and
-      // closes, it is only the remembering that goes.
+      // The one button, wearing the state it would put the sidebar in.
+      var wide = sidebar.querySelector("[data-when-wide]");
+      var narrow = sidebar.querySelector("[data-when-narrow]");
+
+      if (wide) wide.hidden = collapsed;
+      if (narrow) narrow.hidden = !collapsed;
+
+      if (toggle && wideScreen()) {
+        toggle.setAttribute("aria-label", collapsed ? "Widen the menu" : "Narrow the menu");
+      }
+
+      if (!remember) return;
+
+      // Private browsing, blocked site data: the sidebar still narrows and
+      // widens, it is only the remembering that goes.
       try {
         window.sessionStorage.setItem(SIDEBAR_KEY, collapsed ? "closed" : "open");
       } catch (e) {}
     }
 
+    var narrowed = false;
+
     try {
-      if (window.sessionStorage.getItem(SIDEBAR_KEY) === "closed") {
-        shell.classList.add("is-collapsed");
-      }
+      narrowed = window.sessionStorage.getItem(SIDEBAR_KEY) === "closed";
     } catch (e) {}
+
+    // Always, not only when it was narrowed: it is what puts the right mark
+    // and the right word on the button before anybody has pressed it.
+    setCollapsed(narrowed, false);
 
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-sidebar-open]")) {
-        if (wideScreen()) { setCollapsed(false); } else { setOpen(true); }
+        if (wideScreen()) { setCollapsed(false, true); } else { setOpen(true); }
         return;
       }
 
       if (e.target.closest("[data-sidebar-close]")) {
-        if (wideScreen()) { setCollapsed(true); } else { setOpen(false); }
+        // Wide, the one button goes both ways: there is no second control on
+        // the rail, and nor should there be.
+        if (wideScreen()) {
+          setCollapsed(!shell.classList.contains("is-collapsed"), true);
+        } else {
+          setOpen(false);
+        }
       }
     });
   }

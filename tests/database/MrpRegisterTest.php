@@ -256,7 +256,10 @@ final class MrpRegisterTest extends CIUnitTestCase
 
         $this->assertStringContainsString('>User Management</h1>', $html);
         // In the sidebar too, so the item and the screen agree.
-        $this->assertMatchesRegularExpression('~nav-item[^>]*>\s*<span class="nav-icon">.*?</span>User Management~s', $html);
+        $this->assertMatchesRegularExpression(
+            '~nav-item[^>]*>\s*<span class="nav-icon">.*?</span><span class="nav-label">User Management</span>~s',
+            $html
+        );
     }
 
     /** Resetting a password is not something this screen offers. */

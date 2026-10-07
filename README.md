@@ -188,22 +188,30 @@ is left with the sidebar, the lab cards (status buttons, result editor,
 running totals), whole-row click targets, opening the pairing choice as a
 dialog, and the date fields (slashes as you type, and the calendar button).
 
-#### The sidebar closes
+#### The sidebar narrows
 
-On a narrow screen it always did: it slides in over the page with a backdrop
-behind it. It closes on a wide one now as well, and the page takes the width
-back — a register is fifteen columns wide, and the fifteen inches of navigation
-beside it are not what somebody reading one needs.
+On a narrow screen it slides in over the page with a backdrop behind it, as it
+always did. On a wide one it **narrows to its icons** — a rail 4.5rem across —
+and the page takes the rest of the width back. A register is fifteen columns
+wide and the navigation beside it is in the way; taking it off the screen
+altogether, which is what the first version of this did, left whoever was
+reading one with no way to anywhere until they went looking for the control
+that brings it back.
 
 **Open is the default**, every time, on both. What is remembered is a viewer
-shutting it, kept for the session and nowhere else, so a session that never
-shuts it opens with it open. The X over the logo shuts it and the bar along the
-top brings it back — the same pair of controls the narrow screen has always
-had, which is why the bar is no longer hidden on a wide one.
+narrowing it, kept for the session and nowhere else, so a session that never
+narrows it opens wide.
 
-Both controls live under `.has-js`, a class `initSidebar()` puts on `<html>`:
-this file is what opens and shuts the thing, so with it blocked the wide screen
-keeps the sidebar it always had and nothing on the screen offers to close it.
+One button does it, in the sidebar, where it is in either state. It wears three
+marks and the screen's width says which: narrow, the **X** that has always
+meant the sidebar is leaving; wide, a **chevron pointing the way it would
+move** — left to narrow, right to widen. `ui.js` swaps the two chevrons, CSS
+chooses between them and the X. The icons stay, each with its name on `title`,
+so hovering one on the rail still says what it is.
+
+It all lives under `.has-js`, a class `initSidebar()` puts on `<html>`: that
+file is what narrows and widens the thing, so with it blocked the sidebar is
+the one it always was and nothing on the screen offers to move it.
 
 The result was checked against the design package screen by screen with
 full-page screenshot diffs at 1440px. Login, the programme picker, the pairs

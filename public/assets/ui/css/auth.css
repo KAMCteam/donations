@@ -130,36 +130,6 @@
   text-underline-offset: 2px;
 }
 
-/* ---- A role's own dashboard --------------------------------------------
-
-   One card, because there is one thing on it so far: who is signed in. */
-.role-home-who {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.5rem 0.75rem;
-  margin-bottom: 1.5rem;
-}
-
-.role-home-name {
-  font-size: var(--text-lg);
-  line-height: var(--lh-lg);
-  font-weight: 600;
-  color: var(--slate-800);
-}
-
-.role-home-role {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--slate-500);
-  background-color: var(--slate-100);
-  border-radius: 999px;
-  padding: 0.2rem 0.6rem;
-}
-
 /* =========================================================
    The Admin screen
    =========================================================

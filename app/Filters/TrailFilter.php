@@ -50,8 +50,6 @@ class TrailFilter implements FilterInterface
         'exchange'    => 'Paired Exchange',
         'reports'     => 'Reports',
         'admin'       => 'Admin',
-        'doctor/dashboard'      => 'Dashboard',
-        'coordinator/dashboard' => 'Dashboard',
         'organ'       => 'the programme picker',
     ];
 

@@ -54,7 +54,6 @@ $routes->group('', ['filter' => 'auth'], static function ($routes): void {
         $routes->post('users/(:num)', 'Admin\Users::update/$1');
         $routes->post('users/(:num)/active', 'Admin\Users::setActive/$1');
         $routes->post('users/(:num)/admin', 'Admin\Users::setAdmin/$1');
-        $routes->post('users/(:num)/password', 'Admin\Users::resetPassword/$1');
     });
 
     // Programme picker. Its own screen rather than a filter, since the UI asks

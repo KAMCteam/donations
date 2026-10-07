@@ -514,28 +514,6 @@ final class AuthTest extends CIUnitTestCase
         );
     }
 
-    /** Resetting a password is the screen and nothing behind it, and says so. */
-    public function testResettingAPasswordChangesNothingYetAndSaysSo(): void
-    {
-        $this->withSession($this->session('doctor', true))
-            ->post('admin/users', ['id' => '7703', 'name' => 'Dr. Forgetful', 'kind' => 'doctor']);
-
-        $mrp    = $this->db->table('mrp')->where('code', '7703')->get()->getRowArray();
-        $before = $this->users->where('login_id', '7703')->first()['password_hash'];
-
-        $this->withSession($this->session('doctor', true))
-            ->post('admin/users/' . $mrp['id'] . '/password', ['password' => 'TemporaryOne1']);
-
-        $this->assertSame($before, $this->users->where('login_id', '7703')->first()['password_hash']);
-        $this->assertStringContainsString('not connected yet', (string) session('ui_mrp_saved'));
-
-        // The dialog on the screen warns before anybody presses it.
-        $this->assertStringContainsString(
-            'what is typed here is not stored',
-            $this->withSession($this->session('doctor', true))->get('admin')->getBody()
-        );
-    }
-
     // ---- The log ------------------------------------------------------------
 
     /**

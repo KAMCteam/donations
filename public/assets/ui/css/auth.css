@@ -190,20 +190,18 @@
   color: var(--slate-500);
 }
 
-/* The reset dialog's standing warning. Amber and not red: nothing is broken,
-   it simply does not do the thing yet, and saying so loudly is the point. */
-.reset-warning {
-  padding: 0.625rem 0.75rem;
-  border-radius: var(--radius-lg);
-  background-color: var(--amber-50);
-  border: 1px solid var(--amber-200);
-  color: var(--amber-700);
-  font-size: var(--text-xs);
-  line-height: 1.55;
+/* A field the row shows and does not offer: the MRP ID, which is the
+   hospital's number and not this screen's to change. Read as a value rather
+   than as a box, so nobody tries to type in it. */
+.mrp-fixed {
+  margin: 0;
+  padding: 0.5rem 0;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--slate-800);
 }
 
-/* The register's row of actions: Edit, Reset password, Deactivate. Each is a
-   phrase, so none of them wraps — a button broken over two lines reads as two
-   buttons. */
+/* The register's row of actions: Edit and Deactivate. Each is a phrase, so
+   neither wraps — a button broken over two lines reads as two buttons. */
 .mrp-table .cell-action .btn-outline,
 .mrp-table .cell-action .btn-edit { white-space: nowrap; }

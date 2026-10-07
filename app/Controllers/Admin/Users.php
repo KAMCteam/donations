@@ -11,7 +11,7 @@ use CodeIgniter\HTTP\ResponseInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * The register, and who may sign into it.
+ * User Management: the register, and who may sign into it.
  *
  * One screen, because it is one job: the people this platform knows about, and
  * everything about them. It was two things in two places — Add MRP in the
@@ -21,11 +21,11 @@ use Psr\Log\LoggerInterface;
  *
  * Three sections, in the order somebody uses them:
  *
- *   - **Add MRP**, unchanged: look a staff number up in the hospital
- *     directory, and register the person it belongs to as a doctor or a
- *     coordinator.
+ *   - **Add MRP**: look a staff number up in the hospital directory, and
+ *     register the person it belongs to as a doctor or a coordinator — with
+ *     the register permission, if they are to have it.
  *   - **Registered MRPs**: everybody registered, with their row to edit,
- *     deactivate, grant the permission on, and reset the password of.
+ *     to deactivate, and to grant the permission on.
  *   - **Login Activity**: every attempt to sign in, read-only.
  *
  * Nothing here deletes a person. A doctor who has left is still the doctor
@@ -51,7 +51,7 @@ class Users extends BaseController
     public function index(): string
     {
         return view('ui/admin_users', [
-            'title'   => 'Admin',
+            'title'   => 'User Management',
             'navPage' => 'admin',
             'organ'   => $this->store->organ(),
             'users'   => $this->store->mrpRegister(),
@@ -72,7 +72,8 @@ class Users extends BaseController
         return $this->back($this->store->addMrp(
             (string) $this->request->getPost('id'),
             (string) $this->request->getPost('name'),
-            (string) $this->request->getPost('kind')
+            (string) $this->request->getPost('kind'),
+            (string) $this->request->getPost('isAdmin') === '1'
         ), 'User added successfully.');
     }
 
@@ -99,12 +100,14 @@ class Users extends BaseController
         ]);
     }
 
-    /** Changes a registered user's ID, name or kind. */
+    /**
+     * Changes a registered user's name or kind — and not their ID, which the
+     * row shows and does not offer. {@see UiStore::updateMrp()} for why.
+     */
     public function update(string $id): RedirectResponse
     {
         $error = $this->store->updateMrp(
             $id,
-            (string) $this->request->getPost('id'),
             (string) $this->request->getPost('name'),
             (string) $this->request->getPost('kind')
         );
@@ -146,41 +149,6 @@ class Users extends BaseController
         return $this->back(
             $this->store->setMrpAdmin($id, $admin),
             $admin ? 'Admin permission granted.' : 'Admin permission removed.'
-        );
-    }
-
-    /**
-     * Sets a new password for somebody, without sending them round the
-     * directory again.
-     *
-     * **The screen and nothing behind it, on purpose.** What is typed here is
-     * read, checked for being there at all, and thrown away: no hash is
-     * written and no account changes. The flow is what is being built — where
-     * the button sits, what it asks, what it says back — so that wiring it is
-     * one method and not a screen.
-     *
-     * It says so on the page as well as here. A screen that looks like it set
-     * a password and did not is worse than no screen, because somebody would
-     * hand the password over and walk away.
-     */
-    public function resetPassword(string $id): RedirectResponse
-    {
-        $person = $this->store->mrpPerson($id);
-
-        if ($person === null) {
-            return $this->back('That user could not be found.', '');
-        }
-
-        $password = (string) $this->request->getPost('password');
-
-        if (trim($password) === '') {
-            return $this->back('Enter the new password, or generate one.', '');
-        }
-
-        return redirect()->to(site_url('admin'))->with(
-            'ui_mrp_saved',
-            'Nothing was changed: setting a password is not connected yet. '
-                . $person['name'] . "'s password is unchanged."
         );
     }
 

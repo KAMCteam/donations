@@ -193,23 +193,89 @@ final class MrpRegisterTest extends CIUnitTestCase
         $this->assertStringContainsString('action="' . site_url('admin/users/' . $id) . '"', $open);
         $this->assertStringContainsString('value="Dr. Typo"', $open);
 
-        $this->post('admin/users/' . $id, ['id' => 'MRP-107', 'name' => 'Dr. Corrected', 'kind' => 'coordinator']);
+        $this->post('admin/users/' . $id, ['name' => 'Dr. Corrected', 'kind' => 'coordinator']);
 
-        $this->seeInDatabase('mrp', ['id' => $id, 'code' => 'MRP-107', 'name' => 'Dr. Corrected', 'kind' => 'coordinator']);
+        $this->seeInDatabase('mrp', ['id' => $id, 'code' => 'MRP-106', 'name' => 'Dr. Corrected', 'kind' => 'coordinator']);
         // Changed to a coordinator, so they are one where records look.
         $this->seeInDatabase('coordinators', ['name' => 'Dr. Corrected']);
     }
 
-    public function testAnEditCannotTakeAnIdSomebodyElseHolds(): void
+    /**
+     * The ID is shown and not offered, and not taken if it is posted anyway.
+     *
+     * It is the hospital's staff number: the directory answers to it, their
+     * sign-in *is* that number, and the login log is a column of them. Editing
+     * it here would rename somebody in this one database — and a typed-in ID
+     * was never a correction so much as a swap for somebody else's. A row
+     * registered against the wrong number is deactivated, and the right one
+     * registered.
+     */
+    public function testAnEditCannotChangeTheId(): void
     {
-        $this->post('admin/users', ['id' => 'MRP-108', 'name' => 'One', 'kind' => 'doctor']);
-        $this->post('admin/users', ['id' => 'MRP-109', 'name' => 'Two', 'kind' => 'doctor']);
-        $id = (int) $this->db->table('mrp')->where('code', 'MRP-109')->get()->getRowArray()['id'];
+        $this->post('admin/users', ['id' => 'MRP-108', 'name' => 'Dr. Fixed', 'kind' => 'doctor']);
+        $id = (int) $this->db->table('mrp')->where('code', 'MRP-108')->get()->getRowArray()['id'];
 
-        $this->post('admin/users/' . $id, ['id' => 'MRP-108', 'name' => 'Two', 'kind' => 'doctor']);
+        // The open row shows the number and has no box to type one into.
+        $open = $this->get('admin?edit=' . $id)->getBody();
+        $this->assertStringContainsString('MRP-108', $open);
+        $this->assertStringNotContainsString('name="id" class="input input--mono" value="MRP-108"', $open);
 
-        $this->seeInDatabase('mrp', ['id' => $id, 'code' => 'MRP-109']);
-        $this->assertStringContainsString('already registered', (string) session('ui_mrp_error'));
+        // Posted anyway — a hand-made form, or an old one — and ignored.
+        $this->post('admin/users/' . $id, ['id' => 'MRP-999', 'name' => 'Dr. Fixed', 'kind' => 'doctor']);
+
+        $this->seeInDatabase('mrp', ['id' => $id, 'code' => 'MRP-108']);
+        $this->dontSeeInDatabase('mrp', ['code' => 'MRP-999']);
+        // Their sign-in still answers to the same number.
+        $this->seeInDatabase('users', ['login_id' => 'MRP-108', 'name' => 'Dr. Fixed']);
+    }
+
+    /**
+     * The permission can be granted as somebody is registered.
+     *
+     * Whether somebody looks after the register is usually known at the moment
+     * they are being added, and granting it afterwards meant adding them,
+     * finding them in the list, opening their row and saving it again.
+     */
+    public function testAddMrpCanGrantTheAdminPermission(): void
+    {
+        $html = $this->get('admin')->getBody();
+        $this->assertStringContainsString('name="isAdmin"', $html);
+
+        $this->post('admin/users', ['id' => 'MRP-111', 'name' => 'Dr. Keeper', 'kind' => 'doctor', 'isAdmin' => '1']);
+        $this->seeInDatabase('users', ['login_id' => 'MRP-111', 'is_admin' => 1, 'role' => 'doctor']);
+
+        // Unticked is the answer for almost everybody, and it is the default.
+        $this->post('admin/users', ['id' => 'MRP-112', 'name' => 'Dr. Ordinary', 'kind' => 'doctor']);
+        $this->seeInDatabase('users', ['login_id' => 'MRP-112', 'is_admin' => 0]);
+    }
+
+    /** And the screen is called what it does. */
+    public function testTheScreenIsCalledUserManagement(): void
+    {
+        $html = $this->get('admin')->getBody();
+
+        $this->assertStringContainsString('>User Management</h1>', $html);
+        // In the sidebar too, so the item and the screen agree.
+        $this->assertMatchesRegularExpression('~nav-item[^>]*>\s*<span class="nav-icon">.*?</span>User Management~s', $html);
+    }
+
+    /** Resetting a password is not something this screen offers. */
+    public function testThereIsNoPasswordResetOnTheScreen(): void
+    {
+        $this->post('admin/users', ['id' => 'MRP-113', 'name' => 'Dr. Nobody', 'kind' => 'doctor']);
+        $id = (int) $this->db->table('mrp')->where('code', 'MRP-113')->get()->getRowArray()['id'];
+
+        $html = $this->get('admin')->getBody();
+
+        $this->assertStringNotContainsString('Reset password', $html);
+        $this->assertStringNotContainsString('Generate a temporary password', $html);
+
+        // And the address behind it is gone, not merely unlinked.
+        try {
+            $this->post('admin/users/' . $id . '/password', ['password' => 'Whatever1']);
+            $this->fail('the password address should not answer any more');
+        } catch (\CodeIgniter\Exceptions\PageNotFoundException) {
+        }
     }
 
     /**

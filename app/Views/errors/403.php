@@ -53,7 +53,7 @@
             </div>
 
             <div class="auth-message-actions">
-                <a class="login-submit" href="<?= esc($homeUrl) ?>">Go to my dashboard</a>
+                <a class="login-submit" href="<?= esc($homeUrl) ?>">Go to the platform</a>
                 <a class="auth-link" href="<?= site_url('logout') ?>">Sign out</a>
             </div>
         </div>

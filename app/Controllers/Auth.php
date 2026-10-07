@@ -30,17 +30,19 @@ use CodeIgniter\HTTP\RedirectResponse;
 class Auth extends BaseController
 {
     /**
-     * Where each role lands. The one place this mapping is written.
+     * Where signing in lands: the platform, at its front door.
      *
-     * Two of them, because there are two roles. An administrator is a doctor
-     * or a coordinator who also looks after the register, so they land where
-     * their own job is and reach the Admin screen from the sidebar — a
-     * dashboard of their own would be a dashboard with no patients on it.
+     * There were two addresses here once, one per role, each a screen saying
+     * who was signed in with a link into the platform underneath. Nobody read
+     * them. Somebody who has just typed their staff number and password knows
+     * who they are, and being told it again before being allowed to start is
+     * a press between them and their work — the platform's own screens have
+     * their name in the corner anyway.
+     *
+     * So both roles land on the programme picker, which is the one thing the
+     * platform does have to ask before it can show anybody a list.
      */
-    public const HOME = [
-        'doctor'      => 'doctor/dashboard',
-        'coordinator' => 'coordinator/dashboard',
-    ];
+    public const HOME = 'organ';
 
     private const BAD_CREDENTIALS = 'Invalid User ID or password';
     private const INACTIVE        = 'Your account is inactive. Please contact the administrator.';
@@ -182,13 +184,15 @@ class Auth extends BaseController
     /**
      * The screen a role lands on.
      *
-     * A role nothing is mapped for falls back to the login screen rather than
-     * to somebody else's dashboard: an unmapped role is a mistake, and the
-     * safe reading of a mistake is that this person has nowhere to be.
+     * Both roles land in the same place, so this is one line — but it is
+     * still asked per role, because a role the system does not know is a
+     * mistake, and the safe reading of a mistake is that this person has
+     * nowhere to be. They go back to the login screen rather than into the
+     * register.
      */
     public static function homeFor(string $role): string
     {
-        return self::HOME[$role] ?? 'login';
+        return in_array($role, UserModel::ROLES, true) ? self::HOME : 'login';
     }
 
     /**

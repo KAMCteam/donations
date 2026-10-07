@@ -123,12 +123,11 @@ Options -Indexes
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Entry point — the login screen, or the dashboard when already signed in |
+| `/` | Entry point — the login screen, or the platform when already signed in |
 | `/login` | Sign in — User ID and password, checked against `users` |
 | `/admin` | The register, and who may sign into it. Admin permission only |
 | `/logout` | Empties the session and returns to the login screen |
-| `/doctor/dashboard`, `/coordinator/dashboard` | Where each role lands |
-| `/organ` | Programme picker (kidney / liver) |
+| `/organ` | Programme picker (kidney / liver) — where signing in lands |
 | `/dashboard` | Programme statistics and high-priority waitlist |
 | `/recipients` | Recipient waitlist, filterable by blood type and status |
 | `/recipients/print` | The filtered waitlist as a printable sheet |
@@ -1335,19 +1334,21 @@ the browser.
 
 #### Two roles, and a permission over both
 
-| Role | Lands on |
-| --- | --- |
-| `doctor` | `/doctor/dashboard` |
-| `coordinator` | `/coordinator/dashboard` |
-
-Both are placeholders and say so: a name, a role and the way out, with a link
-into the platform. The mapping is written once, in `Auth::HOME`.
+Both land in the same place: `/organ`, the programme picker, written once as
+`Auth::HOME`. There were two addresses there for a while, `/doctor/dashboard`
+and `/coordinator/dashboard`, each a screen saying who was signed in with a
+link into the platform underneath — and that is all either of them ever said.
+Somebody who has just typed their staff number and their password knows who
+they are; being told it again, with a button to press before they may start,
+is a step that holds them up and teaches them nothing. The screens are gone,
+the two controllers and the view with them, and signing in opens the platform
+at the one question it does have to ask.
 
 **Admin is not a third role.** Everybody who uses this system is a doctor or a
 coordinator; some of them also look after the register, and `users.is_admin`
-says which. An administrator keeps their own role, lands on their own
-dashboard, and keeps every screen their role already had — what the permission
-adds is on top:
+says which. An administrator keeps their own role, lands where everybody lands,
+and keeps every screen their role already had — what the permission adds is on
+top:
 
 - the **Admin** item in the sidebar, and the screen behind it;
 - the **delete** button on the three lists, which nobody else is shown.
@@ -1366,12 +1367,15 @@ that a guard is read next to the address it guards:
   way out is the screen they are being sent to.
 - **`role:doctor`, `role:doctor,coordinator`** — allowing rather than denying,
   so a role added later is kept out of every screen until somebody writes it
-  down.
+  down. No address carries it at the moment: the two that did were the landing
+  screens. It is kept because a register that grows a screen for one job will
+  want it again, and `AuthTest` puts a route of its own behind it so a guard
+  nothing uses cannot quietly stop working.
 - **`admin`** — the permission, asked of doctors and coordinators alike.
 
-Signed in and refused either way gets a 403 built on the login screen's own
-panel (`app/Views/errors/403.php`), naming their own dashboard as the way out
-and not naming the screen they asked for.
+Signed in and refused gets a 403 built on the login screen's own panel
+(`app/Views/errors/403.php`), naming the way back into the platform and not
+naming the screen they asked for.
 
 Every address in `Config\Routes` but `/login` and `/logout` is inside the
 `auth` group, so a route added to that file later is protected by being there;

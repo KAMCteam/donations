@@ -129,7 +129,7 @@ $filterQuery = static function () use ($btFilter, $statusFilter, $searchQuery): 
                                 'url'    => site_url('recipients/' . rawurlencode($recipient['id']) . '/delete'),
                                 'name'   => $recipient['name'],
                                 'kind'   => 'recipient',
-                                'detail' => 'MRN ' . $recipient['id'] . '. The record and its whole lab workup will be removed. This cannot be undone.',
+                                'detail' => 'MRN ' . $recipient['id'] . '. The record, its whole lab workup and any pair it has already been through will be removed. This cannot be undone.',
                             ], ['saveData' => false]) ?></td>
                         </tr>
                     <?php endforeach; ?>

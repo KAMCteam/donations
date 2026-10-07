@@ -1493,6 +1493,26 @@ so a recipient's MRN cannot be filed as the donor half, neither side can name
 somebody who does not exist, and deleting someone who is half of a pair fails
 loudly instead of quietly dropping the match.
 
+Which leaves the question of what to do about the rows a *past* pair left. The
+restriction does not know about `ended_at` — a row naming a record is a row
+naming a record — so a delete read the table the same flat way, and anybody who
+had ever been in a pair could not be deleted again. A donor delinked a year ago
+was held for ever by a pair that no longer existed, and the refusal named it by
+number, which was nothing anybody could act on. The same rule sorts it out:
+
+- An **open** pair refuses the delete, with a message saying which pair and
+  that unmaking the link keeps both records. Removing somebody out from under a
+  live match is the thing the restriction is there to stop.
+- An **ended** pair goes with the record. A link to a record that is not there
+  is a link to nobody, so `UiStore::forgetEndedLinks()` clears their ended rows
+  just before the delete and the key is satisfied.
+
+The one thing lost is the other side's archive: a dissolved pair shows on the
+recipient's record as its old donor tabs, and deleting that donor takes the tab
+with them, because what the tab showed was that donor. So the question asked
+first says so — *the record, its whole lab workup and any pair it has already
+been through will be removed* — rather than finding out afterwards.
+
 ### `lab_results` has no foreign key on the person
 
 `person_mrn` plus `person_type` identifies the row, because a result belongs to

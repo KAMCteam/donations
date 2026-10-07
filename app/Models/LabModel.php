@@ -34,21 +34,35 @@ class LabModel extends Model
      * programme, and a filter offering "CBC" four times would be asking the
      * same question four ways. Selecting one selects all its rows.
      *
-     * @return list<array{ids: string, name: string}>
+     * Each carries the heading it is listed under, so the filter can be read
+     * the way the workup is — a hundred test names in one alphabetical column
+     * is a list nobody finds anything in. A test that both sheets ask for is
+     * under the heading the first of them gives it; the headings differ in
+     * wording between the two sides ("Immunology tests" and "Immunology"), and
+     * a filter is not the place to argue about that.
+     *
+     * @return list<array{ids: string, name: string, group: string}>
      */
     public function named(): array
     {
-        $rows = $this->db->table('labs')
-            ->select('name, GROUP_CONCAT(id) AS ids', false)
-            ->where('is_active', 1)
-            ->where('person_mrn', null)
-            ->groupBy('name')
-            ->orderBy('name')
+        $rows = $this->db->table('labs l')
+            ->select('l.name, GROUP_CONCAT(l.id) AS ids', false)
+            ->select('MIN(p.sort_order) AS group_order, SUBSTRING_INDEX(GROUP_CONCAT(p.name ORDER BY p.sort_order, p.id), \',\', 1) AS group_name', false)
+            ->join('lab_parents p', 'p.id = l.lab_parent_id', 'left')
+            ->where('l.is_active', 1)
+            ->where('l.person_mrn', null)
+            ->groupBy('l.name')
+            ->orderBy('group_order')
+            ->orderBy('l.name')
             ->get()
             ->getResultArray();
 
         return array_map(
-            static fn (array $row): array => ['ids' => (string) $row['ids'], 'name' => (string) $row['name']],
+            static fn (array $row): array => [
+                'ids'   => (string) $row['ids'],
+                'name'  => (string) $row['name'],
+                'group' => (string) ($row['group_name'] ?? ''),
+            ],
             $rows
         );
     }

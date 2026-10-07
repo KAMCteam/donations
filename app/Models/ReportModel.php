@@ -121,16 +121,51 @@ class ReportModel extends Model
      */
     private function narrow(\CodeIgniter\Database\BaseBuilder $builder, array $f, string $dateColumn, string $type): void
     {
+        $isSelfRecipient = $type === 'recipient';
+
         foreach ([
             'organs'       => 't.organ_code',
             'groups'       => 't.blood_group',
-            'statuses'     => 't.status',
             'mrps'         => 't.mrp_id',
             'coordinators' => 't.coordinator_id',
         ] as $key => $column) {
             if (($f[$key] ?? []) !== []) {
                 $builder->whereIn($column, $f[$key]);
             }
+        }
+
+        // Status, on either of the two things that hold one. Four of the six
+        // words are a person's own and a pair's alike; the other two —
+        // Paired Exchange and Closed — are only ever a pair's, so asking for
+        // one of those and matching `t.status` alone would answer every time
+        // with nothing. A record matches if its own word is asked for, or if
+        // an open pair holding it wears one that is.
+        if (($f['statuses'] ?? []) !== []) {
+            $words = implode(',', array_map(fn (string $s): string => $this->db->escape($s), $f['statuses']));
+
+            $builder->groupStart()
+                ->where('t.status IN (' . $words . ')', null, false)
+                ->orWhere(
+                    'EXISTS (SELECT 1 FROM pairs ps WHERE ps.' . ($isSelfRecipient ? 'recipient_mrn' : 'donor_mrn')
+                    . ' = t.mrn AND ' . PairModel::openSql('ps') . ' AND ps.status IN (' . $words . '))',
+                    null,
+                    false
+                )
+            ->groupEnd();
+        }
+
+        // In a pair, or not in one — an open pair, which is the only kind that
+        // holds anybody. The question a report asks about somebody who is
+        // still waiting, and the one it asks about a case already under way.
+        if (($f['paired'] ?? '') !== '') {
+            $holds = 'SELECT 1 FROM pairs pp WHERE pp.' . ($isSelfRecipient ? 'recipient_mrn' : 'donor_mrn')
+                . ' = t.mrn AND ' . PairModel::openSql('pp');
+
+            $builder->where(
+                ($f['paired'] === 'yes' ? 'EXISTS (' : 'NOT EXISTS (') . $holds . ')',
+                null,
+                false
+            );
         }
 
         // A date range on the day the record joined the register. Either end
@@ -143,19 +178,50 @@ class ReportModel extends Model
             $builder->where($dateColumn . ' <=', $f['to']);
         }
 
-        // Having a test means having a result recorded against it. Asking for
-        // several asks for any of them, which is what a list of checkboxes
-        // reads as.
+        // A test is **completed** when a result is recorded against it that
+        // says something: a row whose status is one of the words the workup
+        // counts, which is every word but the two that mean nobody has looked
+        // yet. Not completed is the other side of the same line, and it has to
+        // be a NOT EXISTS rather than a status test, because the commonest way
+        // of not having completed a test is having no row for it at all.
+        //
+        // Asking for several asks for any of them, which is what a list of
+        // checkboxes reads as: any one of these completed, or any one of these
+        // still outstanding.
         if (($f['labs'] ?? []) !== []) {
-            $ids = implode(',', array_map('intval', $f['labs']));
+            $ids    = implode(',', array_map('intval', $f['labs']));
+            $unsaid = implode(',', array_map(fn (string $s): string => $this->db->escape($s), UiStore::RESULT_UNANSWERED));
 
-            $builder->where(
-                'EXISTS (SELECT 1 FROM lab_results lr WHERE lr.person_mrn = t.mrn'
+            $done = 'SELECT 1 FROM lab_results lr WHERE lr.person_mrn = t.mrn'
                 . ' AND lr.person_type = ' . $this->db->escape($type)
-                . ' AND lr.lab_id IN (' . $ids . '))',
-                null,
-                false
-            );
+                . ' AND lr.lab_id IN (' . $ids . ')'
+                . ' AND lr.status NOT IN (' . $unsaid . ')';
+
+            if (($f['labMode'] ?? 'done') === 'missing') {
+                // Any of the chosen tests this record has not completed. Each
+                // id is asked about on its own, because "none of them done"
+                // and "one of them not done" are different questions and the
+                // checkbox list reads as the second.
+                $builder->where(
+                    // The chosen name is every row the catalogue has under it
+                    // — one per side, one per programme — and only the row on
+                    // this record's own sheet is a test this record has. Asked
+                    // about the others, a kidney recipient would be missing
+                    // the liver sheet's copy of a test they had completed.
+                    'EXISTS (SELECT 1 FROM labs lx WHERE lx.id IN (' . $ids . ')'
+                    . ' AND lx.person_type = ' . $this->db->escape($type)
+                    . ' AND lx.organ_code = t.organ_code'
+                    . ' AND lx.is_active = 1 AND lx.person_mrn IS NULL'
+                    . ' AND NOT EXISTS (SELECT 1 FROM lab_results lr WHERE lr.person_mrn = t.mrn'
+                    . ' AND lr.person_type = ' . $this->db->escape($type)
+                    . ' AND lr.lab_id = lx.id'
+                    . ' AND lr.status NOT IN (' . $unsaid . ')))',
+                    null,
+                    false
+                );
+            } else {
+                $builder->where('EXISTS (' . $done . ')', null, false);
+            }
         }
     }
 

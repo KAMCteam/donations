@@ -104,15 +104,197 @@ final class ReportsTest extends CIUnitTestCase
         $html = $this->get('reports')->getBody();
 
         foreach ([
-            'Record type', 'Organ', 'Blood group', 'Status',
+            'Organ', 'Blood group', 'Status', 'In a pair?',
             'Labs', 'Date', 'Doctor (MRP)', 'Coordinator', 'Columns',
         ] as $label) {
             $this->assertStringContainsString('<span class="filter-title">' . $label . '</span>', $html);
         }
 
-        // Nine filters, nine "All" — the columns one included, because all five
-        // of its options start chosen, which selects the same as none of them.
-        $this->assertSame(9, substr_count($html, '>All</span>'));
+        // Record type is not one of them: it decides the table's columns, so
+        // it is a row of words above the rest rather than a dropdown among
+        // them. {@see testTheRecordTypeIsAskedAboveTheOtherFilters}
+        $this->assertStringNotContainsString('<span class="filter-title">Record type</span>', $html);
+
+        // Eight of the nine buttons read All — the columns one included,
+        // because all five of its options start chosen, which selects the same
+        // as none of them. Organ is the one that does not: it opens on the
+        // programme the session is in.
+        // {@see testTheOrganFilterOpensOnTheSessionsProgramme}
+        $this->assertSame(8, substr_count($html, '<span class="filter-count">All</span>'));
+        $this->assertSame(1, substr_count($html, '<span class="filter-count is-set">1</span>'));
+    }
+
+    /**
+     * Record type is above the other filters and is not one of them.
+     *
+     * It decides which columns the table has — a donor has no entry date, a
+     * recipient has no donor type — so the rest of the filters are read inside
+     * it, and a control that changes the shape of the answer should not have
+     * to be opened to be seen.
+     */
+    public function testTheRecordTypeIsAskedAboveTheOtherFilters(): void
+    {
+        $html = $this->get('reports')->getBody();
+
+        $type = strpos($html, 'class="report-type"');
+        $rest = strpos($html, 'class="report-filter-row"');
+
+        $this->assertIsInt($type);
+        $this->assertIsInt($rest);
+        $this->assertLessThan($rest, $type, 'the record type comes first');
+
+        // Three words, one chosen: both types at once is the mixed table,
+        // which is what All already says.
+        $this->assertSame(3, substr_count($html, 'class="report-type-option'));
+        $this->assertStringContainsString('>All records</span>', $html);
+        $this->assertStringContainsString('report-type-option is-chosen', $html);
+        $this->assertSame(3, substr_count($html, 'type="radio" name="type[]"'));
+    }
+
+    /**
+     * Organ opens on the programme the session is in, not on every one.
+     *
+     * A report is read inside a programme, like every other screen: the
+     * sidebar, the lists and the dashboard are all that programme's. Opening
+     * Reports on both at once answered a question nobody had asked.
+     */
+    public function testTheOrganFilterOpensOnTheSessionsProgramme(): void
+    {
+        $this->db->table('recipients')->insert([
+            'mrn' => '7003', 'name' => 'Liver Report', 'organ_code' => 'liver',
+            'blood_group' => 'A', 'gender' => 'male', 'age' => 50,
+            'status' => 'active', 'entry_date' => '2024-05-05',
+        ]);
+
+        // The session is on kidney, so the liver record is not on the report.
+        $html = $this->get('reports')->getBody();
+        $this->assertStringContainsString('Amal Report', $html);
+        $this->assertStringNotContainsString('Liver Report', $html);
+        // And the button says one is chosen rather than All.
+        $this->assertStringContainsString('<span class="filter-count is-set">1</span>', $html);
+
+        // Asking for the other is asking for the other.
+        $this->assertStringContainsString('Liver Report', $this->get('reports?organ[]=liver')->getBody());
+
+        // And a form that was submitted with none ticked means every one of
+        // them — which is what `applied` is for.
+        $all = $this->get('reports?applied=1')->getBody();
+        $this->assertStringContainsString('Amal Report', $all);
+        $this->assertStringContainsString('Liver Report', $all);
+    }
+
+    /**
+     * In a pair, not in a pair, or not asked.
+     *
+     * An open pair, which is the only kind that holds anybody: the question a
+     * report asks about somebody still waiting, and the one it asks about a
+     * case already under way.
+     */
+    public function testTheReportCanAskWhoIsInAPair(): void
+    {
+        $this->db->table('pairs')->insert([
+            'recipient_mrn' => 7001, 'donor_mrn' => 7101, 'status' => 'active',
+        ]);
+
+        $paired = $this->get('reports?paired=yes')->getBody();
+        $this->assertStringContainsString('Amal Report', $paired);
+        $this->assertStringContainsString('Ziad Report', $paired);
+        $this->assertStringNotContainsString('Badr Report', $paired);
+
+        $alone = $this->get('reports?paired=no')->getBody();
+        $this->assertStringContainsString('Badr Report', $alone);
+        $this->assertStringNotContainsString('Amal Report', $alone);
+
+        // Not asked is everybody, which is where it opens.
+        $this->assertStringContainsString('3 records', $this->get('reports')->getBody());
+    }
+
+    /**
+     * Status offers every word the platform uses, and asks it of both.
+     *
+     * Four of the pair's six are a person's own as well; the other two are
+     * only ever a pair's. A record matches when its own word is asked for, or
+     * when an open pair holding it wears one that is — without which a report
+     * about the cases in a paired exchange could not be asked for at all.
+     */
+    public function testStatusAsksThePairsWordsAsWellAsThePersons(): void
+    {
+        $html = $this->get('reports')->getBody();
+
+        foreach (['On Hold', 'Active', 'Declined', 'Transplanted', 'Paired Exchange', 'Closed'] as $word) {
+            $this->assertStringContainsString('<span>' . $word . '</span>', $html, $word . ' is offered');
+        }
+
+        // A pair's own word finds the two people it holds, whose own records
+        // say Active.
+        $this->db->table('pairs')->insert([
+            'recipient_mrn' => 7001, 'donor_mrn' => 7101, 'status' => 'paired_exchange',
+        ]);
+
+        $exchange = $this->get('reports?status[]=paired_exchange')->getBody();
+        $this->assertStringContainsString('Amal Report', $exchange);
+        $this->assertStringContainsString('Ziad Report', $exchange);
+        $this->assertStringNotContainsString('Badr Report', $exchange);
+
+        // And a person's own word still answers for itself.
+        $held = $this->get('reports?status[]=on_hold')->getBody();
+        $this->assertStringContainsString('Badr Report', $held);
+        $this->assertStringNotContainsString('Amal Report', $held);
+    }
+
+    /**
+     * The Labs filter asks one of two questions of the tests ticked.
+     *
+     * Completed, or not completed — and never both, because a record cannot
+     * have both completed and not completed the same test, so two lists side
+     * by side would be a way of asking for an empty report. Completed is where
+     * it opens, which is the question somebody opening it has.
+     */
+    public function testTheLabsFilterAsksCompletedOrNotCompleted(): void
+    {
+        $ids = (string) $this->db->table('labs')
+            ->selectMax('id')
+            ->select('GROUP_CONCAT(id) AS ids', false)
+            ->where(['name' => 'HIV', 'person_mrn' => null])
+            ->get()->getRowArray()['ids'];
+
+        $hiv = (int) $this->db->table('labs')
+            ->getWhere(['name' => 'HIV', 'person_type' => 'recipient', 'organ_code' => 'kidney'])
+            ->getRowArray()['id'];
+
+        // One recipient has answered it; the other has not.
+        $this->db->table('lab_results')->insert([
+            'person_mrn' => 7001, 'person_type' => 'recipient', 'lab_id' => $hiv, 'status' => 'negative',
+        ]);
+
+        $done = $this->get('reports?lab[]=' . $ids)->getBody();
+        $this->assertStringContainsString('Amal Report', $done);
+        $this->assertStringNotContainsString('Badr Report', $done);
+
+        $missing = $this->get('reports?lab[]=' . $ids . '&labMode=missing')->getBody();
+        $this->assertStringContainsString('Badr Report', $missing);
+        $this->assertStringNotContainsString('Amal Report', $missing);
+
+        // A result that says nobody has looked yet is not a completed test.
+        $this->db->table('lab_results')
+            ->where(['person_mrn' => 7001, 'lab_id' => $hiv])
+            ->update(['status' => 'pending']);
+
+        $this->assertStringNotContainsString('Amal Report', $this->get('reports?lab[]=' . $ids)->getBody());
+        $this->assertStringContainsString('Amal Report', $this->get('reports?lab[]=' . $ids . '&labMode=missing')->getBody());
+    }
+
+    /** And it lists the tests under the headings the workup lists them under. */
+    public function testTheLabsFilterIsGroupedByItsHeadings(): void
+    {
+        $html = $this->get('reports')->getBody();
+
+        $this->assertStringContainsString('class="filter-group-name">Immunology tests</h4>', $html);
+        $this->assertStringContainsString('class="filter-group-name">Infectious workup</h4>', $html);
+        // The two questions, with Completed the one it opens on.
+        $this->assertStringContainsString('filter-mode is-chosen', $html);
+        $this->assertStringContainsString('value="done" checked', $html);
+        $this->assertStringContainsString('>Not completed</span>', $html);
     }
 
     // ---- One filter at a time ----------------------------------------------
@@ -127,6 +309,7 @@ final class ReportsTest extends CIUnitTestCase
             'blood group'  => ['group[]=O', ['Amal Report', 'Ziad Report'], ['Badr Report']],
             'status'       => ['status[]=on_hold', ['Badr Report'], ['Amal Report', 'Ziad Report']],
             'organ'        => ['organ[]=liver', [], ['Amal Report', 'Badr Report', 'Ziad Report']],
+            'in a pair'    => ['paired=no', ['Amal Report', 'Badr Report', 'Ziad Report'], []],
             'doctor'       => ['mrp[]=%d', ['Amal Report'], ['Badr Report', 'Ziad Report']],
             'from'         => ['from=2025-01-01', ['Badr Report'], ['Amal Report', 'Ziad Report']],
             'to'           => ['to=2024-12-31', ['Amal Report', 'Ziad Report'], ['Badr Report']],

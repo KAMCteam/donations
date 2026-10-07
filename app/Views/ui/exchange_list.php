@@ -31,18 +31,22 @@ use App\Libraries\UiStore;
  *
  * @var list<array<string, mixed>> $rows      Joined pairs, already filtered
  * @var string                     $query
- * @var string                     $btFilter  The recipient blood group, or "all"
+ * @var list<string>               $btFilter  The recipient blood groups; empty is all
  * @var bool                       $hasDraft  An exchange already part-built
  * @var string                     $error
  */
 /**
- * Rebuilds the address with the blood type swapped, keeping the search.
+ * Rebuilds the address with one blood-type chip pressed, keeping the search.
  *
- * A filter on its own default drops out, so a plain list has a plain address.
+ * Pressed, not chosen: the chips are a set, so this list can be asked for two
+ * groups at once. `all` empties it, and an empty row drops out of the address,
+ * so a plain list has a plain one.
  */
-$filterUrl = static function (string $value) use ($query): string {
+$filterUrl = static function (string $value) use ($query, $btFilter): string {
+    $chosen = $value === 'all' ? [] : ui_filter_toggle($btFilter, $value, UiStore::BLOOD_TYPES);
+
     $params = array_filter(
-        ['bt' => $value === 'all' ? '' : $value, 'q' => $query],
+        ['bt' => ui_filter_param($chosen), 'q' => $query],
         static fn (string $v): bool => $v !== ''
     );
 
@@ -71,9 +75,9 @@ $headers = ['Pair #', 'Recipient', 'MRN', 'Blood', 'Donor', 'MRN', 'Blood', 'Sta
             <?php // Said in the label, because this row means something else
                   // here than it does on the Pairs List. ?>
             <span class="filter-label filter-label--mr">Recipient blood type:</span>
-            <a class="chip<?= $btFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('all') ?>">All</a>
+            <a class="chip<?= $btFilter === [] ? ' is-active' : '' ?>" href="<?= $filterUrl('all') ?>">All</a>
             <?php foreach (UiStore::BLOOD_TYPES as $bloodType): ?>
-                <a class="chip chip--mono<?= $btFilter === $bloodType ? ' is-active' : '' ?>" href="<?= $filterUrl($bloodType) ?>"><?= esc($bloodType) ?></a>
+                <a class="chip chip--mono<?= in_array($bloodType, $btFilter, true) ? ' is-active' : '' ?>" href="<?= $filterUrl($bloodType) ?>"><?= esc($bloodType) ?></a>
             <?php endforeach; ?>
         </div>
 
@@ -85,7 +89,7 @@ $headers = ['Pair #', 'Recipient', 'MRN', 'Blood', 'Donor', 'MRN', 'Blood', 'Sta
             <div class="filter-row">
                 <span class="filter-label filter-label--mr">File number:</span>
                 <span class="chip is-active"><?= esc($query) ?></span>
-                <a class="stat-link" href="<?= $filterUrl($btFilter) ?>">Clear</a>
+                <a class="stat-link" href="<?= site_url('exchange') . ($btFilter === [] ? '' : '?' . http_build_query(['bt' => ui_filter_param($btFilter)])) ?>">Clear</a>
             </div>
         <?php endif; ?>
     </div>
@@ -93,7 +97,7 @@ $headers = ['Pair #', 'Recipient', 'MRN', 'Blood', 'Donor', 'MRN', 'Blood', 'Sta
     <div class="card card--scroll">
         <?php if ($rows === []): ?>
             <div class="empty-state">
-                <?php if ($btFilter !== 'all' || $query !== ''): ?>
+                <?php if ($btFilter !== [] || $query !== ''): ?>
                     No pairs on the exchange list match these filters.
                 <?php else: ?>
                     <?php // Empty is the normal starting state, so say what fills it. ?>

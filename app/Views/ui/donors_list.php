@@ -28,13 +28,17 @@ $headers = ['Name', 'MRN', 'Age', 'Gender', 'Blood Group', 'Type', 'Labs', 'Stat
  * the URL, so a plain list has a plain address and the chips still say what is
  * being asked for.
  */
-$filterUrl = static function (string $key, string $value) use ($btFilter, $statusFilter, $searchQuery): string {
-    $query = ['bt' => $btFilter, 'status' => $statusFilter];
-    $query[$key] = $value;
+$allowed = ['bt' => UiStore::BLOOD_TYPES, 'status' => array_keys(UiStore::PERSON_STATUS_OPTIONS)];
 
-    // A filter on its own default drops out, so a plain list has a plain
+$filterUrl = static function (string $key, string $value) use ($btFilter, $statusFilter, $searchQuery, $allowed): string {
+    $query = ['bt' => $btFilter, 'status' => $statusFilter];
+    // Pressed, not chosen: a chip goes into the row's set or comes out of it,
+    // so this list can be asked for A and O at once. `all` empties the row.
+    $query[$key] = $value === 'all' ? [] : ui_filter_toggle($query[$key], $value, $allowed[$key]);
+
+    // An empty row narrows nothing, so it drops out: a plain list has a plain
     // address and the chips still say exactly what is being asked for.
-    $query = array_filter($query, static fn (string $v): bool => $v !== 'all');
+    $query = array_filter(array_map('ui_filter_param', $query), static fn (string $v): bool => $v !== '');
 
     // The search above the list is a filter like the chips are, so pressing
     // one keeps it rather than clearing it.
@@ -49,8 +53,8 @@ $filterUrl = static function (string $key, string $value) use ($btFilter, $statu
 // under this one, not a replacement for it.
 $filterQuery = static function () use ($btFilter, $statusFilter, $searchQuery): string {
     $query = array_filter(
-        ['bt' => $btFilter, 'status' => $statusFilter],
-        static fn (string $v): bool => $v !== 'all'
+        ['bt' => ui_filter_param($btFilter), 'status' => ui_filter_param($statusFilter)],
+        static fn (string $v): bool => $v !== ''
     );
 
     if ($searchQuery !== '') {
@@ -82,19 +86,19 @@ $filterQuery = static function () use ($btFilter, $statusFilter, $searchQuery): 
     <div class="filter-stack">
         <div class="filter-row">
             <span class="filter-label filter-label--mr">Blood type:</span>
-            <a class="chip<?= $btFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', 'all') ?>">All</a>
+            <a class="chip<?= $btFilter === [] ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', 'all') ?>">All</a>
             <?php foreach (UiStore::BLOOD_TYPES as $bloodType): ?>
-                <a class="chip chip--mono<?= $btFilter === $bloodType ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', $bloodType) ?>"><?= esc($bloodType) ?></a>
+                <a class="chip chip--mono<?= in_array($bloodType, $btFilter, true) ? ' is-active' : '' ?>" href="<?= $filterUrl('bt', $bloodType) ?>"><?= esc($bloodType) ?></a>
             <?php endforeach; ?>
         </div>
         <div class="filter-row">
             <span class="filter-label filter-label--mr">Status:</span>
-            <a class="chip<?= $statusFilter === 'all' ? ' is-active' : '' ?>" href="<?= $filterUrl('status', 'all') ?>">All</a>
+            <a class="chip<?= $statusFilter === [] ? ' is-active' : '' ?>" href="<?= $filterUrl('status', 'all') ?>">All</a>
             <?php // The three a record is ever set to. The rest of
                   // `STATUS_OPTIONS` belongs to a pair or is retired, so
                   // offering them would be offering empty lists. ?>
             <?php foreach (UiStore::PERSON_STATUS_OPTIONS as $value => $label): ?>
-                <a class="chip<?= $statusFilter === $value ? ' is-active' : '' ?>" href="<?= $filterUrl('status', $value) ?>"><?= esc($label) ?></a>
+                <a class="chip<?= in_array($value, $statusFilter, true) ? ' is-active' : '' ?>" href="<?= $filterUrl('status', $value) ?>"><?= esc($label) ?></a>
             <?php endforeach; ?>
         </div>
     </div>
@@ -104,7 +108,7 @@ $filterQuery = static function () use ($btFilter, $statusFilter, $searchQuery): 
             <?php // One sentence for both filters rather than one about blood
                   // type and silence about the other. ?>
             <div class="empty-state">
-                <?= $btFilter === 'all' && $statusFilter === 'all'
+                <?= $btFilter === [] && $statusFilter === []
                     ? 'No unmatched donors.'
                     : 'No unmatched donors match these filters.' ?>
             </div>

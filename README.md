@@ -184,9 +184,26 @@ reacts to it:
 Navigation, filtering, sorting, opening a card for editing and saving are links
 and form posts, so every screen renders, navigates and submits **with
 JavaScript switched off**. `ui.js`
-is left with the mobile sidebar, the lab cards (status buttons, result editor,
+is left with the sidebar, the lab cards (status buttons, result editor,
 running totals), whole-row click targets, opening the pairing choice as a
 dialog, and the date fields (slashes as you type, and the calendar button).
+
+#### The sidebar closes
+
+On a narrow screen it always did: it slides in over the page with a backdrop
+behind it. It closes on a wide one now as well, and the page takes the width
+back — a register is fifteen columns wide, and the fifteen inches of navigation
+beside it are not what somebody reading one needs.
+
+**Open is the default**, every time, on both. What is remembered is a viewer
+shutting it, kept for the session and nowhere else, so a session that never
+shuts it opens with it open. The X over the logo shuts it and the bar along the
+top brings it back — the same pair of controls the narrow screen has always
+had, which is why the bar is no longer hidden on a wide one.
+
+Both controls live under `.has-js`, a class `initSidebar()` puts on `<html>`:
+this file is what opens and shuts the thing, so with it blocked the wide screen
+keeps the sidebar it always had and nothing on the screen offers to close it.
 
 The result was checked against the design package screen by screen with
 full-page screenshot diffs at 1440px. Login, the programme picker, the pairs
@@ -496,6 +513,28 @@ links, so pressing one keeps the search. Both end up in the address together
 (`?bt=A&q=Dosari`), which the Export PDF button then takes with it, so the
 sheet is what the screen was showing.
 
+### A chip row is a set
+
+Each row — blood type, status — holds **as many chips as are pressed**, written
+in the address as `?bt=A,B`. A chip goes in when it is pressed and comes out
+when it is pressed again; **All** empties the row, and an empty row narrows
+nothing, so it drops out of the address and a plain list has a plain one.
+
+They were one at a time, which made "A and B" a question no list could be
+asked: somebody looking for a donor an AB recipient could take had to read
+three lists and hold the answer in their head. The rows still narrow together,
+so `?bt=A,B&status=active` is two questions at once and means both.
+
+`ui_filter_values()` reads a row off the address, keeping only the values that
+screen offers, so a hand-typed one narrows the list rather than breaking the
+query behind it; `ui_filter_toggle()` is the press. The two registers do it in
+SQL with `whereIn`, so the waiting list is still ordered by its computed score
+in the database rather than in PHP.
+
+The Pairs List is the one with a default that is not "all": it opens on
+**Active**, so `status=all` has to be written out there — leaving the parameter
+off means the default, and an address has to be able to say "every status".
+
 What each screen matches is its own: the two registers match an MRN or a name
 in SQL; the Pairs List and Paired Exchange match either of a pair's people by
 number or name, and the Pairs List matches the pair number as well; Reports
@@ -573,6 +612,26 @@ they post as `pairDetails[<recipient MRN>][…]`. The review is one form around
 the whole summary now — which is why its Back and its close are buttons
 `ui.js` shuts the dialog with rather than little forms of their own: a form
 cannot sit inside another.
+
+#### The donor the chain leaves over
+
+A chain can end on a donor nobody is taking. They are allowed — that is what
+the end of a chain looks like — but not left hanging: it has to be said that
+they go **back to the available donors list**, and until it is, the exchange
+cannot be saved.
+
+There were two answers there, and the other was **Delete from the system**,
+which took the record, its whole workup and every pair row naming it, the one
+the exchange had just closed included. A screen for working out who gives to
+whom is no place for that. The donor is a person on the register who has not
+been matched this time, and the register's own answer for somebody who is not
+available is their **status** — so the review asks for it, per donor, beside
+the name it is about. Active is what it offers first, because a donor on the
+available list who is not Active is available to nobody, and On Hold is the
+true word for one going back who is not to be offered yet.
+
+Deleting a donor is the register's to do, deliberately, from the donor's own
+list, where the question is asked about a record rather than about a chain.
 
 #### Who the chain may offer
 

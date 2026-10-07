@@ -79,33 +79,34 @@ $newPairStatuses = array_diff_key(UiStore::PAIR_STATUS_OPTIONS, ['closed' => '']
 <?php if ($summary['released'] !== []): ?>
     <div class="summary-block">
         <h3 class="summary-heading">Moved to the available donors list <span class="summary-count"><?= count($summary['released']) ?></span></h3>
-        <ul class="summary-list">
+        <?php // Each one with the word they go back on. Closing their pair is
+              // what puts them back on the register; what it cannot say is
+              // whether they are to be matched again straight away. Active is
+              // offered first because a donor on the available list who is not
+              // Active is not available to anybody — and On Hold is the true
+              // word for one who is going back but is not to be offered yet,
+              // which is the case this asks about. Asked here rather than on
+              // the chain, because it is a fact about the donor and not a step
+              // in working the chain out. ?>
+        <ul class="summary-list summary-list--released">
             <?php foreach ($summary['released'] as $donor): ?>
-                <li>
-                    <span class="summary-name"><?= esc($donor['name']) ?></span>
-                    <span class="chip-blood"><?= esc($donor['blood_group']) ?></span>
-                    <span class="summary-meta"><?= esc($donor['mrn']) ?></span>
+                <li class="summary-released">
+                    <div class="summary-released-who">
+                        <span class="summary-name"><?= esc($donor['name']) ?></span>
+                        <span class="chip-blood"><?= esc($donor['blood_group']) ?></span>
+                        <span class="summary-meta"><?= esc($donor['mrn']) ?></span>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="xs-<?= esc($donor['mrn']) ?>">Donor Status</label>
+                        <select id="xs-<?= esc($donor['mrn']) ?>" name="donorStatus[<?= esc($donor['mrn']) ?>]" class="input">
+                            <?php foreach (UiStore::PERSON_STATUS_OPTIONS as $value => $label): ?>
+                                <option value="<?= esc($value) ?>"<?= $value === 'active' ? ' selected' : '' ?>><?= esc($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </li>
             <?php endforeach; ?>
         </ul>
     </div>
 <?php endif; ?>
 
-<?php if ($summary['deleted'] !== []): ?>
-    <div class="summary-block summary-block--danger">
-        <h3 class="summary-heading">Deleted from the system <span class="summary-count"><?= count($summary['deleted']) ?></span></h3>
-        <ul class="summary-list">
-            <?php foreach ($summary['deleted'] as $donor): ?>
-                <li>
-                    <span class="summary-name"><?= esc($donor['name']) ?></span>
-                    <span class="chip-blood"><?= esc($donor['blood_group']) ?></span>
-                    <span class="summary-meta"><?= esc($donor['mrn']) ?></span>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-        <p class="summary-warning">
-            This removes the record, its whole lab workup, and the pair records that name them —
-            including the one this exchange is closing. It cannot be undone.
-        </p>
-    </div>
-<?php endif; ?>

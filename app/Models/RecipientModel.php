@@ -47,7 +47,7 @@ class RecipientModel extends Model
      *
      * @return list<array<string, mixed>>
      */
-    public function waitingList(?string $organCode = null, ?string $bloodGroup = null, ?string $status = null, ?string $query = null): array
+    public function waitingList(?string $organCode = null, string|array|null $bloodGroup = null, string|array|null $status = null, ?string $query = null): array
     {
         $builder = $this->db->table('recipients r')
             ->select('r.*, ' . self::SCORE_CALC, false)
@@ -61,12 +61,12 @@ class RecipientModel extends Model
             $builder->where('r.organ_code', $organCode);
         }
 
-        if ($bloodGroup !== null && $bloodGroup !== '') {
-            $builder->where('r.blood_group', $bloodGroup);
+        if (self::narrowTo($bloodGroup) !== []) {
+            $builder->whereIn('r.blood_group', self::narrowTo($bloodGroup));
         }
 
-        if ($status !== null && $status !== '') {
-            $builder->where('r.status', $status);
+        if (self::narrowTo($status) !== []) {
+            $builder->whereIn('r.status', self::narrowTo($status));
         }
 
         // The search box above the list: an MRN or a name, which are the two
@@ -101,5 +101,22 @@ class RecipientModel extends Model
             ->where('recipient_mrn', $mrn)
             ->where('ended_at', null)
             ->countAllResults() > 0;
+    }
+
+    /**
+     * One value or several, as a chip row asks it.
+     *
+     * The chips are a set now — `?bt=A,O` — so a filter is a list, and `null`
+     * or an empty one narrows nothing. A single string still works, because
+     * the screens that ask for one compatible blood group are asking a
+     * different question from the chips.
+     */
+    private static function narrowTo($value): array
+    {
+        if ($value === null || $value === '' || $value === []) {
+            return [];
+        }
+
+        return is_array($value) ? array_values($value) : [$value];
     }
 }

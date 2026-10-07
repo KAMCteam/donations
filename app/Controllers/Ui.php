@@ -179,11 +179,7 @@ class Ui extends BaseController
             'organ'   => $this->store->organ(),
             // Unpaired only, most urgent first and then by score — all of it in
             // SQL, because the score is computed and PHP cannot sort by it.
-            'recipients' => $this->store->waitingList(
-                $filter === 'all' ? null : $filter,
-                $status === 'all' ? null : $status,
-                $query
-            ),
+            'recipients' => $this->store->waitingList($filter, $status, $query),
             'btFilter'     => $filter,
             'statusFilter' => $status,
             'searchQuery'  => $query,
@@ -202,11 +198,7 @@ class Ui extends BaseController
         $filter = $this->bloodTypeFilter();
         $status = $this->personStatusFilter();
         $query  = $this->listQuery();
-        $rows   = $this->store->waitingList(
-            $filter === 'all' ? null : $filter,
-            $status === 'all' ? null : $status,
-            $query
-        );
+        $rows   = $this->store->waitingList($filter, $status, $query);
 
         $score = static fn (?float $value): string => $value === null ? '' : number_format($value, 1);
 
@@ -264,11 +256,7 @@ class Ui extends BaseController
             'title'    => 'Donors List',
             'navPage'  => 'donors',
             'organ'    => $this->store->organ(),
-            'donors'   => $this->store->availableDonors(
-                $filter === 'all' ? null : $filter,
-                $status === 'all' ? null : $status,
-                $query
-            ),
+            'donors'   => $this->store->availableDonors($filter, $status, $query),
             'btFilter'     => $filter,
             'statusFilter' => $status,
             'searchQuery'  => $query,
@@ -282,11 +270,7 @@ class Ui extends BaseController
         $filter = $this->bloodTypeFilter();
         $status = $this->personStatusFilter();
         $query  = $this->listQuery();
-        $rows   = $this->store->availableDonors(
-            $filter === 'all' ? null : $filter,
-            $status === 'all' ? null : $status,
-            $query
-        );
+        $rows   = $this->store->availableDonors($filter, $status, $query);
 
         return view('ui/register_print', [
             'sheetTitle' => 'Donors List',
@@ -1215,16 +1199,19 @@ class Ui extends BaseController
     }
 
     /** What the chips were narrowed to, for the line under the title. */
-    private function filterSummary(string $btFilter, string $statusFilter, string $search = ''): string
+    private function filterSummary(array $btFilter, array $statusFilter, string $search = ''): string
     {
         $applied = [];
 
-        if ($btFilter !== 'all') {
-            $applied[] = 'Blood type ' . $btFilter;
+        if ($btFilter !== []) {
+            $applied[] = 'Blood type ' . implode(', ', $btFilter);
         }
 
-        if ($statusFilter !== 'all') {
-            $applied[] = UiStore::STATUS_OPTIONS[$statusFilter] ?? $statusFilter;
+        if ($statusFilter !== []) {
+            $applied[] = implode(', ', array_map(
+                static fn (string $key): string => UiStore::STATUS_OPTIONS[$key] ?? $key,
+                $statusFilter
+            ));
         }
 
         if ($search !== '') {
@@ -1235,14 +1222,21 @@ class Ui extends BaseController
     }
 
     /** The filters as a query string, so Back returns to the same view. */
-    private function filterQuery(string $btFilter, string $statusFilter, string $search = ''): string
+    private function filterQuery(array $btFilter, array $statusFilter, string $search = ''): string
     {
         // Each filter drops out of the URL when it is on its own default —
-        // `all` for blood type, Active for status — so the address stays short
-        // and says only what was actually narrowed.
+        // every blood group for one, Active alone for the other — so the
+        // address stays short and says only what was actually narrowed. The
+        // empty status set is not the default here, so it is written out as
+        // `all`: this list starts narrowed, and "no parameter" already means
+        // something else.
+        $status = $statusFilter === [UiStore::PAIRS_DEFAULT_STATUS]
+            ? null
+            : ($statusFilter === [] ? 'all' : ui_filter_param($statusFilter));
+
         $query = array_filter([
-            'bt'     => $btFilter === 'all' ? null : $btFilter,
-            'status' => $statusFilter === UiStore::PAIRS_DEFAULT_STATUS ? null : $statusFilter,
+            'bt'     => $btFilter === [] ? null : ui_filter_param($btFilter),
+            'status' => $status,
             'q'      => $search === '' ? null : $search,
         ], static fn (?string $value): bool => $value !== null);
 
@@ -1261,17 +1255,16 @@ class Ui extends BaseController
         $query    = $this->listQuery();
 
         // No `status` in the query means the screen's own default rather than
-        // everything; `all` is a filter the chips ask for by name.
-        $statusFilter = (string) ($this->request->getGet('status') ?? UiStore::PAIRS_DEFAULT_STATUS);
-
-        if ($statusFilter !== 'all' && ! isset(UiStore::STATUS_OPTIONS[$statusFilter])) {
-            $statusFilter = UiStore::PAIRS_DEFAULT_STATUS;
-        }
+        // everything; `all`, which the All chip writes, is the empty set.
+        $said         = $this->request->getGet('status');
+        $statusFilter = $said === null
+            ? [UiStore::PAIRS_DEFAULT_STATUS]
+            : ui_filter_values($said, array_keys(UiStore::STATUS_OPTIONS));
 
         $rows = [];
 
         foreach ($this->store->pairs() as $pair) {
-            if ($statusFilter !== 'all' && $pair['status'] !== $statusFilter) {
+            if ($statusFilter !== [] && ! in_array($pair['status'], $statusFilter, true)) {
                 continue;
             }
 
@@ -1279,9 +1272,9 @@ class Ui extends BaseController
             $donor     = $this->store->findDonor($pair['donorId']);
 
             // A pair matches a blood type if either side has it, as in the source.
-            if ($btFilter !== 'all'
-                && ($recipient['bloodType'] ?? null) !== $btFilter
-                && ($donor['bloodType'] ?? null) !== $btFilter) {
+            if ($btFilter !== []
+                && ! in_array($recipient['bloodType'] ?? '', $btFilter, true)
+                && ! in_array($donor['bloodType'] ?? '', $btFilter, true)) {
                 continue;
             }
 
@@ -2305,11 +2298,18 @@ class Ui extends BaseController
     }
 
     /** The blood-type chip row, validated against the known types. */
-    private function bloodTypeFilter(): string
+    /**
+     * The blood groups the chips are set to. Empty is all of them.
+     *
+     * A set rather than one value: the chips were one-at-a-time, so "A and O"
+     * was a question the lists could not be asked, and somebody looking for a
+     * donor for an AB recipient had to read three lists to see one answer.
+     *
+     * @return list<string>
+     */
+    private function bloodTypeFilter(): array
     {
-        $filter = (string) ($this->request->getGet('bt') ?? 'all');
-
-        return in_array($filter, UiStore::BLOOD_TYPES, true) ? $filter : 'all';
+        return ui_filter_values($this->request->getGet('bt'), UiStore::BLOOD_TYPES);
     }
 
     /** What the search box above a list is asking for, trimmed. */
@@ -2319,16 +2319,19 @@ class Ui extends BaseController
     }
 
     /** What the two registers' chips were narrowed to, for the sheet's meta line. */
-    private function registerFilterSummary(string $bloodType, string $status, string $search = ''): string
+    private function registerFilterSummary(array $bloodType, array $status, string $search = ''): string
     {
         $applied = [];
 
-        if ($bloodType !== 'all') {
-            $applied[] = 'Blood type ' . $bloodType;
+        if ($bloodType !== []) {
+            $applied[] = 'Blood type ' . implode(', ', $bloodType);
         }
 
-        if ($status !== 'all') {
-            $applied[] = UiStore::PERSON_STATUS_OPTIONS[$status] ?? $status;
+        if ($status !== []) {
+            $applied[] = implode(', ', array_map(
+                static fn (string $key): string => UiStore::PERSON_STATUS_OPTIONS[$key] ?? $key,
+                $status
+            ));
         }
 
         if ($search !== '') {
@@ -2339,11 +2342,11 @@ class Ui extends BaseController
     }
 
     /** The same ones as a query string, so Back returns to the same list. */
-    private function registerFilterQuery(string $bloodType, string $status, string $search = ''): string
+    private function registerFilterQuery(array $bloodType, array $status, string $search = ''): string
     {
         $query = array_filter([
-            'bt'     => $bloodType === 'all' ? '' : $bloodType,
-            'status' => $status === 'all' ? '' : $status,
+            'bt'     => ui_filter_param($bloodType),
+            'status' => ui_filter_param($status),
             'q'      => $search,
         ], static fn (string $value): bool => $value !== '');
 
@@ -2351,17 +2354,20 @@ class Ui extends BaseController
     }
 
     /**
-     * Which status the two registers are being narrowed to, or `all`.
+     * The statuses the chips are set to, on the two registers. Empty is all.
      *
-     * The three a record is ever set to, and `all` for anything else — a
-     * hand-edited address asking for a status nobody can choose would
-     * otherwise return an empty list and look like a bug.
+     * Only the ones a record is ever set to survive: a hand-edited address
+     * asking for a status nobody can choose would otherwise return an empty
+     * list and look like a bug.
+     *
+     * @return list<string>
      */
-    private function personStatusFilter(): string
+    private function personStatusFilter(): array
     {
-        $filter = (string) ($this->request->getGet('status') ?? 'all');
-
-        return isset(UiStore::PERSON_STATUS_OPTIONS[$filter]) ? $filter : 'all';
+        return ui_filter_values(
+            $this->request->getGet('status'),
+            array_keys(UiStore::PERSON_STATUS_OPTIONS)
+        );
     }
 
     /**

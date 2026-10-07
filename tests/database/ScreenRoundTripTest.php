@@ -4440,7 +4440,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $this->assertStringContainsString('data-lab-status="seen"', $view);
         $this->assertStringContainsString('data-lab-tone="tone-emerald"', $view);
         $this->assertStringContainsString('data-lab-status="not_seen" data-lab-tone="tone-emerald"', $view);
-        $this->assertStringNotContainsString('What this test answers', $view);
+        $this->assertStringNotContainsString('What this test result offers', $view);
         // Every answer carries the colour it was given, ready for when it is
         // pressed — the stylesheet keeps an unchosen chip white, and the class
         // is what it wears once it is the answer.
@@ -4451,7 +4451,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
 
         // Editing brings the picker back with the choices still on it.
         $edit = $this->get('recipients/4081?edit=labs')->getBody();
-        $this->assertStringContainsString('What this test answers', $edit);
+        $this->assertStringContainsString('What this test result offers', $edit);
         // The index is wherever the custom test falls in the workup, which is
         // after everything the check list asks for.
         $this->assertStringContainsString('[answers][seen][on]" value="1" checked', $edit);
@@ -4583,7 +4583,7 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         $html = $this->get('recipients/4091?edit=labs')->getBody();
 
         $this->assertStringContainsString('Blood group', $html);
-        $this->assertStringNotContainsString('What this test answers', $html);
+        $this->assertStringNotContainsString('What this test result offers', $html);
     }
 
     /** One record's test is not on anybody else's sheet. */

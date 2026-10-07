@@ -2438,6 +2438,69 @@ final class ScreenRoundTripTest extends CIUnitTestCase
         );
     }
 
+    /**
+     * A pair that has ended does not hold anybody back any more.
+     *
+     * The refusal above reads the pairs table, and for a while it read the
+     * whole of it: any row naming somebody was enough to keep their record
+     * for ever, so a donor delinked a year ago could not be deleted at all
+     * and the message named a pair that no longer existed. Only an open pair
+     * is a reason; an ended one is history, and goes with the record.
+     */
+    public function testSomebodyWhosePairHasEndedIsDeleted(): void
+    {
+        [$pairId] = $this->pairWith('9213', '9214', 'Donor Five');
+        [$link]   = $this->pairLinks(9213);
+
+        $this->post('pairs/' . $pairId . '/donors/' . $link . '/delink', ['outcome' => 'dissolve']);
+        $this->seeInDatabase('pairs', ['id' => $pairId, 'recipient_mrn' => 9213]);
+
+        $this->post('donors/9214/delete')->assertRedirectTo(site_url('donors'));
+
+        $this->dontSeeInDatabase('donors', ['mrn' => 9214]);
+        // The ended link went with them: a link to a record that is not
+        // there is a link to nobody, and the foreign key would block the
+        // delete otherwise.
+        $this->dontSeeInDatabase('pairs', ['id' => $pairId]);
+        // And the one on the other side of it is untouched.
+        $this->seeInDatabase('recipients', ['mrn' => 9213]);
+        $this->assertSame('', (string) session()->getFlashdata('ui_error'));
+    }
+
+    /** The same from the other end, and with the workup going too. */
+    public function testTheRecipientOfAnEndedPairIsDeletedWithTheirWorkup(): void
+    {
+        [$pairId] = $this->pairWith('9215', '9216', 'Donor Six');
+        [$link]   = $this->pairLinks(9215);
+
+        $lab = $this->db->table('labs')
+            ->where(['organ_code' => 'kidney', 'person_type' => 'recipient', 'name' => 'HIV'])
+            ->get()->getRowArray();
+        $this->post('pairs/' . $pairId, [
+            'section' => 'labs',
+            'labs'    => [['id' => $lab['id'], 'name' => 'HIV', 'status' => 'negative']],
+        ]);
+
+        $this->post('pairs/' . $pairId . '/donors/' . $link . '/delink', ['outcome' => 'dissolve']);
+        $this->post('recipients/9215/delete')->assertRedirectTo(site_url('recipients'));
+
+        $this->dontSeeInDatabase('recipients', ['mrn' => 9215]);
+        $this->dontSeeInDatabase('pairs', ['id' => $pairId]);
+        $this->dontSeeInDatabase('lab_results', ['person_mrn' => 9215, 'person_type' => 'recipient']);
+        $this->seeInDatabase('donors', ['mrn' => 9216]);
+    }
+
+    /** And the question asked first says the old link goes. */
+    public function testTheDeleteQuestionSaysThePastPairGoesToo(): void
+    {
+        $this->post('donors/new', ['mrn' => '9217', 'name' => 'Donor Seven', 'age' => '30', 'bloodType' => 'A']);
+
+        $this->assertStringContainsString(
+            'any pair it has already been through will be removed',
+            $this->get('donors')->getBody()
+        );
+    }
+
     /** A record on the other programme is not this programme's to delete. */
     public function testARecordFromAnotherProgrammeIsNotDeleted(): void
     {

@@ -656,9 +656,15 @@ final class UiStore
      * standing in for the ON DELETE CASCADE that `lab_results.person_mrn`
      * cannot have, since it points at either register depending on the row.
      *
-     * A recipient held by a pair is refused rather than deleted. Removing them
-     * would leave the pair naming a patient who is not there — the foreign key
-     * would block it anyway, and a message says so better than an SQL error.
+     * A recipient held by an **open** pair is refused rather than deleted:
+     * removing them would leave that pair naming a patient who is not there,
+     * the foreign key would block it anyway, and a message says so better
+     * than an SQL error.
+     *
+     * A pair they were in and are not any more does not stand in the way. It
+     * goes with them — a link to a record that is not there is a link to
+     * nobody — and the question asked before the delete says so, because the
+     * donor on the other side of it loses it from their record's archive.
      *
      * @return string An empty string when it is done, else why it was not
      */
@@ -670,12 +676,13 @@ final class UiStore
             return 'That recipient is not on this programme.';
         }
 
-        $pair = $this->anyPairFor('recipient_mrn', (int) $row['mrn']);
+        $pair = $this->openPairHolding('recipient_mrn', (int) $row['mrn']);
 
         if ($pair !== null) {
             return $this->heldByAPair($row['name'], $pair);
         }
 
+        $this->forgetEndedLinks('recipient_mrn', (int) $row['mrn']);
         $this->recipients->delete($row['mrn']);
 
         return '';
@@ -690,12 +697,13 @@ final class UiStore
             return 'That donor is not on this programme.';
         }
 
-        $pair = $this->anyPairFor('donor_mrn', (int) $row['mrn']);
+        $pair = $this->openPairHolding('donor_mrn', (int) $row['mrn']);
 
         if ($pair !== null) {
             return $this->heldByAPair($row['name'], $pair);
         }
 
+        $this->forgetEndedLinks('donor_mrn', (int) $row['mrn']);
         $this->donors->delete($row['mrn']);
 
         return '';
@@ -767,10 +775,39 @@ final class UiStore
         return '';
     }
 
-    /** Any pair naming this person, open or closed — a row is a row. */
-    private function anyPairFor(string $column, int $mrn): ?array
+    /**
+     * The open pair holding this person, if one is — by column, for a delete.
+     *
+     * Open, and not merely any row naming them: a pair that has ended is
+     * history and not a thing standing in the way. Deleting somebody who was
+     * in one used to be refused outright, which left a donor delinked a year
+     * ago undeletable for ever with no way out but deleting the old pair by
+     * hand first.
+     *
+     * Named apart from {@see self::openPairFor()}, which asks the same
+     * question of a person type for the screens that link people up.
+     */
+    private function openPairHolding(string $column, int $mrn): ?array
     {
-        return $this->pairs->where($column, $mrn)->orderBy('id')->first();
+        return $this->pairs->where($column, $mrn)->where('ended_at', null)->orderBy('id')->first();
+    }
+
+    /**
+     * The ended links naming this person, taken off with them.
+     *
+     * A pair row names two people and points at both registers, so a record
+     * cannot go while a row still names it — the foreign keys say so, and
+     * they are right to. Their ended links are part of what is being deleted:
+     * a link to a record that is not there any more is a link to nobody.
+     *
+     * This is the part of a delete worth hesitating over, and it is why the
+     * question says so before it is answered. The other side of an ended link
+     * loses it from their record's archive, because what that archive showed
+     * was this person.
+     */
+    private function forgetEndedLinks(string $column, int $mrn): void
+    {
+        $this->pairs->where($column, $mrn)->where('ended_at !=', null)->delete();
     }
 
     private function heldByAPair(string $name, array $pair): string
